@@ -46,7 +46,8 @@ export class Processor {
     core.startGroup(`🚀 Import test reports`)
 
     // construct search params
-    let searchParams: any = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const searchParams: any = {
       testExecKey: this.importOptions.testExecKey,
       projectKey: this.importOptions.projectKey
     }

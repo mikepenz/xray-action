@@ -1,9 +1,8 @@
-import { Processor } from '../src/processor';
-
+import {Processor} from '../src/processor'
 
 test('import test results', async () => {
   jest.setTimeout(180000)
-  
+
   /*
   await new Processor(
     {

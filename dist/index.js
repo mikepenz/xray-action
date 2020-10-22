@@ -6696,6 +6696,7 @@ class Processor {
             core.endGroup();
             core.startGroup(`🚀 Import test reports`);
             // construct search params
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const searchParams = {
                 testExecKey: this.importOptions.testExecKey,
                 projectKey: this.importOptions.projectKey
