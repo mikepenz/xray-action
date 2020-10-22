@@ -1,6 +1,9 @@
 name: 'xray-action'
 description: 'GitHub action, reading in JUnit test results, and importing them into Jira-Xray'
 author: 'Mike Penz'
+branding:
+  icon: 'check-circle'  
+  color: 'green'
 inputs:
   username:
     required: true
