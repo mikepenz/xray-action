@@ -1,8 +1,8 @@
 {
-  "name": "typescript-action",
+  "name": "xray-action",
   "version": "0.0.0",
   "private": true,
-  "description": "TypeScript template action",
+  "description": "GitHub action, reading in JUnit test results, and importing them into Jira-Xray",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -15,17 +15,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/mikepenz/xray-action.git"
   },
   "keywords": [
     "actions",
-    "node",
-    "setup"
+    "xray",
+    "junit"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Mike Penz",
+  "license": "Apache2.0",
   "dependencies": {
-    "@actions/core": "^1.2.6"
+    "@actions/core": "^1.2.6",
+    "jira-client": "^6.21.1"
   },
   "devDependencies": {
     "@types/jest": "^26.0.10",

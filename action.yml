@@ -1,11 +1,19 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'xray-action'
+description: 'GitHub action, reading in JUnit test results, and importing them into Jira-Xray'
+author: 'Mike Penz'
 inputs:
-  milliseconds: # change this
+  host:
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+    description: 'The JIRA host to do the API request to'
+  username:
+    required: true
+    description: 'The user to log in with'
+  password:
+    required: true
+    description: 'The password to use to login with'
+  xrayVersion:
+    required: false
+    description: '1.0'
 runs:
   using: 'node12'
   main: 'dist/index.js'
