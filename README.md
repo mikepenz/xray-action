@@ -1,103 +1,64 @@
+<div align="center">
+  :octocat:
+</div>
+<h1 align="center">
+  xray-action
+</h1>
+
 <p align="center">
-  <a href="https://github.com/actions/typescript-action/actions"><img alt="typescript-action status" src="https://github.com/actions/typescript-action/workflows/build-test/badge.svg"></a>
+    ... imports JUnit test results using xray for jira
 </p>
 
-# Create a JavaScript Action using TypeScript
+<div align="center">
+  <a href="https://github.com/mikepenz/xray-action/actions">
+		<img src="https://github.com/mikepenz/xray-action/workflows/CI/badge.svg"/>
+	</a>
+</div>
+<br />
 
-Use this template to bootstrap the creation of a TypeScript action.:rocket:
+-------
 
-This template includes compilation support, tests, a validation workflow, publishing, and versioning guidance.  
+## Setup
 
-If you are new, there's also a simpler introduction.  See the [Hello World JavaScript Action](https://github.com/actions/hello-world-javascript-action)
+### Configure the workflow
 
-## Create an action from this template
+Specify the action as part of your GitHub actions workflow:
 
-Click the `Use this Template` and provide the new repo details for your action
-
-## Code in Main
-
-Install the dependencies  
-```bash
-$ npm install
+```yml
+- name: "Import files"
+  uses: mikepenz/xray-action@{latest-release}
+  with:
+    username: "username to xray"
+    password: "password to xray"
+    testPaths: "glob retrieving junit xml files"
+    testExecKey: ""
+    projectKey: ""
+    # testPlanKey: ""
+    # testEnvironments: ""
+    # revision: ""
+    # fixVersion: ""
+    # failOnImportError: ""
+    # continueOnImportError: ""
 ```
 
-Build the typescript and package it for distribution
-```bash
-$ npm run build && npm run package
-```
+## Developed By
 
-Run the tests :heavy_check_mark:  
-```bash
-$ npm test
+* Mike Penz
+ * [mikepenz.com](http://mikepenz.com) - <mikepenz@gmail.com>
+ * [paypal.me/mikepenz](http://paypal.me/mikepenz)
 
- PASS  ./index.test.js
-  ✓ throws invalid number (3ms)
-  ✓ wait 500 ms (504ms)
-  ✓ test runs (95ms)
+## License
 
-...
-```
+    Copyright 2020 Mike Penz
 
-## Change action.yml
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
-The action.yml contains defines the inputs and output for your action.
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Update the action.yml with your name, description, inputs and outputs for your action.
-
-See the [documentation](https://help.github.com/en/articles/metadata-syntax-for-github-actions)
-
-## Change the Code
-
-Most toolkit and CI/CD operations involve async operations so the action is run in an async function.
-
-```javascript
-import * as core from '@actions/core';
-...
-
-async function run() {
-  try { 
-      ...
-  } 
-  catch (error) {
-    core.setFailed(error.message);
-  }
-}
-
-run()
-```
-
-See the [toolkit documentation](https://github.com/actions/toolkit/blob/master/README.md#packages) for the various packages.
-
-## Publish to a distribution branch
-
-Actions are run from GitHub repos so we will checkin the packed dist folder. 
-
-Then run [ncc](https://github.com/zeit/ncc) and push the results:
-```bash
-$ npm run package
-$ git add dist
-$ git commit -a -m "prod dependencies"
-$ git push origin releases/v1
-```
-
-Note: We recommend using the `--license` option for ncc, which will create a license file for all of the production node modules used in your project.
-
-Your action is now published! :rocket: 
-
-See the [versioning documentation](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md)
-
-## Validate
-
-You can now validate the action by referencing `./` in a workflow in your repo (see [test.yml](.github/workflows/test.yml))
-
-```yaml
-uses: ./
-with:
-  milliseconds: 1000
-```
-
-See the [actions tab](https://github.com/actions/typescript-action/actions) for runs of this action! :rocket:
-
-## Usage:
-
-After testing you can [create a v1 tag](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md) to reference the stable and latest V1 action
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
