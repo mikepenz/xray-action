@@ -1,16 +1,40 @@
 import * as core from '@actions/core'
-import {wait} from './wait'
+import {Processor} from './processor'
 
 async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
-    core.debug(`Waiting ${ms} milliseconds ...`) // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
+    const username: string = core.getInput('username')
+    const password: string = core.getInput('password')
 
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    const testPaths: string = core.getInput('testPaths')
+    const testExecKey: string = core.getInput('testExecKey')
+    const projectKey: string = core.getInput('projectKey')
+    const testPlanKey: string = core.getInput('testPlanKey')
+    const testEnvironments: string = core.getInput('testEnvironments')
+    const revision: string = core.getInput('revision')
+    const fixVersion: string = core.getInput('fixVersion')
+    const failOnImportError: boolean =
+      core.getInput('failOnImportError') === 'true'
+    const continueOnImportError: boolean =
+      core.getInput('continueOnImportError') === 'true'
 
-    core.setOutput('time', new Date().toTimeString())
+    await new Processor(
+      {
+        username,
+        password
+      },
+      {
+        testPaths,
+        testExecKey,
+        projectKey,
+        testPlanKey,
+        testEnvironments,
+        revision,
+        fixVersion,
+        failOnImportError,
+        continueOnImportError
+      }
+    ).process()
   } catch (error) {
     core.setFailed(error.message)
   }
