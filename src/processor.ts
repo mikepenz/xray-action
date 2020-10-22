@@ -46,7 +46,7 @@ export class Processor {
     core.startGroup(`🚀 Import test reports`)
 
     // construct search params
-    const searchParams = {
+    let searchParams: any = {
       testExecKey: this.importOptions.testExecKey,
       projectKey: this.importOptions.projectKey
     }
