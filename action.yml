@@ -2,18 +2,33 @@ name: 'xray-action'
 description: 'GitHub action, reading in JUnit test results, and importing them into Jira-Xray'
 author: 'Mike Penz'
 inputs:
-  host:
-    required: true
-    description: 'The JIRA host to do the API request to'
   username:
     required: true
     description: 'The user to log in with'
   password:
     required: true
     description: 'The password to use to login with'
-  xrayVersion:
+  testPaths:
+    required: true
+    description: 'The path to the test results in glob format'
+  testExecKey:
+    required: true
+  projectKey:
+    required: true
+  testPlanKey:
     required: false
-    description: '1.0'
+  testEnvironments:
+    required: false
+  revision:
+    required: false
+  fixVersion:
+    required: false
+  failOnImportError:
+    required: true
+    default: "false"
+  continueOnImportError:
+    required: true
+    default: "true"
 runs:
   using: 'node12'
   main: 'dist/index.js'
