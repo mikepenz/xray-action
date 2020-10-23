@@ -44,6 +44,11 @@ inputs:
     description: 'Defines if the action should continue after a single import error occurred.'
     required: true
     default: "true"
+outputs:
+  count:
+    description: 'The count of imported files.'
+  failed:
+    description: 'The count of failed imports.'
 runs:
   using: 'node12'
   main: 'dist/index.js'

@@ -70,6 +70,9 @@ export class Processor {
 
     core.info(`ℹ️ Processed ${count} elements. Failed to import: ${failed}`)
 
+    core.setOutput('count', count)
+    core.setOutput('failed', failed)
+    
     if (failed > 0 && this.importOptions.failOnImportError) {
       core.setFailed(`🔥 ${failed} failed imports detected`)
     }
