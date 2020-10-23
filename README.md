@@ -30,17 +30,16 @@ Specify the action as part of your GitHub actions workflow:
   with:
     username: "username to xray cloud"
     password: "password to xray cloud"
-    testFormat: ""
-    testPaths: "glob retrieving the test result paths"
-    testExecKey: ""
-    projectKey: ""
-    # testPlanKey: ""
-    # testEnvironments: ""
-    # revision: ""
-    # fixVersion: ""
-    # failOnImportError: ""
-    # continueOnImportError: ""
+    testFormat: "junit"
+    testPaths: "**/test/*.xml"
+    testExecKey: "TEST-1"
+    projectKey: "TEST"
 ```
+
+## Xray
+
+- [Xray](https://docs.getxray.app/site/xray) website
+- Currently supporting all (non multipart) requests according to [Xray REST API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-xUnitXMLresults)
 
 ## Developed By
 
