@@ -61,6 +61,23 @@ Specify the action as part of your GitHub actions workflow:
 | `failOnImportError`     | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError` | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 
+### Action outputs
+
+After action execution it will return helpful information.
+
+```yml
+# ${{steps.{XRAY_STEP_ID}.outputs.count}}
+${{steps.xray.outputs.count}}
+```
+
+A full set list of possible output values for this action.
+
+
+| **Output** | **Description**              |
+|------------|------------------------------|
+| count      | The count of imported files. |
+| failed     | The count of failed imports. |
+
 ## Contribute 🧬
 
 ```bash
@@ -71,6 +88,9 @@ $ npm install
 $ npm run build && npm run package
 
 # Run the tests, use to debug, and test it out
+# Please note you have to uncomment the test
+# Provide your xray instance username and password
+# And then execute the test:
 $ npm test
 
 # Verify lint is happy
