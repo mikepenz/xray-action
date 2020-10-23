@@ -6,7 +6,7 @@
 </h1>
 
 <p align="center">
-    ... imports JUnit test results using xray for jira
+    ... a GitHub action to import test results into "Xray" - A complete Test Management tool for Jira.
 </p>
 
 <div align="center">
@@ -28,9 +28,10 @@ Specify the action as part of your GitHub actions workflow:
 - name: "Import files"
   uses: mikepenz/xray-action@{latest-release}
   with:
-    username: "username to xray"
-    password: "password to xray"
-    testPaths: "glob retrieving junit xml files"
+    username: "username to xray cloud"
+    password: "password to xray cloud"
+    testFormat: ""
+    testPaths: "glob retrieving the test result paths"
     testExecKey: ""
     projectKey: ""
     # testPlanKey: ""

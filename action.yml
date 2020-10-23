@@ -1,5 +1,5 @@
 name: 'xray-action'
-description: 'GitHub action, reading in JUnit test results, and importing them into Jira-Xray'
+description: 'GitHub action to import test results into "Xray" - A complete Test Management tool for Jira.'
 author: 'Mike Penz'
 branding:
   icon: 'check-circle'  
@@ -7,29 +7,41 @@ branding:
 inputs:
   username:
     required: true
-    description: 'The user to log in with'
+    description: 'The username to login to xray cloud'
   password:
     required: true
-    description: 'The password to use to login with'
+    description: 'The password to login to xray cloud'
   testPaths:
     required: true
-    description: 'The path to the test results in glob format'
+    description: 'A `glob` pattern, to find all test results which should get imported'
+    default: "**/test-results/test/TEST-*.xml"
+  testFormat:
+    description: 'The format of the to be imported data. ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]'
+    default: "junit"
   testExecKey:
+    description: 'Key of the Test Execution'
     required: true
   projectKey:
+    description: 'Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created.'
     required: true
   testPlanKey:
+    description: 'Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.'
     required: false
   testEnvironments:
+    description: 'A string containing a list of test environments separated by ";"'
     required: false
   revision:
+    description: 'Source code and documentation version used in the test execution.'
     required: false
   fixVersion:
+    description: 'The Fix Version associated with the test execution (it supports only one value).'
     required: false
   failOnImportError:
+    description: 'Defines if the action should fail if a import error occurred.'
     required: true
     default: "false"
   continueOnImportError:
+    description: 'Defines if the action should continue after a single import error occurred.'
     required: true
     default: "true"
 runs:
