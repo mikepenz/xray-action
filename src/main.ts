@@ -7,6 +7,7 @@ async function run(): Promise<void> {
     const password: string = core.getInput('password')
 
     const testPaths: string = core.getInput('testPaths')
+    const testFormat: string = core.getInput('testExecKey')
     const testExecKey: string = core.getInput('testExecKey')
     const projectKey: string = core.getInput('projectKey')
     const testPlanKey: string = core.getInput('testPlanKey')
@@ -24,6 +25,7 @@ async function run(): Promise<void> {
         password
       },
       {
+        testFormat,
         testPaths,
         testExecKey,
         projectKey,

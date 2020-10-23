@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import * as fs from 'fs'
-import got from 'got'
+import {Xray} from './xray'
 
 export interface XrayOptions {
   username: string
@@ -9,6 +9,7 @@ export interface XrayOptions {
 }
 
 export interface ImportOptions {
+  testFormat: string
   testPaths: string
   testExecKey: string
   projectKey: string
@@ -29,40 +30,18 @@ export class Processor {
   async process(): Promise<void> {
     core.startGroup(`🚀 Connect to jira`)
 
-    const xrayBaseUrl = 'https://xray.cloud.xpand-it.com'
-    const authenticateResponse = await got.post<String>(
-      `${xrayBaseUrl}/api/v1/authenticate`,
-      {
-        json: {
-          client_id: `${this.xrayOptions.username}`,
-          client_secret: `${this.xrayOptions.password}`
-        },
-        responseType: 'json'
-      }
-    )
-    const token = authenticateResponse.body
+    const xray = new Xray(this.xrayOptions, this.importOptions)
+    core.info('ℹ️ Start logging in procedure to xray')
+    try {
+      await xray.auth()
+      core.info('ℹ️ Completed login and retrieved token')
+    } catch (error) {
+      core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`)
+      return
+    }
 
     core.endGroup()
-    core.startGroup(`🚀 Import test reports`)
-
-    // construct search params
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const searchParams: any = {
-      testExecKey: this.importOptions.testExecKey,
-      projectKey: this.importOptions.projectKey
-    }
-    if (this.importOptions.testPlanKey) {
-      searchParams['testPlanKey'] = this.importOptions.testPlanKey
-    }
-    if (this.importOptions.testEnvironments) {
-      searchParams['testEnvironments'] = this.importOptions.testEnvironments
-    }
-    if (this.importOptions.revision) {
-      searchParams['revision'] = this.importOptions.revision
-    }
-    if (this.importOptions.fixVersion) {
-      searchParams['fixVersion'] = this.importOptions.fixVersion
-    }
+    core.startGroup(`📝 Import test reports`)
 
     let count = 0
     let failed = 0
@@ -70,27 +49,17 @@ export class Processor {
       followSymbolicLinks: false
     })
 
+    core.info(`ℹ️ Importing from: ${this.importOptions.testPaths}`)
+    core.info(`ℹ️ Importing using format: ${this.importOptions.testFormat}`)
+
     for await (const file of globber.globGenerator()) {
       core.debug(`Try to import: ${file}`)
       count++
       try {
-        const data = await fs.promises.readFile(file)
-        const importResponse = await got.post<String>(
-          `${xrayBaseUrl}/api/v1/import/execution/junit`,
-          {
-            searchParams,
-            headers: {
-              'Content-Type': 'text/xml',
-              Authorization: `Bearer ${token}`
-            },
-            body: data,
-            responseType: 'json'
-          }
-        )
-
-        core.info(`Imported: ${file} to ${importResponse.body.toString()}`)
+        const result = await xray.import(await fs.promises.readFile(file))
+        core.info(`ℹ️ Imported: ${file} to ${result.toString()}`)
       } catch (error) {
-        core.warning(`Failed to import: ${file}`)
+        core.warning(`🔥 Failed to import: ${file}`)
         failed++
 
         if (!this.importOptions.continueOnImportError) {
@@ -99,10 +68,10 @@ export class Processor {
       }
     }
 
-    core.info(`Processed ${count} elements. Failed to import: ${failed}`)
+    core.info(`ℹ️ Processed ${count} elements. Failed to import: ${failed}`)
 
     if (failed > 0 && this.importOptions.failOnImportError) {
-      core.setFailed(`${failed} Failed imports detected`)
+      core.setFailed(`🔥 ${failed} failed imports detected`)
     }
     core.endGroup()
   }

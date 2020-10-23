@@ -1,8 +1,8 @@
 {
   "name": "xray-action",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "GitHub action, reading in JUnit test results, and importing them into Jira-Xray",
+  "description": "GitHub action to import test results into 'Xray' - A complete Test Management tool for Jira.",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -20,7 +20,14 @@
   "keywords": [
     "actions",
     "xray",
-    "junit"
+    "junit",
+    "cucumber", 
+    "behave", 
+    "testng", 
+    "nunit", 
+    "xunit", 
+    "robot", 
+    "bundle"
   ],
   "author": "Mike Penz",
   "license": "Apache 2.0",
