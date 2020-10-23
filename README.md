@@ -18,6 +18,14 @@
 
 -------
 
+<p align="center">
+    <a href="#setup">Setup 🛠️</a> &bull;
+    <a href="#contribute-">Contribute 🧬</a> &bull;
+    <a href="#license">License 📓</a>
+</p>
+
+-------
+
 ## Setup
 
 ### Configure the workflow
@@ -28,12 +36,45 @@ Specify the action as part of your GitHub actions workflow:
 - name: "Import files"
   uses: mikepenz/xray-action@{latest-release}
   with:
-    username: "username to xray cloud"
-    password: "password to xray cloud"
+    username: ${{ secrets.XRAY_USERNAME }}
+    password: ${{ secrets.XRAY_PASSWORD }}
     testFormat: "junit"
     testPaths: "**/test/*.xml"
     testExecKey: "TEST-1"
     projectKey: "TEST"
+```
+
+💡 Do not specify username and password in cleartext, instead prefer to read them from GitHub action secrets.
+
+| **Input**               | **Description**                                                                                                                                                | **Required** |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
+| `username`              | Username required to login to the Xray cloud                                                                                                                   | x            |
+| `password`              | Password required to login to the Xray cloud                                                                                                                   | x            |
+| `testFormat`            | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
+| `testPaths`             | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
+| `testExecKey`           | Key of the Test Execution                                                                                                                                      | x            |
+| `projectKey`            | Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created. | x            |
+| `testPlanKey`           | Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.                          |              |
+| `testEnvironments`      | A string containing a list of test environments separated by ";"                                                                                               |              |
+| `revision`              | Source code and documentation version used in the test execution.                                                                                              |              |
+| `fixVersion`            | The Fix Version associated with the test execution (it supports only one value).                                                                               |              |
+| `failOnImportError`     | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
+| `continueOnImportError` | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
+
+## Contribute 🧬
+
+```bash
+# Install the dependencies  
+$ npm install
+
+# Build the typescript and package it for distribution
+$ npm run build && npm run package
+
+# Run the tests, use to debug, and test it out
+$ npm test
+
+# Verify lint is happy
+$ npm run lint -- --fix
 ```
 
 ## Xray
