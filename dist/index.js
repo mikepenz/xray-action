@@ -263,7 +263,10 @@ class Xray {
                     client_id: `${this.xrayOptions.username}`,
                     client_secret: `${this.xrayOptions.password}`
                 },
-                responseType: 'json'
+                responseType: 'json',
+                timeout: 30000,
+                retry: 2,
+                http2: true // try to allow http2 requests
             });
             this.token = authenticateResponse.body;
             core.setSecret(this.token);
@@ -285,7 +288,10 @@ class Xray {
                     Authorization: `Bearer ${this.token}`
                 },
                 body: data,
-                responseType: 'json'
+                responseType: 'json',
+                timeout: 30000,
+                retry: 2,
+                http2: true // try to allow http2 requests
             });
             return importResponse.body;
         });
