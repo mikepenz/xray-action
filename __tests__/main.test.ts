@@ -1,15 +1,15 @@
 import {Processor} from '../src/processor'
 
+jest.setTimeout(180000)
 test('import test results', async () => {
-  jest.setTimeout(180000)
-
   /*
-  await new Processor(
+  const processor = new Processor(
     {
       username: "x",
-      password: "x"
+      password: "y"
     },
     {
+      testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
       testExecKey: "TA-1",
       projectKey: "TA",
@@ -20,6 +20,7 @@ test('import test results', async () => {
       failOnImportError: false,
       continueOnImportError: true
     }
-  ).process()
+  )
+  const result = await processor.process()
   */
 })
