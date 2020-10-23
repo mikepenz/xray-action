@@ -22,10 +22,10 @@ inputs:
     description: 'Key of the Test Execution.'
     required: true
   projectKey:
-    description: 'Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created.'
+    description: 'Key of the project where the Test Execution (if the testExecKey parameter was not provided) and the tests (if they are not created yet) are going to be created.'
     required: true
   testPlanKey:
-    description: 'Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.'
+    description: 'Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they are not part of it.'
     required: false
   testEnvironments:
     description: 'A string containing a list of test environments separated by ";".'
