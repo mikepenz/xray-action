@@ -44,7 +44,7 @@ function run() {
             const username = core.getInput('username');
             const password = core.getInput('password');
             const testPaths = core.getInput('testPaths');
-            const testFormat = core.getInput('testExecKey');
+            const testFormat = core.getInput('testFormat');
             const testExecKey = core.getInput('testExecKey');
             const projectKey = core.getInput('projectKey');
             const testPlanKey = core.getInput('testPlanKey');
@@ -179,6 +179,8 @@ class Processor {
                 finally { if (e_1) throw e_1.error; }
             }
             core.info(`ℹ️ Processed ${count} elements. Failed to import: ${failed}`);
+            core.setOutput('count', count);
+            core.setOutput('failed', failed);
             if (failed > 0 && this.importOptions.failOnImportError) {
                 core.setFailed(`🔥 ${failed} failed imports detected`);
             }
