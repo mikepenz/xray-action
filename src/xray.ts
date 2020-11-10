@@ -150,7 +150,7 @@ export class Xray {
       try {
         return importResponse.key
       } catch (error) {
-        core.warning(`🔥 Response did not match expected format: ${importResponse}`)
+        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`)
         return ""
       }
     } else {
@@ -173,7 +173,7 @@ export class Xray {
       try {
         return importResponse.body.key
       } catch (error) {
-        core.warning(`🔥 Response did not match expected format: ${importResponse.body || importResponse}`)
+        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`)
         return ""
       }
     }
