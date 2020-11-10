@@ -51,8 +51,17 @@ export class Xray {
   updateTestExecJson(testExecutionJson: Object): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const testExecJson: any = testExecutionJson
+    if (!testExecJson['fields']) {
+      testExecJson['fields'] = {}
+    }
+    if (!testExecJson['fields']['project']) {
+      testExecJson['fields']['project'] = {}
+    }
     testExecJson['fields']['project']['key'] = this.xrayImportOptions.projectKey
-    testExecJson['xrayFields'] = {}
+
+    if (!testExecJson['xrayFields']) {
+      testExecJson['xrayFields'] = {}
+    }
     if (this.xrayImportOptions.testExecKey) {
       testExecJson['xrayFields'][
         'testExecKey'
@@ -150,8 +159,12 @@ export class Xray {
       try {
         return importResponse.key
       } catch (error) {
-        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`)
-        return ""
+        core.warning(
+          `🔥 Response did not match expected format: ${JSON.stringify(
+            importResponse
+          )}`
+        )
+        return ''
       }
     } else {
       const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`
@@ -173,8 +186,12 @@ export class Xray {
       try {
         return importResponse.body.key
       } catch (error) {
-        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`)
-        return ""
+        core.warning(
+          `🔥 Response did not match expected format: ${JSON.stringify(
+            importResponse.body || importResponse
+          )}`
+        )
+        return ''
       }
     }
   }
