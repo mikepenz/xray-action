@@ -37,7 +37,7 @@ async function run(): Promise<void> {
     const continueOnImportError: boolean =
       core.getInput('continueOnImportError') === 'true'
     const importParallelism: number =
-      Number(core.getInput('importParallelism')) || 12 // by default go to 12 parallelism
+      Number(core.getInput('importParallelism')) || 2 // by default go to 2 parallelism
 
     await new Processor(
       {
