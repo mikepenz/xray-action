@@ -46,20 +46,21 @@ Specify the action as part of your GitHub actions workflow:
 
 💡 Do not specify username and password in cleartext, instead prefer to read them from GitHub action secrets.
 
-| **Input**               | **Description**                                                                                                                                                | **Required** |
-|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
-| `username`              | Username required to login to the Xray cloud                                                                                                                   | x            |
-| `password`              | Password required to login to the Xray cloud                                                                                                                   | x            |
-| `testFormat`            | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
-| `testPaths`             | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
-| `testExecKey`           | Key of the Test Execution                                                                                                                                      | x            |
-| `projectKey`            | Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created. | x            |
-| `testPlanKey`           | Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.                          |              |
-| `testEnvironments`      | A string containing a list of test environments separated by ";"                                                                                               |              |
-| `revision`              | Source code and documentation version used in the test execution.                                                                                              |              |
-| `fixVersion`            | The Fix Version associated with the test execution (it supports only one value).                                                                               |              |
-| `failOnImportError`     | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
-| `continueOnImportError` | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
+| **Input**                 | **Description**                                                                                                                                                | **Required** |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
+| `username`                | Username required to login to the Xray cloud                                                                                                                   | x            |
+| `password`                | Password required to login to the Xray cloud                                                                                                                   | x            |
+| `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
+| `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
+| `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
+| `projectKey`              | Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created. | x            |
+| `testPlanKey`             | Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.                          |              |
+| `testEnvironments`        | A string containing a list of test environments separated by ";"                                                                                               |              |
+| `revision`                | Source code and documentation version used in the test execution.                                                                                              |              |
+| `fixVersion`              | The Fix Version associated with the test execution (it supports only one value).                                                                               |              |
+| `combineInSingleTestExec` | If no `testExecKey` is provided, it will generate a testExec with the first import, and reuse the same for all other imports. (Default: false)                 |              |
+| `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
+| `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 
 ### Action outputs
 

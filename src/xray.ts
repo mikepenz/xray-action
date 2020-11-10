@@ -4,18 +4,24 @@ import * as core from '@actions/core'
 
 export class Xray {
   xrayBaseUrl = 'https://xray.cloud.xpand-it.com'
-  searchParams: URLSearchParams
+  searchParams!: URLSearchParams
   token = ''
 
   constructor(
     private xrayOptions: XrayOptions,
     private importOptions: ImportOptions
   ) {
-    // parepare params
+    this.createSearchParams()
+  }
+  
+  createSearchParams(): void {
+    // prepare params
     const elements: string[][] = [
-      ['testExecKey', this.importOptions.testExecKey],
       ['projectKey', this.importOptions.projectKey]
     ]
+    if (this.importOptions.testExecKey) {
+      elements.push(['testExecKey', this.importOptions.testExecKey])
+    }
     if (this.importOptions.testPlanKey) {
       elements.push(['testPlanKey', this.importOptions.testPlanKey])
     }
@@ -49,7 +55,7 @@ export class Xray {
     core.setSecret(this.token)
   }
 
-  async import(data: Buffer): Promise<string> {
+  async import(data: Buffer): Promise<any> {
     // do import
     let format = this.importOptions.testFormat
     if (format === 'xray') {
@@ -59,7 +65,7 @@ export class Xray {
     const endpoint = `${this.xrayBaseUrl}/api/v1/import/execution/${format}`
     core.debug(`Using endpoint: ${endpoint}`)
 
-    const importResponse = await got.post<string>(endpoint, {
+    const importResponse = await got.post<any>(endpoint, {
       searchParams: this.searchParams,
       headers: {
         'Content-Type': 'text/xml',
@@ -71,6 +77,11 @@ export class Xray {
       retry: 2,         // retry count for some requests
       http2: true       // try to allow http2 requests
     })
-    return importResponse.body
+    const importResponseBody = importResponse.body
+    if(!this.importOptions.testExecKey && this.importOptions.combineInSingleTestExec) {
+      this.importOptions.testExecKey = importResponseBody.key
+      this.createSearchParams()
+    }
+    return importResponseBody
   }
 }

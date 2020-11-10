@@ -17,6 +17,7 @@ export interface ImportOptions {
   testEnvironments: string
   revision: string
   fixVersion: string
+  combineInSingleTestExec: boolean
   failOnImportError: boolean
   continueOnImportError: boolean
 }
@@ -57,9 +58,9 @@ export class Processor {
       count++
       try {
         const result = await xray.import(await fs.promises.readFile(file))
-        core.info(`ℹ️ Imported: ${file} to ${result.toString()}`)
+        core.info(`ℹ️ Imported: ${file} (${result.key})`)
       } catch (error) {
-        core.warning(`🔥 Failed to import: ${file}`)
+        core.warning(`🔥 Failed to import: ${file} (${error.message})`)
         failed++
 
         if (!this.importOptions.continueOnImportError) {

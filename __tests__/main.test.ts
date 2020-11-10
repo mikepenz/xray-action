@@ -17,6 +17,7 @@ test('import test results', async () => {
       testEnvironments: "",
       revision: "",
       fixVersion: "",
+      combineInSingleTestExec: true,
       failOnImportError: false,
       continueOnImportError: true
     }
