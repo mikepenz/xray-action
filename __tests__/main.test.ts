@@ -17,9 +17,12 @@ test('import test results', async () => {
       testEnvironments: "",
       revision: "",
       fixVersion: "",
+    },
+    {
       combineInSingleTestExec: true,
       failOnImportError: false,
-      continueOnImportError: true
+      continueOnImportError: true,
+      importParallelism: 12
     }
   )
   const result = await processor.process()

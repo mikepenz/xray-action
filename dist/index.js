@@ -54,6 +54,7 @@ function run() {
             const combineInSingleTestExec = core.getInput('combineInSingleTestExec') === 'true';
             const failOnImportError = core.getInput('failOnImportError') === 'true';
             const continueOnImportError = core.getInput('continueOnImportError') === 'true';
+            const importParallelism = Number(core.getInput('importParallelism')) || 12; // by default go to 12 parallelism
             yield new processor_1.Processor({
                 username,
                 password
@@ -65,10 +66,12 @@ function run() {
                 testPlanKey,
                 testEnvironments,
                 revision,
-                fixVersion,
+                fixVersion
+            }, {
                 combineInSingleTestExec,
                 failOnImportError,
-                continueOnImportError
+                continueOnImportError,
+                importParallelism
             }).process();
         }
         catch (error) {
@@ -114,29 +117,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __asyncValues = (this && this.__asyncValues) || function (o) {
-    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
-    var m = o[Symbol.asyncIterator], i;
-    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
-    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
-    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Processor = void 0;
 const core = __importStar(__webpack_require__(2186));
 const glob = __importStar(__webpack_require__(8090));
+const promise_pool_1 = __webpack_require__(8941);
 const fs = __importStar(__webpack_require__(5747));
 const xray_1 = __webpack_require__(6083);
 class Processor {
-    constructor(xrayOptions, importOptions) {
+    constructor(xrayOptions, xrayImportOptions, importOptions) {
         this.xrayOptions = xrayOptions;
+        this.xrayImportOptions = xrayImportOptions;
         this.importOptions = importOptions;
     }
     process() {
-        var e_1, _a;
         return __awaiter(this, void 0, void 0, function* () {
             core.startGroup(`🚀 Connect to jira`);
-            const xray = new xray_1.Xray(this.xrayOptions, this.importOptions);
+            const xray = new xray_1.Xray(this.xrayOptions, this.xrayImportOptions);
             core.info('ℹ️ Start logging in procedure to xray');
             try {
                 yield xray.auth();
@@ -148,40 +145,63 @@ class Processor {
             }
             core.endGroup();
             core.startGroup(`📝 Import test reports`);
-            let count = 0;
+            const importOptions = this.importOptions;
+            let completed = 0;
             let failed = 0;
-            const globber = yield glob.create(this.importOptions.testPaths, {
+            const globber = yield glob.create(this.xrayImportOptions.testPaths, {
                 followSymbolicLinks: false
             });
-            core.info(`ℹ️ Importing from: ${this.importOptions.testPaths}`);
-            core.info(`ℹ️ Importing using format: ${this.importOptions.testFormat}`);
+            core.info(`ℹ️ Importing from: ${this.xrayImportOptions.testPaths}`);
+            core.info(`ℹ️ Importing using format: ${this.xrayImportOptions.testFormat}`);
+            const files = yield globber.glob();
             try {
-                for (var _b = __asyncValues(globber.globGenerator()), _c; _c = yield _b.next(), !_c.done;) {
-                    const file = _c.value;
-                    core.debug(`Try to import: ${file}`);
-                    count++;
-                    try {
-                        const result = yield xray.import(yield fs.promises.readFile(file));
-                        core.info(`ℹ️ Imported: ${file} (${result.key})`);
-                    }
-                    catch (error) {
-                        core.warning(`🔥 Failed to import: ${file} (${error.message})`);
-                        failed++;
-                        if (!this.importOptions.continueOnImportError) {
-                            break;
+                /* does a import for a specific file */
+                // eslint-disable-next-line no-inner-declarations
+                function doImport(file) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        core.debug(`Try to import: ${file}`);
+                        try {
+                            const result = yield xray.import(yield fs.promises.readFile(file));
+                            core.info(`ℹ️ Imported: ${file} (${result})`);
+                            completed++;
+                            return result;
                         }
+                        catch (error) {
+                            core.warning(`🔥 Failed to import: ${file} (${error.message})`);
+                            failed++;
+                            if (!importOptions.continueOnImportError) {
+                                throw error;
+                            }
+                        }
+                        return '';
+                    });
+                }
+                // if no test exec key was specified we wanna execute once and then update the testExec for the remaining imports
+                if (files.length > 1 &&
+                    !this.xrayImportOptions.testExecKey &&
+                    this.importOptions.combineInSingleTestExec) {
+                    core.debug(`Do import of first file to retrieve a new testExec`);
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    const testExecKey = yield doImport(files.shift());
+                    if (testExecKey) {
+                        xray.updateTestExecKey(testExecKey);
+                    }
+                    else {
+                        throw Error("Couldn't retrieve the test exec key by importing one test");
                     }
                 }
+                // execute all remaining in parallel
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { results } = yield promise_pool_1.PromisePool.for(files)
+                    .withConcurrency(this.importOptions.importParallelism)
+                    .process((file) => __awaiter(this, void 0, void 0, function* () { return yield doImport(file); }));
             }
-            catch (e_1_1) { e_1 = { error: e_1_1 }; }
-            finally {
-                try {
-                    if (_c && !_c.done && (_a = _b.return)) yield _a.call(_b);
-                }
-                finally { if (e_1) throw e_1.error; }
+            catch (error) {
+                core.warning(`🔥 Stopped import (${error.message})`);
             }
-            core.info(`ℹ️ Processed ${count} elements. Failed to import: ${failed}`);
-            core.setOutput('count', count);
+            core.info(`ℹ️ Processed ${completed} of ${files.length} elements. Failed to import: ${failed}`);
+            core.setOutput('count', files.length);
+            core.setOutput('completed', completed);
             core.setOutput('failed', failed);
             if (failed > 0 && this.importOptions.failOnImportError) {
                 core.setFailed(`🔥 ${failed} failed imports detected`);
@@ -236,32 +256,39 @@ exports.Xray = void 0;
 const got_1 = __importDefault(__webpack_require__(3061));
 const core = __importStar(__webpack_require__(2186));
 class Xray {
-    constructor(xrayOptions, importOptions) {
+    constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
-        this.importOptions = importOptions;
+        this.xrayImportOptions = xrayImportOptions;
         this.xrayBaseUrl = 'https://xray.cloud.xpand-it.com';
         this.token = '';
+        this.createSearchParams();
+    }
+    updateTestExecKey(testExecKey) {
+        this.xrayImportOptions.testExecKey = testExecKey;
         this.createSearchParams();
     }
     createSearchParams() {
         // prepare params
         const elements = [
-            ['projectKey', this.importOptions.projectKey]
+            ['projectKey', this.xrayImportOptions.projectKey]
         ];
-        if (this.importOptions.testExecKey) {
-            elements.push(['testExecKey', this.importOptions.testExecKey]);
+        if (this.xrayImportOptions.testExecKey) {
+            elements.push(['testExecKey', this.xrayImportOptions.testExecKey]);
         }
-        if (this.importOptions.testPlanKey) {
-            elements.push(['testPlanKey', this.importOptions.testPlanKey]);
+        if (this.xrayImportOptions.testPlanKey) {
+            elements.push(['testPlanKey', this.xrayImportOptions.testPlanKey]);
         }
-        if (this.importOptions.testEnvironments) {
-            elements.push(['testEnvironments', this.importOptions.testEnvironments]);
+        if (this.xrayImportOptions.testEnvironments) {
+            elements.push([
+                'testEnvironments',
+                this.xrayImportOptions.testEnvironments
+            ]);
         }
-        if (this.importOptions.revision) {
-            elements.push(['revision', this.importOptions.revision]);
+        if (this.xrayImportOptions.revision) {
+            elements.push(['revision', this.xrayImportOptions.revision]);
         }
-        if (this.importOptions.fixVersion) {
-            elements.push(['fixVersion', this.importOptions.fixVersion]);
+        if (this.xrayImportOptions.fixVersion) {
+            elements.push(['fixVersion', this.xrayImportOptions.fixVersion]);
         }
         this.searchParams = new URLSearchParams(elements);
     }
@@ -284,12 +311,13 @@ class Xray {
     import(data) {
         return __awaiter(this, void 0, void 0, function* () {
             // do import
-            let format = this.importOptions.testFormat;
+            let format = this.xrayImportOptions.testFormat;
             if (format === 'xray') {
                 format = ''; // xray format has no subpath
             }
             const endpoint = `${this.xrayBaseUrl}/api/v1/import/execution/${format}`;
             core.debug(`Using endpoint: ${endpoint}`);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const importResponse = yield got_1.default.post(endpoint, {
                 searchParams: this.searchParams,
                 headers: {
@@ -302,12 +330,7 @@ class Xray {
                 retry: 2,
                 http2: true // try to allow http2 requests
             });
-            const importResponseBody = importResponse.body;
-            if (!this.importOptions.testExecKey) {
-                this.importOptions.testExecKey = importResponseBody.key;
-                this.createSearchParams();
-            }
-            return importResponseBody;
+            return importResponse.body.key;
         });
     }
 }
@@ -2053,6 +2076,602 @@ exports.default = is;
 module.exports = is;
 module.exports.default = is;
 module.exports.assert = exports.assert;
+
+
+/***/ }),
+
+/***/ 4274:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Goodies = void 0;
+class Goodies {
+    /**
+     * Handles the tap call and delegates it either to an async tap
+     * handler or to a sync tap handler.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    tap(value, callback) {
+        if (this.isPromise(value)) {
+            return this.tapAsync(value, callback);
+        }
+        if (this.isAsyncFunction(callback)) {
+            return this.tapAsync(value, callback);
+        }
+        return this.tapSync(value, callback);
+    }
+    /**
+     * Calls the given `callback` function with the
+     * given `value` and returns `value`.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    tapSync(value, callback) {
+        if (!callback) {
+            return value;
+        }
+        if (this.isFunction(callback)) {
+            callback(value);
+        }
+        return value;
+    }
+    /**
+    * Calls the given `callback` function with the given `value`
+    * and returns `value`. It resolves the `value` before
+    * passing it to the callback in case it is a Promise.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    async tapAsync(value, callback) {
+        if (!callback) {
+            return value;
+        }
+        if (this.isPromise(value)) {
+            value = await value;
+        }
+        if (this.isFunction(callback)) {
+            await callback(value);
+        }
+        return value;
+    }
+    /**
+     * Calls the given `callback` function with the given `value` and returns
+     * the result of the callback. It resolves the `value` before passing
+     * it to the callback in case it is a Promise.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    upon(value, callback) {
+        if (this.isPromise(value)) {
+            return this.uponAsync(value, callback);
+        }
+        if (this.isAsyncFunction(callback)) {
+            return this.uponAsync(value, callback);
+        }
+        return this.uponSync(value, callback);
+    }
+    /**
+     * Calls the given `callback` function with the given `value` and returns
+     * the result of the callback.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    uponSync(value, callback) {
+        if (!callback) {
+            return value;
+        }
+        return this.isFunction(callback)
+            ? callback(value)
+            : value;
+    }
+    /**
+     * Calls the given `callback` function with the given `value` and returns
+     * the result of the callback. It resolves the `value` before passing
+     * it to the callback in case it is a Promise.
+     *
+     * @param {*} value
+     * @param {Function} callback
+     *
+     * @returns {*} value
+     */
+    async uponAsync(value, callback) {
+        if (!callback) {
+            return value;
+        }
+        if (this.isPromise(value)) {
+            value = await value;
+        }
+        return this.isFunction(callback)
+            ? callback(value)
+            : value;
+    }
+    /**
+     * Determine whether the given `promise` is a Promise.
+     *
+     * @param {*} promise
+     *
+     * @returns {Boolean}
+     */
+    isPromise(promise) {
+        return !!promise && this.isFunction(promise.then);
+    }
+    /**
+     * Determine whether the given `input` is a function.
+     *
+     * @param {*} input
+     *
+     * @returns {Boolean}
+     */
+    isFunction(input) {
+        return typeof input === 'function';
+    }
+    /**
+     * Determine whether the given `func` is an async function.
+     *
+     * @param {*} input
+     *
+     * @returns {Boolean}
+     */
+    isAsyncFunction(input) {
+        return this.isFunction(input) && input.constructor.name === 'AsyncFunction';
+    }
+    /**
+     * Runs the given `callback` if the `predicate` is `null` or `undefined`.
+     *
+     * @param {Boolean} predicate
+     * @param {Function} callback
+     *
+     * @returns {*}
+     */
+    ifNullish(predicate, callback) {
+        if (predicate === null || predicate === undefined) {
+            return callback();
+        }
+    }
+}
+exports.Goodies = Goodies;
+
+
+/***/ }),
+
+/***/ 8596:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ifNullish = exports.isAsyncFunction = exports.isPromise = exports.upon = exports.tap = void 0;
+const goodies_1 = __webpack_require__(4274);
+function tap(value, callback) {
+    return new goodies_1.Goodies().tap(value, callback);
+}
+exports.tap = tap;
+function upon(value, callback) {
+    return new goodies_1.Goodies().upon(value, callback);
+}
+exports.upon = upon;
+/**
+ * Determine whether the given `promise` is a Promise.
+ *
+ * @param {*} promise
+ *
+ * @returns {Boolean}
+ *
+ * @example
+ * isPromise('no') // false
+ * isPromise(new Promise(() => {})) // true
+ */
+function isPromise(promise) {
+    return new goodies_1.Goodies().isPromise(promise);
+}
+exports.isPromise = isPromise;
+/**
+ * Determine whether the given `input` is an async function.
+ *
+ * @param {*} input
+ *
+ * @returns {Boolean}
+ */
+function isAsyncFunction(input) {
+    return new goodies_1.Goodies().isAsyncFunction(input);
+}
+exports.isAsyncFunction = isAsyncFunction;
+function ifNullish(input, callback) {
+    return new goodies_1.Goodies().ifNullish(input, callback);
+}
+exports.ifNullish = ifNullish;
+
+
+/***/ }),
+
+/***/ 9186:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+module.exports = __webpack_require__(8596)
+
+
+/***/ }),
+
+/***/ 1705:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PromisePoolError = void 0;
+class PromisePoolError extends Error {
+    /**
+     * Create a new instance for the given `message` and `item`.
+     *
+     * @param error  The original error
+     * @param item   The item causing the error
+     */
+    constructor(error, item) {
+        super();
+        this.item = item;
+        this.name = this.constructor.name;
+        this.message = this.messageFrom(error);
+        Error.captureStackTrace(this, this.constructor);
+    }
+    /**
+     * Returns a new promise pool error instance wrapping the `error` and `item`.
+     *
+     * @param {*} error
+     * @param {*} item
+     *
+     * @returns {PromisePoolError}
+     */
+    static createFrom(error, item) {
+        return new this(error, item);
+    }
+    /**
+     * Returns the error message from the given `error`.
+     *
+     * @param {*} error
+     *
+     * @returns {String}
+     */
+    messageFrom(error) {
+        if (error instanceof Error) {
+            return error.message;
+        }
+        if (typeof error === 'object') {
+            return error.message;
+        }
+        if (typeof error === 'string' || typeof error === 'number') {
+            return error.toString();
+        }
+        return '';
+    }
+}
+exports.PromisePoolError = PromisePoolError;
+
+
+/***/ }),
+
+/***/ 6331:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PromisePoolExecutor = void 0;
+const goodies_1 = __webpack_require__(9186);
+const promise_pool_error_1 = __webpack_require__(1705);
+class PromisePoolExecutor {
+    /**
+     * Creates a new promise pool executer instance with a default concurrency of 10.
+     */
+    constructor() {
+        this.tasks = [];
+        this.items = [];
+        this.errors = [];
+        this.results = [];
+        this.concurrency = 10;
+        this.handler = () => { };
+        this.errorHandler = undefined;
+    }
+    /**
+     * Set the number of tasks to process concurrently the promise pool.
+     *
+     * @param {Integer} concurrency
+     *
+     * @returns {PromisePoolExecutor}
+     */
+    withConcurrency(concurrency) {
+        return goodies_1.tap(this, () => {
+            this.concurrency = concurrency;
+        });
+    }
+    /**
+     * Set the items to be processed in the promise pool.
+     *
+     * @param {Array} items
+     *
+     * @returns {PromisePoolExecutor}
+     */
+    for(items) {
+        return goodies_1.tap(this, () => {
+            this.items = items;
+        });
+    }
+    /**
+     * Set the handler that is applied to each item.
+     *
+     * @param {Function} action
+     *
+     * @returns {PromisePoolExecutor}
+     */
+    withHandler(action) {
+        return goodies_1.tap(this, () => {
+            this.handler = action;
+        });
+    }
+    /**
+     * Set the error handler function to execute when an error occurs.
+     *
+     * @param {Function} handler
+     *
+     * @returns {PromisePoolExecutor}
+     */
+    handleError(handler) {
+        return goodies_1.tap(this, () => {
+            this.errorHandler = handler;
+        });
+    }
+    /**
+     * Determines whether the number of active tasks is greater or equal to the concurrency limit.
+     *
+     * @returns {Boolean}
+     */
+    hasReachedConcurrencyLimit() {
+        return this.activeCount() >= this.concurrency;
+    }
+    /**
+     * Returns the number of active tasks.
+     *
+     * @returns {Number}
+     */
+    activeCount() {
+        return this.tasks.length;
+    }
+    /**
+     * Start processing the promise pool.
+     *
+     * @returns {Array}
+     */
+    async start() {
+        return goodies_1.upon(this.validateInputs(), async () => {
+            return this.process();
+        });
+    }
+    /**
+     * Ensure valid inputs and throw otherwise.
+     *
+     * @throws
+     */
+    validateInputs() {
+        if (typeof this.handler !== 'function') {
+            throw new Error('The first parameter for the .process(fn) method must be a function');
+        }
+        if (!(typeof this.concurrency === 'number' && this.concurrency >= 1)) {
+            throw new TypeError(`"concurrency" must be a number, 1 or up. Received "${this.concurrency}" (${typeof this.concurrency})`);
+        }
+        if (!Array.isArray(this.items)) {
+            throw new TypeError(`"items" must be an array. Received ${typeof this.items}`);
+        }
+        if (this.errorHandler) {
+            if (typeof this.errorHandler !== 'function') {
+                throw new Error(`The error handler must be a function. Received ${typeof this.errorHandler}`);
+            }
+        }
+    }
+    /**
+     * Starts processing the promise pool by iterating over the items
+     * and running each item through the async `callback` function.
+     *
+     * @param {Function} callback
+     *
+     * @returns {Promise}
+     */
+    async process() {
+        for (const item of this.items) {
+            if (this.hasReachedConcurrencyLimit()) {
+                await this.processingSlot();
+            }
+            this.startProcessing(item);
+        }
+        return this.drained();
+    }
+    /**
+     * Creates a deferred promise and pushes the related callback to the pending
+     * queue. Returns the promise which is used to wait for the callback.
+     *
+     * @returns {Promise}
+     */
+    async processingSlot() {
+        return this.waitForTaskToFinish();
+    }
+    /**
+     * Wait for one of the active tasks to finish processing.
+     */
+    async waitForTaskToFinish() {
+        await Promise.race(this.tasks);
+    }
+    /**
+     * Create a processing function for the given `item`.
+     *
+     * @param {*} item
+     */
+    startProcessing(item) {
+        const task = this.createTaskFor(item)
+            .then(result => {
+            this.results.push(result);
+            this.tasks.splice(this.tasks.indexOf(task), 1);
+        })
+            .catch(error => {
+            this.tasks.splice(this.tasks.indexOf(task), 1);
+            if (this.errorHandler) {
+                return this.errorHandler(error, item);
+            }
+            this.errors.push(promise_pool_error_1.PromisePoolError.createFrom(error, item));
+        });
+        this.tasks.push(task);
+    }
+    /**
+     * Ensures a returned promise for the processing of the given `item`.
+     *
+     * @param item
+     *
+     * @returns {*}
+     */
+    async createTaskFor(item) {
+        return this.handler(item);
+    }
+    /**
+     * Wait for all active tasks to finish. Once all the tasks finished
+     * processing, returns an object containing the results and errors.
+     *
+     * @returns {Object}
+     */
+    async drained() {
+        await this.drainActiveTasks();
+        return {
+            results: this.results,
+            errors: this.errors
+        };
+    }
+    /**
+     * Wait for all of the active tasks to finish processing.
+     */
+    async drainActiveTasks() {
+        await Promise.all(this.tasks);
+    }
+}
+exports.PromisePoolExecutor = PromisePoolExecutor;
+
+
+/***/ }),
+
+/***/ 8941:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PromisePool = void 0;
+const goodies_1 = __webpack_require__(9186);
+const promise_pool_executor_1 = __webpack_require__(6331);
+class PromisePool {
+    /**
+     * Instantiates a new promise pool with a default `concurrency: 10` and `items: []`.
+     *
+     * @param {Object} options
+     */
+    constructor() {
+        this.items = [];
+        this.concurrency = 10;
+        this.errorHandler = undefined;
+    }
+    /**
+     * Set the number of tasks to process concurrently in the promise pool.
+     *
+     * @param {Integer} concurrency
+     *
+     * @returns {PromisePool}
+     */
+    withConcurrency(concurrency) {
+        return goodies_1.tap(this, () => {
+            this.concurrency = concurrency;
+        });
+    }
+    /**
+     * Set the number of tasks to process concurrently in the promise pool.
+     *
+     * @param {Number} concurrency
+     *
+     * @returns {PromisePool}
+     */
+    static withConcurrency(concurrency) {
+        return goodies_1.tap(this, () => {
+            this.concurrency = concurrency;
+        });
+    }
+    /**
+     * Set the items to be processed in the promise pool.
+     *
+     * @param {Array} items
+     *
+     * @returns {PromisePool}
+     */
+    for(items) {
+        return goodies_1.tap(this, () => {
+            this.items = items;
+        });
+    }
+    /**
+     * Set the items to be processed in the promise pool.
+     *
+     * @param {Array} items
+     *
+     * @returns {PromisePool}
+     */
+    static for(items) {
+        return new this()
+            .for(items)
+            .withConcurrency(this.concurrency);
+    }
+    /**
+     * Set the error handler function to execute when an error occurs.
+     *
+     * @param {Function} handler
+     *
+     * @returns {PromisePool}
+     */
+    handleError(handler) {
+        return goodies_1.tap(this, () => {
+            this.errorHandler = handler;
+        });
+    }
+    /**
+     * Starts processing the promise pool by iterating over the items
+     * and running each item through the async `callback` function.
+     *
+     * @param {Function} The async processing function receiving each item from the `items` array.
+     *
+     * @returns Promise<{ results, errors }>
+     */
+    async process(callback) {
+        return new promise_pool_executor_1.PromisePoolExecutor()
+            .withConcurrency(this.concurrency)
+            .withHandler(callback)
+            .handleError(this.errorHandler)
+            .for(this.items)
+            .start();
+    }
+}
+exports.PromisePool = PromisePool;
 
 
 /***/ }),

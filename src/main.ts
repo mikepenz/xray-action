@@ -14,12 +14,15 @@ async function run(): Promise<void> {
     const testEnvironments: string = core.getInput('testEnvironments')
     const revision: string = core.getInput('revision')
     const fixVersion: string = core.getInput('fixVersion')
-    const combineInSingleTestExec: boolean = 
+
+    const combineInSingleTestExec: boolean =
       core.getInput('combineInSingleTestExec') === 'true'
     const failOnImportError: boolean =
       core.getInput('failOnImportError') === 'true'
     const continueOnImportError: boolean =
       core.getInput('continueOnImportError') === 'true'
+    const importParallelism: number =
+      Number(core.getInput('importParallelism')) || 12 // by default go to 12 parallelism
 
     await new Processor(
       {
@@ -34,10 +37,13 @@ async function run(): Promise<void> {
         testPlanKey,
         testEnvironments,
         revision,
-        fixVersion,
+        fixVersion
+      },
+      {
         combineInSingleTestExec,
         failOnImportError,
-        continueOnImportError
+        continueOnImportError,
+        importParallelism
       }
     ).process()
   } catch (error) {

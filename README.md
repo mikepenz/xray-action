@@ -61,6 +61,7 @@ Specify the action as part of your GitHub actions workflow:
 | `combineInSingleTestExec` | If no `testExecKey` is provided, it will generate a testExec with the first import, and reuse the same for all other imports. (Default: false)                 |              |
 | `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
+| `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 12)                                                                                            |              |
 
 ### Action outputs
 
