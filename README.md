@@ -62,6 +62,26 @@ Specify the action as part of your GitHub actions workflow:
 | `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 | `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 12)                                                                                            |              |
+| `testExecutionJson`       | File path to a json file, containing the meta information to create the xray ticket.                                                                           |              |
+
+#### Test execution json
+
+The test execution json should the meta information in the following format:
+
+```json
+{
+    "fields": {
+        "summary": "Brand new Test execution",
+        "issuetype": { "id": "10007" },
+        "components": [
+            { "name": "Interface" },
+            { "name": "Core" }
+        ]
+    }
+}
+```
+
+💡 The import will fail if the provided issueType for example does not exist. Please ensure correct information is provided.
 
 ### Action outputs
 

@@ -18,6 +18,7 @@ export interface XrayImportOptions {
   testEnvironments: string
   revision: string
   fixVersion: string
+  testExecutionJson: Object | undefined
 }
 
 export interface ImportOptions {
@@ -61,6 +62,7 @@ export class Processor {
     core.info(`ℹ️ Importing using format: ${this.xrayImportOptions.testFormat}`)
 
     const files = await globber.glob()
+    const filesCount = files.length
 
     try {
       /* does a import for a specific file */
@@ -113,10 +115,10 @@ export class Processor {
     }
 
     core.info(
-      `ℹ️ Processed ${completed} of ${files.length} elements. Failed to import: ${failed}`
+      `ℹ️ Processed ${completed} of ${filesCount} elements. Failed to import: ${failed}`
     )
 
-    core.setOutput('count', files.length)
+    core.setOutput('count', filesCount)
     core.setOutput('completed', completed)
     core.setOutput('failed', failed)
 
