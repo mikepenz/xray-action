@@ -122,7 +122,8 @@ $ npm run lint -- --fix
 ## Xray
 
 - [Xray](https://docs.getxray.app/site/xray) website
-- Currently supporting all (non multipart) requests according to [Xray REST API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-xUnitXMLresults)
+- Currently fully supporting all (non multipart) requests according to [Xray REST API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#expander-339243592)
+- Partially support for multipart request. Supports specifying test execution meta information [Xray REST API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#expander-1959649602)
 
 ## Developed By
 
