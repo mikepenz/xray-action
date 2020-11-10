@@ -147,7 +147,12 @@ export class Xray {
         path: `/api/v1/import/execution/${format}/multipart`,
         headers: {Authorization: `Bearer ${this.token}`}
       })
-      return importResponse.key
+      try {
+        return importResponse.key
+      } catch (error) {
+        core.warning(`🔥 Response did not match expected format: ${importResponse}`)
+        return ""
+      }
     } else {
       const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`
       core.debug(`Using endpoint: ${endpoint}`)
@@ -165,7 +170,12 @@ export class Xray {
         retry: 2, // retry count for some requests
         http2: true // try to allow http2 requests
       })
-      return importResponse.body.key
+      try {
+        return importResponse.body.key
+      } catch (error) {
+        core.warning(`🔥 Response did not match expected format: ${importResponse.body || importResponse}`)
+        return ""
+      }
     }
   }
 }
