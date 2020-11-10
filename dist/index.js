@@ -416,8 +416,16 @@ class Xray {
     updateTestExecJson(testExecutionJson) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const testExecJson = testExecutionJson;
+        if (!testExecJson['fields']) {
+            testExecJson['fields'] = {};
+        }
+        if (!testExecJson['fields']['project']) {
+            testExecJson['fields']['project'] = {};
+        }
         testExecJson['fields']['project']['key'] = this.xrayImportOptions.projectKey;
-        testExecJson['xrayFields'] = {};
+        if (!testExecJson['xrayFields']) {
+            testExecJson['xrayFields'] = {};
+        }
         if (this.xrayImportOptions.testExecKey) {
             testExecJson['xrayFields']['testExecKey'] = this.xrayImportOptions.testExecKey;
         }
@@ -488,7 +496,13 @@ class Xray {
                     path: `/api/v1/import/execution/${format}/multipart`,
                     headers: { Authorization: `Bearer ${this.token}` }
                 });
-                return importResponse.key;
+                try {
+                    return importResponse.key;
+                }
+                catch (error) {
+                    core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`);
+                    return '';
+                }
             }
             else {
                 const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`;
@@ -506,7 +520,13 @@ class Xray {
                     retry: 2,
                     http2: true // try to allow http2 requests
                 });
-                return importResponse.body.key;
+                try {
+                    return importResponse.body.key;
+                }
+                catch (error) {
+                    core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`);
+                    return '';
+                }
             }
         });
     }
