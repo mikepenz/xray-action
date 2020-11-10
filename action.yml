@@ -48,6 +48,10 @@ inputs:
     description: 'Defines if the action should continue after a single import error occurred.'
     required: false
     default: "true"
+  importParallelism:
+    description: 'Specifies the level of parallelism to import to Xray.'
+    required: false
+    default: "12"
 outputs:
   count:
     description: 'The count of imported files.'
