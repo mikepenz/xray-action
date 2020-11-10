@@ -64,7 +64,7 @@ function run() {
             const combineInSingleTestExec = core.getInput('combineInSingleTestExec') === 'true';
             const failOnImportError = core.getInput('failOnImportError') === 'true';
             const continueOnImportError = core.getInput('continueOnImportError') === 'true';
-            const importParallelism = Number(core.getInput('importParallelism')) || 12; // by default go to 12 parallelism
+            const importParallelism = Number(core.getInput('importParallelism')) || 2; // by default go to 2 parallelism
             yield new processor_1.Processor({
                 username,
                 password
@@ -516,7 +516,7 @@ class Xray {
                     },
                     body: data,
                     responseType: 'json',
-                    timeout: 30000,
+                    timeout: 60000,
                     retry: 2,
                     http2: true // try to allow http2 requests
                 });

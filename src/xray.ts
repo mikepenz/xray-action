@@ -179,7 +179,7 @@ export class Xray {
         },
         body: data,
         responseType: 'json',
-        timeout: 30000, // 30s timeout
+        timeout: 60000, // 60s timeout
         retry: 2, // retry count for some requests
         http2: true // try to allow http2 requests
       })
