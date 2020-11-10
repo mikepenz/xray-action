@@ -36,13 +36,17 @@ inputs:
   fixVersion:
     description: 'The Fix Version associated with the test execution (it supports only one value).'
     required: false
+  combineInSingleTestExec: 
+    description: 'If no `testExecKey` is provided, it will generate a testExec with the first import, and reuse the same for all other imports.'
+    required: false
+    default: "false"
   failOnImportError:
     description: 'Defines if the action should fail if an import error occurred.'
-    required: true
+    required: false
     default: "false"
   continueOnImportError:
     description: 'Defines if the action should continue after a single import error occurred.'
-    required: true
+    required: false
     default: "true"
 outputs:
   count:

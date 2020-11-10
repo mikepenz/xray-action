@@ -14,6 +14,8 @@ async function run(): Promise<void> {
     const testEnvironments: string = core.getInput('testEnvironments')
     const revision: string = core.getInput('revision')
     const fixVersion: string = core.getInput('fixVersion')
+    const combineInSingleTestExec: boolean = 
+      core.getInput('combineInSingleTestExec') === 'true'
     const failOnImportError: boolean =
       core.getInput('failOnImportError') === 'true'
     const continueOnImportError: boolean =
@@ -33,6 +35,7 @@ async function run(): Promise<void> {
         testEnvironments,
         revision,
         fixVersion,
+        combineInSingleTestExec,
         failOnImportError,
         continueOnImportError
       }

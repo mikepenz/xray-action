@@ -51,6 +51,7 @@ function run() {
             const testEnvironments = core.getInput('testEnvironments');
             const revision = core.getInput('revision');
             const fixVersion = core.getInput('fixVersion');
+            const combineInSingleTestExec = core.getInput('combineInSingleTestExec') === 'true';
             const failOnImportError = core.getInput('failOnImportError') === 'true';
             const continueOnImportError = core.getInput('continueOnImportError') === 'true';
             yield new processor_1.Processor({
@@ -65,6 +66,7 @@ function run() {
                 testEnvironments,
                 revision,
                 fixVersion,
+                combineInSingleTestExec,
                 failOnImportError,
                 continueOnImportError
             }).process();
@@ -160,10 +162,10 @@ class Processor {
                     count++;
                     try {
                         const result = yield xray.import(yield fs.promises.readFile(file));
-                        core.info(`ℹ️ Imported: ${file} to ${result.toString()}`);
+                        core.info(`ℹ️ Imported: ${file} (${result.key})`);
                     }
                     catch (error) {
-                        core.warning(`🔥 Failed to import: ${file}`);
+                        core.warning(`🔥 Failed to import: ${file} (${error.message})`);
                         failed++;
                         if (!this.importOptions.continueOnImportError) {
                             break;
@@ -239,11 +241,16 @@ class Xray {
         this.importOptions = importOptions;
         this.xrayBaseUrl = 'https://xray.cloud.xpand-it.com';
         this.token = '';
-        // parepare params
+        this.createSearchParams();
+    }
+    createSearchParams() {
+        // prepare params
         const elements = [
-            ['testExecKey', this.importOptions.testExecKey],
             ['projectKey', this.importOptions.projectKey]
         ];
+        if (this.importOptions.testExecKey) {
+            elements.push(['testExecKey', this.importOptions.testExecKey]);
+        }
         if (this.importOptions.testPlanKey) {
             elements.push(['testPlanKey', this.importOptions.testPlanKey]);
         }
@@ -295,7 +302,12 @@ class Xray {
                 retry: 2,
                 http2: true // try to allow http2 requests
             });
-            return importResponse.body;
+            const importResponseBody = importResponse.body;
+            if (!this.importOptions.testExecKey) {
+                this.importOptions.testExecKey = importResponseBody.key;
+                this.createSearchParams();
+            }
+            return importResponseBody;
         });
     }
 }
@@ -10544,7 +10556,7 @@ function wrappy (fn, cb) {
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("assert");
+module.exports = require("assert");;
 
 /***/ }),
 
@@ -10552,7 +10564,7 @@ module.exports = require("assert");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("buffer");
+module.exports = require("buffer");;
 
 /***/ }),
 
@@ -10560,7 +10572,7 @@ module.exports = require("buffer");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("dns");
+module.exports = require("dns");;
 
 /***/ }),
 
@@ -10568,7 +10580,7 @@ module.exports = require("dns");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("events");
+module.exports = require("events");;
 
 /***/ }),
 
@@ -10576,7 +10588,7 @@ module.exports = require("events");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("fs");
+module.exports = require("fs");;
 
 /***/ }),
 
@@ -10584,7 +10596,7 @@ module.exports = require("fs");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("http");
+module.exports = require("http");;
 
 /***/ }),
 
@@ -10592,7 +10604,7 @@ module.exports = require("http");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("http2");
+module.exports = require("http2");;
 
 /***/ }),
 
@@ -10600,7 +10612,7 @@ module.exports = require("http2");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("https");
+module.exports = require("https");;
 
 /***/ }),
 
@@ -10608,7 +10620,7 @@ module.exports = require("https");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("net");
+module.exports = require("net");;
 
 /***/ }),
 
@@ -10616,7 +10628,7 @@ module.exports = require("net");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("os");
+module.exports = require("os");;
 
 /***/ }),
 
@@ -10624,7 +10636,7 @@ module.exports = require("os");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("path");
+module.exports = require("path");;
 
 /***/ }),
 
@@ -10632,7 +10644,7 @@ module.exports = require("path");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("stream");
+module.exports = require("stream");;
 
 /***/ }),
 
@@ -10640,7 +10652,7 @@ module.exports = require("stream");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("tls");
+module.exports = require("tls");;
 
 /***/ }),
 
@@ -10648,7 +10660,7 @@ module.exports = require("tls");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("url");
+module.exports = require("url");;
 
 /***/ }),
 
@@ -10656,7 +10668,7 @@ module.exports = require("url");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("util");
+module.exports = require("util");;
 
 /***/ }),
 
@@ -10664,7 +10676,7 @@ module.exports = require("util");
 /***/ ((module) => {
 
 "use strict";
-module.exports = require("zlib");
+module.exports = require("zlib");;
 
 /***/ })
 
