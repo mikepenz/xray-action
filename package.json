@@ -33,7 +33,7 @@
   "license": "Apache 2.0",
   "dependencies": {
     "@actions/core": "^1.2.6",
-    "@actions/glob": "^0.1.0",
+    "@actions/glob": "^0.1.1",
     "@supercharge/promise-pool": "^1.6.0",
     "form-data": "^3.0.0",
     "got": "^11.8.0"
