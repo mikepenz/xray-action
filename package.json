@@ -39,7 +39,7 @@
     "got": "^11.8.0"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.15",
+    "@types/jest": "^26.0.16",
     "@types/node": "^14.14.10",
     "@typescript-eslint/parser": "^4.9.0",
     "@vercel/ncc": "^0.25.1",
