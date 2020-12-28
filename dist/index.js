@@ -416,7 +416,7 @@ class XrayCloud {
     }
     updateTestExecKey(testExecKey) {
         this.xrayImportOptions.testExecKey = testExecKey;
-        return xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
     }
     import(data) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -566,7 +566,7 @@ class XrayServer {
     }
     updateTestExecKey(testExecKey) {
         this.xrayImportOptions.testExecKey = testExecKey;
-        return xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
     }
     import(data) {
         return __awaiter(this, void 0, void 0, function* () {

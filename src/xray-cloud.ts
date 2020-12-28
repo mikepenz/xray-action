@@ -37,9 +37,9 @@ export class XrayCloud implements Xray {
     core.setSecret(this.token)
   }
 
-  updateTestExecKey(testExecKey: string): URLSearchParams {
+  updateTestExecKey(testExecKey: string): void {
     this.xrayImportOptions.testExecKey = testExecKey
-    return createSearchParams(this.xrayImportOptions)
+    this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 
   async import(data: Buffer): Promise<string> {
