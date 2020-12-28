@@ -7,9 +7,7 @@ import {createSearchParams, updateTestExecJson} from './xray-utils'
 import {Xray} from './xray'
 
 export class XrayCloud implements Xray {
-  xrayProtocol = 'https'
-  protocol: 'https:' | 'http:'
-  xrayBaseUrl = 'xray.cloud.xpand-it.com'
+  xrayBaseUrl = new URL('https://xray.cloud.xpand-it.com')
   searchParams!: URLSearchParams
   token = ''
 
@@ -18,17 +16,19 @@ export class XrayCloud implements Xray {
     private xrayImportOptions: XrayImportOptions
   ) {
     this.searchParams = createSearchParams(this.xrayImportOptions)
+  }
 
-    if (this.xrayProtocol === 'https') {
-      this.protocol = 'https:'
+  private protocol(): 'https:' | 'http:' {
+    if (this.xrayBaseUrl.protocol === 'http') {
+      return 'http:'
     } else {
-      this.protocol = 'http:'
+      return 'https:'
     }
   }
 
   async auth(): Promise<void> {
     const authenticateResponse = await got.post<string>(
-      `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/authenticate`,
+      `${this.xrayBaseUrl.href}/api/v1/authenticate`,
       {
         json: {
           client_id: `${this.xrayOptions.username}`,
@@ -96,12 +96,12 @@ export class XrayCloud implements Xray {
       )
 
       core.debug(
-        `Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`
+        `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`
       )
       const importResponse = await doFormDataRequest(form, {
-        protocol: this.protocol,
-        host: this.xrayBaseUrl,
-        path: `/api/v1/import/execution/${format}/multipart`,
+        protocol: this.protocol(),
+        host: this.xrayBaseUrl.host,
+        path: `${this.xrayBaseUrl.pathname}/api/v1/import/execution/${format}/multipart`,
         headers: {Authorization: `Bearer ${this.token}`}
       })
       try {
@@ -115,7 +115,7 @@ export class XrayCloud implements Xray {
         return ''
       }
     } else {
-      const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`
+      const endpoint = `${this.xrayBaseUrl.href}/api/v1/import/execution/${format}`
       core.debug(`Using endpoint: ${endpoint}`)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
