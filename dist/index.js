@@ -138,6 +138,7 @@ const core = __importStar(__webpack_require__(2186));
 const glob = __importStar(__webpack_require__(8090));
 const promise_pool_1 = __webpack_require__(8941);
 const fs = __importStar(__webpack_require__(5747));
+const mime_types_1 = __webpack_require__(3583);
 const xray_cloud_1 = __webpack_require__(4261);
 const xray_server_1 = __webpack_require__(909);
 class Processor {
@@ -186,7 +187,17 @@ class Processor {
                     return __awaiter(this, void 0, void 0, function* () {
                         core.debug(`Try to import: ${file}`);
                         try {
-                            const result = yield xray.import(yield fs.promises.readFile(file));
+                            // identify mimetype
+                            const tmpMime = mime_types_1.lookup(file);
+                            let mimeType;
+                            if (tmpMime === false) {
+                                mimeType = 'application/xml';
+                            }
+                            else {
+                                mimeType = tmpMime;
+                            }
+                            // execute import
+                            const result = yield xray.import(yield fs.promises.readFile(file), mimeType);
                             core.info(`ℹ️ Imported: ${file} (${result})`);
                             completed++;
                             return result;
@@ -334,7 +345,12 @@ function doFormDataRequest(formData, params
                         responseBody += chunk;
                     });
                     res.on('end', () => {
-                        resolve(JSON.parse(responseBody));
+                        try {
+                            resolve(JSON.parse(responseBody));
+                        }
+                        catch (error) {
+                            reject(error);
+                        }
                     });
                 }
             });
@@ -397,6 +413,12 @@ class XrayCloud {
         this.xrayBaseUrl = 'xray.cloud.xpand-it.com';
         this.token = '';
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        if (this.xrayProtocol === 'https') {
+            this.protocol = 'https:';
+        }
+        else {
+            this.protocol = 'http:';
+        }
     }
     auth() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -418,7 +440,7 @@ class XrayCloud {
         this.xrayImportOptions.testExecKey = testExecKey;
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
     }
-    import(data) {
+    import(data, mimeType) {
         return __awaiter(this, void 0, void 0, function* () {
             // do import
             let format = this.xrayImportOptions.testFormat;
@@ -426,7 +448,7 @@ class XrayCloud {
                 format = ''; // xray format has no subpath
             }
             if (this.xrayImportOptions.testExecutionJson &&
-                !this.xrayImportOptions.testExecKey) {
+                this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
                 xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
@@ -435,7 +457,7 @@ class XrayCloud {
                     filepath: 'info.json'
                 });
                 form.append('results', data.toString('utf-8'), {
-                    contentType: 'text/xml',
+                    contentType: mimeType,
                     filename: 'test.xml',
                     filepath: 'test.xml'
                 });
@@ -452,6 +474,7 @@ class XrayCloud {
                 });
                 core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`);
                 const importResponse = yield utils_1.doFormDataRequest(form, {
+                    protocol: this.protocol,
                     host: this.xrayBaseUrl,
                     path: `/api/v1/import/execution/${format}/multipart`,
                     headers: { Authorization: `Bearer ${this.token}` }
@@ -471,8 +494,8 @@ class XrayCloud {
                 const importResponse = yield got_1.default.post(endpoint, {
                     searchParams: this.searchParams,
                     headers: {
-                        'Content-Type': 'text/xml',
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${this.token}`,
+                        'Content-Type': mimeType
                     },
                     body: data,
                     responseType: 'json',
@@ -544,31 +567,27 @@ class XrayServer {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
         this.xrayProtocol = 'https';
-        this.xrayBaseUrl = 'xray.cloud.xpand-it.com';
+        this.xrayBaseUrl = 'sandbox.xpand-it.com';
         this.token = '';
+        this.xrayBaseUrl = this.xrayOptions.baseUrl;
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        if (this.xrayProtocol === 'https') {
+            this.protocol = 'https:';
+        }
+        else {
+            this.protocol = 'http:';
+        }
     }
     auth() {
         return __awaiter(this, void 0, void 0, function* () {
-            const authenticateResponse = yield got_1.default.post(`${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/authenticate`, {
-                json: {
-                    client_id: `${this.xrayOptions.username}`,
-                    client_secret: `${this.xrayOptions.password}`
-                },
-                responseType: 'json',
-                timeout: 30000,
-                retry: 2,
-                http2: true // try to allow http2 requests
-            });
-            this.token = authenticateResponse.body;
-            core.setSecret(this.token);
+            // no auth needed
         });
     }
     updateTestExecKey(testExecKey) {
         this.xrayImportOptions.testExecKey = testExecKey;
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
     }
-    import(data) {
+    import(data, mimeType) {
         return __awaiter(this, void 0, void 0, function* () {
             // do import
             let format = this.xrayImportOptions.testFormat;
@@ -576,7 +595,7 @@ class XrayServer {
                 format = ''; // xray format has no subpath
             }
             if (this.xrayImportOptions.testExecutionJson &&
-                !this.xrayImportOptions.testExecKey) {
+                this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
                 xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
@@ -584,10 +603,10 @@ class XrayServer {
                     filename: 'info.json',
                     filepath: 'info.json'
                 });
-                form.append('results', data.toString('utf-8'), {
-                    contentType: 'text/xml',
-                    filename: 'test.xml',
-                    filepath: 'test.xml'
+                form.append('file', data.toString('utf-8'), {
+                    contentType: mimeType,
+                    filename: 'report.xml',
+                    filepath: 'report.xml'
                 });
                 form.append('testInfo', JSON.stringify({
                     fields: {
@@ -600,14 +619,15 @@ class XrayServer {
                     filename: 'testInfo.json',
                     filepath: 'testInfo.json'
                 });
-                core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}/multipart`);
                 const importResponse = yield utils_1.doFormDataRequest(form, {
+                    protocol: this.protocol,
                     host: this.xrayBaseUrl,
-                    path: `/api/v1/import/execution/${format}/multipart`,
-                    headers: { Authorization: `Bearer ${this.token}` }
+                    auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+                    path: `/rest/raven/2.0/import/execution/${format}/multipart`
                 });
                 try {
-                    return importResponse.key;
+                    return importResponse.testExecIssue.key;
                 }
                 catch (error) {
                     core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`);
@@ -615,27 +635,48 @@ class XrayServer {
                 }
             }
             else {
-                const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`;
-                core.debug(`Using endpoint: ${endpoint}`);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const importResponse = yield got_1.default.post(endpoint, {
-                    searchParams: this.searchParams,
-                    headers: {
-                        'Content-Type': 'text/xml',
-                        Authorization: `Bearer ${this.token}`
-                    },
-                    body: data,
-                    responseType: 'json',
-                    timeout: 60000,
-                    retry: 2,
-                    http2: true // try to allow http2 requests
-                });
-                try {
-                    return importResponse.body.key;
+                if (mimeType === 'application/xml') {
+                    const form = new form_data_1.default();
+                    form.append('file', data.toString('utf-8'), {
+                        contentType: mimeType,
+                        filename: 'report.xml',
+                        filepath: 'report.xml'
+                    });
+                    const importResponse = yield utils_1.doFormDataRequest(form, {
+                        protocol: this.protocol,
+                        host: this.xrayBaseUrl,
+                        auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+                        path: `/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
+                    });
+                    try {
+                        return importResponse.testExecIssue.key;
+                    }
+                    catch (error) {
+                        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`);
+                        return '';
+                    }
                 }
-                catch (error) {
-                    core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`);
-                    return '';
+                else {
+                    const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}`;
+                    core.debug(`Using endpoint: ${endpoint}`);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const importResponse = yield got_1.default.post(endpoint, {
+                        searchParams: this.searchParams,
+                        headers: {
+                            Authorization: `Basic ${Buffer.from(`${this.xrayOptions.username}:${this.xrayOptions.password}`).toString('base64')}`,
+                            'Content-Type': mimeType
+                        },
+                        body: data,
+                        responseType: 'json',
+                        timeout: 60000 // 60s timeout
+                    });
+                    try {
+                        return importResponse.body.testExecIssue.key;
+                    }
+                    catch (error) {
+                        core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`);
+                        return '';
+                    }
                 }
             }
         });
