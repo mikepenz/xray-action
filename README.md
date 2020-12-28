@@ -48,8 +48,10 @@ Specify the action as part of your GitHub actions workflow:
 
 | **Input**                 | **Description**                                                                                                                                                | **Required** |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
-| `username`                | Username required to login to the Xray cloud                                                                                                                   | x            |
-| `password`                | Password required to login to the Xray cloud                                                                                                                   | x            |
+| `xrayCloud`               | Defines which variant of xray to target [cloud (default) vs server]                                                                                            |              |
+| `xrayBaseUrl`             | Defines the base url if xray server is chosen (only required if xrayCloud=false)                                                                               | x*           |
+| `username`                | Username required to login to the Xray                                                                                                                         | x            |
+| `password`                | Password required to login to the Xray                                                                                                                         | x            |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
 | `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
 | `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
