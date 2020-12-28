@@ -2,9 +2,13 @@ import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
-import {Xray} from './xray'
+import { Xray } from './xray';
+import { XrayCloud } from './xray-cloud';
+import { XrayServer } from './xray-server';
 
 export interface XrayOptions {
+  cloud: boolean
+  baseUrl: string | undefined
   username: string
   password: string
 }
@@ -36,9 +40,17 @@ export class Processor {
   ) {}
 
   async process(): Promise<void> {
-    core.startGroup(`🚀 Connect to jira`)
+    core.startGroup(`🚀 Connect to xray`)
 
-    const xray = new Xray(this.xrayOptions, this.xrayImportOptions)
+    let xray: Xray
+    if(this.xrayOptions.cloud) {
+      xray = new XrayCloud(this.xrayOptions, this.xrayImportOptions)
+      core.info('ℹ️ Configured XrayCloud')
+    } else {
+      xray = new XrayServer(this.xrayOptions, this.xrayImportOptions)
+      core.info('ℹ️ Configured XrayServer')
+    }
+
     core.info('ℹ️ Start logging in procedure to xray')
     try {
       await xray.auth()

@@ -16,6 +16,8 @@ async function run(): Promise<void> {
     )
 
     // credentials for xray
+    const cloud: boolean = core.getInput('xrayCloud') === 'true'
+    const baseUrl: string = core.getInput('xrayBaseUrl')
     const username: string = core.getInput('username')
     const password: string = core.getInput('password')
 
@@ -41,6 +43,8 @@ async function run(): Promise<void> {
 
     await new Processor(
       {
+        cloud,
+        baseUrl,
         username,
         password
       },
