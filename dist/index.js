@@ -50,7 +50,16 @@ function run() {
             const testExecutionJson = utils_1.resolveJson(repositoryPath, testExecutionJsonInput);
             // credentials for xray
             const cloud = core.getInput('xrayCloud') === 'true';
-            const baseUrl = core.getInput('xrayBaseUrl');
+            const xrayBaseUrl = core.getInput('xrayBaseUrl');
+            let baseUrl = undefined;
+            if (xrayBaseUrl !== '') {
+                try {
+                    baseUrl = new URL(xrayBaseUrl);
+                }
+                catch (error) {
+                    core.setFailed(error.message);
+                }
+            }
             const username = core.getInput('username');
             const password = core.getInput('password');
             // params for xray
@@ -166,7 +175,7 @@ class Processor {
             }
             catch (error) {
                 core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`);
-                return;
+                return false;
             }
             core.endGroup();
             core.startGroup(`📝 Import test reports`);
@@ -239,10 +248,13 @@ class Processor {
             core.setOutput('count', filesCount);
             core.setOutput('completed', completed);
             core.setOutput('failed', failed);
+            let success = true;
             if (failed > 0 && this.importOptions.failOnImportError) {
                 core.setFailed(`🔥 ${failed} failed imports detected`);
+                success = false;
             }
             core.endGroup();
+            return success;
         });
     }
 }
@@ -409,20 +421,21 @@ class XrayCloud {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
-        this.xrayProtocol = 'https';
-        this.xrayBaseUrl = 'xray.cloud.xpand-it.com';
+        this.xrayBaseUrl = new URL('https://xray.cloud.xpand-it.com');
         this.token = '';
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
-        if (this.xrayProtocol === 'https') {
-            this.protocol = 'https:';
+    }
+    protocol() {
+        if (this.xrayBaseUrl.protocol === 'http') {
+            return 'http:';
         }
         else {
-            this.protocol = 'http:';
+            return 'https:';
         }
     }
     auth() {
         return __awaiter(this, void 0, void 0, function* () {
-            const authenticateResponse = yield got_1.default.post(`${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/authenticate`, {
+            const authenticateResponse = yield got_1.default.post(`${this.xrayBaseUrl.href}/api/v1/authenticate`, {
                 json: {
                     client_id: `${this.xrayOptions.username}`,
                     client_secret: `${this.xrayOptions.password}`
@@ -472,11 +485,11 @@ class XrayCloud {
                     filename: 'testInfo.json',
                     filepath: 'testInfo.json'
                 });
-                core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`);
                 const importResponse = yield utils_1.doFormDataRequest(form, {
-                    protocol: this.protocol,
-                    host: this.xrayBaseUrl,
-                    path: `/api/v1/import/execution/${format}/multipart`,
+                    protocol: this.protocol(),
+                    host: this.xrayBaseUrl.host,
+                    path: `${this.xrayBaseUrl.pathname}/api/v1/import/execution/${format}/multipart`,
                     headers: { Authorization: `Bearer ${this.token}` }
                 });
                 try {
@@ -488,7 +501,7 @@ class XrayCloud {
                 }
             }
             else {
-                const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`;
+                const endpoint = `${this.xrayBaseUrl.href}/api/v1/import/execution/${format}`;
                 core.debug(`Using endpoint: ${endpoint}`);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const importResponse = yield got_1.default.post(endpoint, {
@@ -566,16 +579,17 @@ class XrayServer {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
-        this.xrayProtocol = 'https';
-        this.xrayBaseUrl = 'sandbox.xpand-it.com';
         this.token = '';
-        this.xrayBaseUrl = this.xrayOptions.baseUrl;
+        this.xrayBaseUrl =
+            this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com');
         this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
-        if (this.xrayProtocol === 'https') {
-            this.protocol = 'https:';
+    }
+    protocol() {
+        if (this.xrayBaseUrl.protocol === 'http') {
+            return 'http:';
         }
         else {
-            this.protocol = 'http:';
+            return 'https:';
         }
     }
     auth() {
@@ -619,12 +633,12 @@ class XrayServer {
                     filename: 'testInfo.json',
                     filepath: 'testInfo.json'
                 });
-                core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`);
                 const importResponse = yield utils_1.doFormDataRequest(form, {
-                    protocol: this.protocol,
-                    host: this.xrayBaseUrl,
+                    protocol: this.protocol(),
+                    host: this.xrayBaseUrl.host,
                     auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
-                    path: `/rest/raven/2.0/import/execution/${format}/multipart`
+                    path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}/multipart`
                 });
                 try {
                     return importResponse.testExecIssue.key;
@@ -643,10 +657,10 @@ class XrayServer {
                         filepath: 'report.xml'
                     });
                     const importResponse = yield utils_1.doFormDataRequest(form, {
-                        protocol: this.protocol,
-                        host: this.xrayBaseUrl,
+                        protocol: this.protocol(),
+                        host: this.xrayBaseUrl.host,
                         auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
-                        path: `/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
+                        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
                     });
                     try {
                         return importResponse.testExecIssue.key;
@@ -657,7 +671,7 @@ class XrayServer {
                     }
                 }
                 else {
-                    const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}`;
+                    const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}`;
                     core.debug(`Using endpoint: ${endpoint}`);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const importResponse = yield got_1.default.post(endpoint, {

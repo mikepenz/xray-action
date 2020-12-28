@@ -17,7 +17,15 @@ async function run(): Promise<void> {
 
     // credentials for xray
     const cloud: boolean = core.getInput('xrayCloud') === 'true'
-    const baseUrl: string = core.getInput('xrayBaseUrl')
+    const xrayBaseUrl: string = core.getInput('xrayBaseUrl')
+    let baseUrl: URL | undefined = undefined
+    if (xrayBaseUrl !== '') {
+      try {
+        baseUrl = new URL(xrayBaseUrl)
+      } catch (error) {
+        core.setFailed(error.message)
+      }
+    }
     const username: string = core.getInput('username')
     const password: string = core.getInput('password')
 

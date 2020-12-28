@@ -7,7 +7,7 @@ test('import test results server', async () => {
   const processor = new Processor(
     {
       cloud: true,
-      baseUrl: "",
+      baseUrl: undefined,
       username: "x",
       password: "y"
     },
@@ -41,7 +41,7 @@ test('import test results server', async () => {
   const processor = new Processor(
     {
       cloud: false,
-      baseUrl: "sandbox.xpand-it.com",
+      baseUrl: new URL("https://sandbox.xpand-it.com"),
       username: "x",
       password: "y"
     },
@@ -77,7 +77,7 @@ test('import test results cloud', async () => {
   const processor = new Processor(
     {
       cloud: true,
-      baseUrl: "",
+      baseUrl: undefined,
       username: "x",
       password: "y"
     },

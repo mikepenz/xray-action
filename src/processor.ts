@@ -9,7 +9,7 @@ import {XrayServer} from './xray-server'
 
 export interface XrayOptions {
   cloud: boolean
-  baseUrl: string
+  baseUrl: URL | undefined
   username: string
   password: string
 }
