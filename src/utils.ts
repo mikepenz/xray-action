@@ -65,7 +65,11 @@ export async function doFormDataRequest(
         })
 
         res.on('end', () => {
-          resolve(JSON.parse(responseBody))
+          try {
+            resolve(JSON.parse(responseBody))
+          } catch (error) {
+            reject(error)
+          }
         })
       }
     })

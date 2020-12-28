@@ -5,12 +5,19 @@ branding:
   icon: 'check-circle'  
   color: 'green'
 inputs:
+  xrayCloud:
+    required: false
+    default: "true"
+    description: 'Defines which variant of xray to target at [cloud vs server]'
+  xrayBaseUrl:
+    required: false
+    description: 'The endpoint for an xray server instance. (Keep empty for cloud instances)'
   username:
     required: true
-    description: 'The username to login to xray cloud.'
+    description: 'The username to login to xray.'
   password:
     required: true
-    description: 'The password to login to xray cloud.'
+    description: 'The password to login to xray.'
   testPaths:
     required: true
     description: 'A `glob` pattern, to find all test results which should get imported.'

@@ -2,9 +2,14 @@ import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
+import {lookup} from 'mime-types'
 import {Xray} from './xray'
+import {XrayCloud} from './xray-cloud'
+import {XrayServer} from './xray-server'
 
 export interface XrayOptions {
+  cloud: boolean
+  baseUrl: string
   username: string
   password: string
 }
@@ -35,17 +40,25 @@ export class Processor {
     private importOptions: ImportOptions
   ) {}
 
-  async process(): Promise<void> {
-    core.startGroup(`🚀 Connect to jira`)
+  async process(): Promise<boolean> {
+    core.startGroup(`🚀 Connect to xray`)
 
-    const xray = new Xray(this.xrayOptions, this.xrayImportOptions)
+    let xray: Xray
+    if (this.xrayOptions.cloud) {
+      xray = new XrayCloud(this.xrayOptions, this.xrayImportOptions)
+      core.info('ℹ️ Configured XrayCloud')
+    } else {
+      xray = new XrayServer(this.xrayOptions, this.xrayImportOptions)
+      core.info('ℹ️ Configured XrayServer')
+    }
+
     core.info('ℹ️ Start logging in procedure to xray')
     try {
       await xray.auth()
       core.info('ℹ️ Completed login and retrieved token')
     } catch (error) {
       core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`)
-      return
+      return false
     }
 
     core.endGroup()
@@ -70,7 +83,20 @@ export class Processor {
       async function doImport(file: string): Promise<string> {
         core.debug(`Try to import: ${file}`)
         try {
-          const result = await xray.import(await fs.promises.readFile(file))
+          // identify mimetype
+          const tmpMime = lookup(file)
+          let mimeType: string
+          if (tmpMime === false) {
+            mimeType = 'application/xml'
+          } else {
+            mimeType = tmpMime
+          }
+
+          // execute import
+          const result = await xray.import(
+            await fs.promises.readFile(file),
+            mimeType
+          )
           core.info(`ℹ️ Imported: ${file} (${result})`)
 
           completed++
@@ -122,9 +148,12 @@ export class Processor {
     core.setOutput('completed', completed)
     core.setOutput('failed', failed)
 
+    let success = true
     if (failed > 0 && this.importOptions.failOnImportError) {
       core.setFailed(`🔥 ${failed} failed imports detected`)
+      success = false
     }
     core.endGroup()
+    return success
   }
 }

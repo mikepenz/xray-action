@@ -1,31 +1,117 @@
 import {Processor} from '../src/processor'
 
 jest.setTimeout(180000)
-test('import test results', async () => {
-  /*
+
+test('import test results server', async () => {
+  
   const processor = new Processor(
     {
+      cloud: true,
+      baseUrl: "",
       username: "x",
       password: "y"
     },
     {
       testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
-      testExecKey: "TA-1",
-      projectKey: "TA",
+      testExecKey: "",
+      projectKey: "GHXA",
       testPlanKey: "",
       testEnvironments: "",
       revision: "",
       fixVersion: "",
-      testExecutionJson: undefined,
+      testExecutionJson: undefined
+    },
+    {
+      combineInSingleTestExec: true,
+      failOnImportError: true,
+      continueOnImportError: true,
+      importParallelism: 2
+    }
+  )
+  const result = await processor.process()
+
+  // expect it to fail
+  expect(result).toEqual(false)
+})
+
+/*
+test('import test results server', async () => {
+  
+  const processor = new Processor(
+    {
+      cloud: false,
+      baseUrl: "sandbox.xpand-it.com",
+      username: "x",
+      password: "y"
+    },
+    {
+      testFormat: "junit",
+      testPaths: "marathon_tests/*.xml",
+      testExecKey: "",
+      projectKey: "GHXA",
+      testPlanKey: "",
+      testEnvironments: "",
+      revision: "",
+      fixVersion: "",
+      testExecutionJson: {
+        "fields": {
+            "summary": "Brand new Test execution",
+            "description": "This test execution covers the Android section of things"
+        }
+      },
     },
     {
       combineInSingleTestExec: true,
       failOnImportError: false,
       continueOnImportError: true,
-      importParallelism: 12
+      importParallelism: 2
     }
   )
   const result = await processor.process()
-  */
+  
 })
+
+test('import test results cloud', async () => {
+  
+  const processor = new Processor(
+    {
+      cloud: true,
+      baseUrl: "",
+      username: "x",
+      password: "y"
+    },
+    {
+      testFormat: "junit",
+      testPaths: "marathon_tests/*.xml",
+      testExecKey: "",
+      projectKey: "TA",
+      testPlanKey: "TA-33",
+      testEnvironments: "",
+      revision: "",
+      fixVersion: "",
+      testExecutionJson: {
+        "fields": {
+            "summary": "Brand new Test execution",
+            "description": "This test execution covers the Android section of things",
+            "customfield_10904": [ { "value": "Android" } ],
+            "assignee": {
+              "id": "123"
+            },
+            "issuetype": {
+                "id": "123"
+            }
+        }
+      },
+    },
+    {
+      combineInSingleTestExec: true,
+      failOnImportError: false,
+      continueOnImportError: true,
+      importParallelism: 2
+    }
+  )
+  const result = await processor.process()
+  
+})
+*/
