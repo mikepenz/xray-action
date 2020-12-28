@@ -8,7 +8,8 @@ import {Xray} from './xray'
 
 export class XrayServer implements Xray {
   xrayProtocol = 'https'
-  xrayBaseUrl = 'xray.cloud.xpand-it.com'
+  protocol: 'https:' | 'http:'
+  xrayBaseUrl = 'sandbox.xpand-it.com'
   searchParams!: URLSearchParams
   token = ''
 
@@ -16,25 +17,18 @@ export class XrayServer implements Xray {
     private xrayOptions: XrayOptions,
     private xrayImportOptions: XrayImportOptions
   ) {
+    this.xrayBaseUrl = this.xrayOptions.baseUrl
     this.searchParams = createSearchParams(this.xrayImportOptions)
+
+    if (this.xrayProtocol === 'https') {
+      this.protocol = 'https:'
+    } else {
+      this.protocol = 'http:'
+    }
   }
 
   async auth(): Promise<void> {
-    const authenticateResponse = await got.post<string>(
-      `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/authenticate`,
-      {
-        json: {
-          client_id: `${this.xrayOptions.username}`,
-          client_secret: `${this.xrayOptions.password}`
-        },
-        responseType: 'json',
-        timeout: 30000, // 30s timeout
-        retry: 2, // retry count for some requests
-        http2: true // try to allow http2 requests
-      }
-    )
-    this.token = authenticateResponse.body
-    core.setSecret(this.token)
+    // no auth needed
   }
 
   updateTestExecKey(testExecKey: string): void {
@@ -42,7 +36,7 @@ export class XrayServer implements Xray {
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 
-  async import(data: Buffer): Promise<string> {
+  async import(data: Buffer, mimeType: string): Promise<string> {
     // do import
     let format = this.xrayImportOptions.testFormat
     if (format === 'xray') {
@@ -51,7 +45,7 @@ export class XrayServer implements Xray {
 
     if (
       this.xrayImportOptions.testExecutionJson &&
-      !this.xrayImportOptions.testExecKey
+      this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
       updateTestExecJson(
@@ -67,10 +61,10 @@ export class XrayServer implements Xray {
           filepath: 'info.json'
         }
       )
-      form.append('results', data.toString('utf-8'), {
-        contentType: 'text/xml',
-        filename: 'test.xml',
-        filepath: 'test.xml'
+      form.append('file', data.toString('utf-8'), {
+        contentType: mimeType,
+        filename: 'report.xml',
+        filepath: 'report.xml'
       })
       form.append(
         'testInfo',
@@ -89,15 +83,17 @@ export class XrayServer implements Xray {
       )
 
       core.debug(
-        `Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`
+        `Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}/multipart`
       )
+
       const importResponse = await doFormDataRequest(form, {
+        protocol: this.protocol,
         host: this.xrayBaseUrl,
-        path: `/api/v1/import/execution/${format}/multipart`,
-        headers: {Authorization: `Bearer ${this.token}`}
+        auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+        path: `/rest/raven/2.0/import/execution/${format}/multipart`
       })
       try {
-        return importResponse.key
+        return importResponse.testExecIssue.key
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
@@ -107,31 +103,57 @@ export class XrayServer implements Xray {
         return ''
       }
     } else {
-      const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`
-      core.debug(`Using endpoint: ${endpoint}`)
+      if (mimeType === 'application/xml') {
+        const form = new FormData()
+        form.append('file', data.toString('utf-8'), {
+          contentType: mimeType,
+          filename: 'report.xml',
+          filepath: 'report.xml'
+        })
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const importResponse = await got.post<any>(endpoint, {
-        searchParams: this.searchParams,
-        headers: {
-          'Content-Type': 'text/xml',
-          Authorization: `Bearer ${this.token}`
-        },
-        body: data,
-        responseType: 'json',
-        timeout: 60000, // 60s timeout
-        retry: 2, // retry count for some requests
-        http2: true // try to allow http2 requests
-      })
-      try {
-        return importResponse.body.key
-      } catch (error) {
-        core.warning(
-          `🔥 Response did not match expected format: ${JSON.stringify(
-            importResponse.body || importResponse
-          )}`
-        )
-        return ''
+        const importResponse = await doFormDataRequest(form, {
+          protocol: this.protocol,
+          host: this.xrayBaseUrl,
+          auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+          path: `/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
+        })
+        try {
+          return importResponse.testExecIssue.key
+        } catch (error) {
+          core.warning(
+            `🔥 Response did not match expected format: ${JSON.stringify(
+              importResponse
+            )}`
+          )
+          return ''
+        }
+      } else {
+        const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/rest/raven/2.0/import/execution/${format}`
+        core.debug(`Using endpoint: ${endpoint}`)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const importResponse = await got.post<any>(endpoint, {
+          searchParams: this.searchParams,
+          headers: {
+            Authorization: `Basic ${Buffer.from(
+              `${this.xrayOptions.username}:${this.xrayOptions.password}`
+            ).toString('base64')}`,
+            'Content-Type': mimeType
+          },
+          body: data,
+          responseType: 'json',
+          timeout: 60000 // 60s timeout
+        })
+        try {
+          return importResponse.body.testExecIssue.key
+        } catch (error) {
+          core.warning(
+            `🔥 Response did not match expected format: ${JSON.stringify(
+              importResponse.body || importResponse
+            )}`
+          )
+          return ''
+        }
       }
     }
   }

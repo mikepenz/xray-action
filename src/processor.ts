@@ -2,13 +2,14 @@ import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
+import {lookup} from 'mime-types'
 import {Xray} from './xray'
 import {XrayCloud} from './xray-cloud'
 import {XrayServer} from './xray-server'
 
 export interface XrayOptions {
   cloud: boolean
-  baseUrl: string | undefined
+  baseUrl: string
   username: string
   password: string
 }
@@ -82,7 +83,20 @@ export class Processor {
       async function doImport(file: string): Promise<string> {
         core.debug(`Try to import: ${file}`)
         try {
-          const result = await xray.import(await fs.promises.readFile(file))
+          // identify mimetype
+          const tmpMime = lookup(file)
+          let mimeType: string
+          if (tmpMime === false) {
+            mimeType = 'application/xml'
+          } else {
+            mimeType = tmpMime
+          }
+
+          // execute import
+          const result = await xray.import(
+            await fs.promises.readFile(file),
+            mimeType
+          )
           core.info(`ℹ️ Imported: ${file} (${result})`)
 
           completed++

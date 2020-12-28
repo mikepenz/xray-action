@@ -8,6 +8,7 @@ import {Xray} from './xray'
 
 export class XrayCloud implements Xray {
   xrayProtocol = 'https'
+  protocol: 'https:' | 'http:'
   xrayBaseUrl = 'xray.cloud.xpand-it.com'
   searchParams!: URLSearchParams
   token = ''
@@ -17,6 +18,12 @@ export class XrayCloud implements Xray {
     private xrayImportOptions: XrayImportOptions
   ) {
     this.searchParams = createSearchParams(this.xrayImportOptions)
+
+    if (this.xrayProtocol === 'https') {
+      this.protocol = 'https:'
+    } else {
+      this.protocol = 'http:'
+    }
   }
 
   async auth(): Promise<void> {
@@ -42,7 +49,7 @@ export class XrayCloud implements Xray {
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 
-  async import(data: Buffer): Promise<string> {
+  async import(data: Buffer, mimeType: string): Promise<string> {
     // do import
     let format = this.xrayImportOptions.testFormat
     if (format === 'xray') {
@@ -51,7 +58,7 @@ export class XrayCloud implements Xray {
 
     if (
       this.xrayImportOptions.testExecutionJson &&
-      !this.xrayImportOptions.testExecKey
+      this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
       updateTestExecJson(
@@ -68,7 +75,7 @@ export class XrayCloud implements Xray {
         }
       )
       form.append('results', data.toString('utf-8'), {
-        contentType: 'text/xml',
+        contentType: mimeType,
         filename: 'test.xml',
         filepath: 'test.xml'
       })
@@ -92,6 +99,7 @@ export class XrayCloud implements Xray {
         `Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`
       )
       const importResponse = await doFormDataRequest(form, {
+        protocol: this.protocol,
         host: this.xrayBaseUrl,
         path: `/api/v1/import/execution/${format}/multipart`,
         headers: {Authorization: `Bearer ${this.token}`}
@@ -114,8 +122,8 @@ export class XrayCloud implements Xray {
       const importResponse = await got.post<any>(endpoint, {
         searchParams: this.searchParams,
         headers: {
-          'Content-Type': 'text/xml',
-          Authorization: `Bearer ${this.token}`
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': mimeType
         },
         body: data,
         responseType: 'json',
