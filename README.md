@@ -30,28 +30,45 @@
 
 ### Configure the workflow
 
-Specify the action as part of your GitHub actions workflow:
+Specify the action as part of your GitHub actions workflow, using a [Xray API key](https://docs.getxray.app/display/XRAYCLOUD/Global+Settings%3A+API+Keys) (i.e. a pair of client id and client secret):
 
 ```yml
-- name: "Import files"
+- name: "Import results to Xray"
   uses: mikepenz/xray-action@{latest-release}
   with:
-    username: ${{ secrets.XRAY_USERNAME }}
-    password: ${{ secrets.XRAY_PASSWORD }}
+    username: ${{ secrets.XRAY_CLIENT_ID }}
+    password: ${{ secrets.XRAY_CLIENT_SECRET }}
     testFormat: "junit"
     testPaths: "**/test/*.xml"
     testExecKey: "TEST-1"
     projectKey: "TEST"
 ```
 
+If you're using Xray server/DC, you'll need to set xrayCloud as "false", use Jira credentials for authentication, and specify additional parameters.
+
+ ```yml
+- name: "Import results to Xray"
+  uses: mikepenz/xray-action@{latest-release}
+  with:
+    username: ${{ secrets.JIRA_USERNAME }}
+    password: ${{ secrets.JIRA_PASSWORD }}
+    xrayCloud: "false"
+    xrayBaseUrl: "https://myjiraserver.example.com"
+    testFormat: "junit"
+    testPaths: "**/test/*.xml"
+    testExecKey: "TEST-1"
+    projectKey: "TEST"
+```
+
+
 💡 Do not specify username and password in cleartext, instead prefer to read them from GitHub action secrets.
 
 | **Input**                 | **Description**                                                                                                                                                | **Required** |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
-| `xrayCloud`               | Defines which variant of xray to target [cloud (default) vs server]                                                                                            |              |
-| `xrayBaseUrl`             | Defines the base url if xray server is chosen (only required if xrayCloud=false)                                                                               | x*           |
-| `username`                | Username required to login to the Xray                                                                                                                         | x            |
-| `password`                | Password required to login to the Xray                                                                                                                         | x            |
+| `xrayCloud`               | Defines which variant of Xray to target [cloud vs server/DC] (default="true")                                                                                  |              |
+| `xrayBaseUrl`             | Defines the base URL if Xray server/DC is chosen (only required if xrayCloud="false")                                                                          | x*           |
+| `username`                | Xray API client id (cloud) or Jira username (server/DC)                                                                                                        | x            |
+| `password`                | Xray API client secret (cloud) or Jira password (server/DC)                                                                                                    | x            |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
 | `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
 | `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
