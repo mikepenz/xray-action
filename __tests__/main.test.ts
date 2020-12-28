@@ -2,6 +2,39 @@ import {Processor} from '../src/processor'
 
 jest.setTimeout(180000)
 
+test('import test results server', async () => {
+  
+  const processor = new Processor(
+    {
+      cloud: true,
+      baseUrl: "",
+      username: "x",
+      password: "y"
+    },
+    {
+      testFormat: "junit",
+      testPaths: "marathon_tests/*.xml",
+      testExecKey: "",
+      projectKey: "GHXA",
+      testPlanKey: "",
+      testEnvironments: "",
+      revision: "",
+      fixVersion: "",
+      testExecutionJson: undefined
+    },
+    {
+      combineInSingleTestExec: true,
+      failOnImportError: true,
+      continueOnImportError: true,
+      importParallelism: 2
+    }
+  )
+  const result = await processor.process()
+
+  // expect it to fail
+  expect(result).toEqual(false)
+})
+
 /*
 test('import test results server', async () => {
   

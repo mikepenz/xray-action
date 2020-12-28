@@ -40,7 +40,7 @@ export class Processor {
     private importOptions: ImportOptions
   ) {}
 
-  async process(): Promise<void> {
+  async process(): Promise<boolean> {
     core.startGroup(`🚀 Connect to xray`)
 
     let xray: Xray
@@ -58,7 +58,7 @@ export class Processor {
       core.info('ℹ️ Completed login and retrieved token')
     } catch (error) {
       core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`)
-      return
+      return false
     }
 
     core.endGroup()
@@ -148,9 +148,12 @@ export class Processor {
     core.setOutput('completed', completed)
     core.setOutput('failed', failed)
 
+    let success = true
     if (failed > 0 && this.importOptions.failOnImportError) {
       core.setFailed(`🔥 ${failed} failed imports detected`)
+      success = false
     }
     core.endGroup()
+    return success
   }
 }
