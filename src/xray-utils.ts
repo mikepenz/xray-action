@@ -1,13 +1,13 @@
-import { XrayImportOptions } from './processor'
+import {XrayImportOptions} from './processor'
 
 /**
- * 
+ *
  */
-export function createSearchParams(xrayImportOptions: XrayImportOptions): URLSearchParams {
+export function createSearchParams(
+  xrayImportOptions: XrayImportOptions
+): URLSearchParams {
   // prepare params
-  const elements: string[][] = [
-    ['projectKey', xrayImportOptions.projectKey]
-  ]
+  const elements: string[][] = [['projectKey', xrayImportOptions.projectKey]]
   if (xrayImportOptions.testExecKey) {
     elements.push(['testExecKey', xrayImportOptions.testExecKey])
   }
@@ -15,10 +15,7 @@ export function createSearchParams(xrayImportOptions: XrayImportOptions): URLSea
     elements.push(['testPlanKey', xrayImportOptions.testPlanKey])
   }
   if (xrayImportOptions.testEnvironments) {
-    elements.push([
-      'testEnvironments',
-      xrayImportOptions.testEnvironments
-    ])
+    elements.push(['testEnvironments', xrayImportOptions.testEnvironments])
   }
   if (xrayImportOptions.revision) {
     elements.push(['revision', xrayImportOptions.revision])
@@ -30,9 +27,12 @@ export function createSearchParams(xrayImportOptions: XrayImportOptions): URLSea
 }
 
 /**
- * 
+ *
  */
-export function updateTestExecJson(xrayImportOptions: XrayImportOptions, testExecutionJson: Object): void {
+export function updateTestExecJson(
+  xrayImportOptions: XrayImportOptions,
+  testExecutionJson: Object
+): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const testExecJson: any = testExecutionJson
   if (!testExecJson['fields']) {
@@ -47,26 +47,19 @@ export function updateTestExecJson(xrayImportOptions: XrayImportOptions, testExe
     testExecJson['xrayFields'] = {}
   }
   if (xrayImportOptions.testExecKey) {
-    testExecJson['xrayFields'][
-      'testExecKey'
-    ] = xrayImportOptions.testExecKey
+    testExecJson['xrayFields']['testExecKey'] = xrayImportOptions.testExecKey
   }
   if (xrayImportOptions.testPlanKey) {
-    testExecJson['xrayFields'][
-      'testPlanKey'
-    ] = xrayImportOptions.testPlanKey
+    testExecJson['xrayFields']['testPlanKey'] = xrayImportOptions.testPlanKey
   }
   if (xrayImportOptions.testEnvironments) {
-    testExecJson['xrayFields'][
-      'testEnvironments'
-    ] = xrayImportOptions.testEnvironments
+    testExecJson['xrayFields']['testEnvironments'] =
+      xrayImportOptions.testEnvironments
   }
   if (xrayImportOptions.revision) {
     testExecJson['xrayFields']['revision'] = xrayImportOptions.revision
   }
   if (xrayImportOptions.fixVersion) {
-    testExecJson['xrayFields'][
-      'fixVersion'
-    ] = xrayImportOptions.fixVersion
+    testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion
   }
 }

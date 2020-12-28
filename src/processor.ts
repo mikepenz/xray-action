@@ -2,9 +2,9 @@ import * as core from '@actions/core'
 import * as glob from '@actions/glob'
 import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
-import { Xray } from './xray';
-import { XrayCloud } from './xray-cloud';
-import { XrayServer } from './xray-server';
+import {Xray} from './xray'
+import {XrayCloud} from './xray-cloud'
+import {XrayServer} from './xray-server'
 
 export interface XrayOptions {
   cloud: boolean
@@ -43,7 +43,7 @@ export class Processor {
     core.startGroup(`🚀 Connect to xray`)
 
     let xray: Xray
-    if(this.xrayOptions.cloud) {
+    if (this.xrayOptions.cloud) {
       xray = new XrayCloud(this.xrayOptions, this.xrayImportOptions)
       core.info('ℹ️ Configured XrayCloud')
     } else {

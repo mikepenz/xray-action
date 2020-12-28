@@ -49,6 +49,8 @@ function run() {
             const testExecutionJsonInput = core.getInput('testExecutionJson');
             const testExecutionJson = utils_1.resolveJson(repositoryPath, testExecutionJsonInput);
             // credentials for xray
+            const cloud = core.getInput('xrayCloud') === 'true';
+            const baseUrl = core.getInput('xrayBaseUrl');
             const username = core.getInput('username');
             const password = core.getInput('password');
             // params for xray
@@ -66,6 +68,8 @@ function run() {
             const continueOnImportError = core.getInput('continueOnImportError') === 'true';
             const importParallelism = Number(core.getInput('importParallelism')) || 2; // by default go to 2 parallelism
             yield new processor_1.Processor({
+                cloud,
+                baseUrl,
                 username,
                 password
             }, {
@@ -134,7 +138,8 @@ const core = __importStar(__webpack_require__(2186));
 const glob = __importStar(__webpack_require__(8090));
 const promise_pool_1 = __webpack_require__(8941);
 const fs = __importStar(__webpack_require__(5747));
-const xray_1 = __webpack_require__(6083);
+const xray_cloud_1 = __webpack_require__(4261);
+const xray_server_1 = __webpack_require__(909);
 class Processor {
     constructor(xrayOptions, xrayImportOptions, importOptions) {
         this.xrayOptions = xrayOptions;
@@ -143,8 +148,16 @@ class Processor {
     }
     process() {
         return __awaiter(this, void 0, void 0, function* () {
-            core.startGroup(`🚀 Connect to jira`);
-            const xray = new xray_1.Xray(this.xrayOptions, this.xrayImportOptions);
+            core.startGroup(`🚀 Connect to xray`);
+            let xray;
+            if (this.xrayOptions.cloud) {
+                xray = new xray_cloud_1.XrayCloud(this.xrayOptions, this.xrayImportOptions);
+                core.info('ℹ️ Configured XrayCloud');
+            }
+            else {
+                xray = new xray_server_1.XrayServer(this.xrayOptions, this.xrayImportOptions);
+                core.info('ℹ️ Configured XrayServer');
+            }
             core.info('ℹ️ Start logging in procedure to xray');
             try {
                 yield xray.auth();
@@ -333,7 +346,7 @@ exports.doFormDataRequest = doFormDataRequest;
 
 /***/ }),
 
-/***/ 6083:
+/***/ 4261:
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 "use strict";
@@ -370,77 +383,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Xray = void 0;
+exports.XrayCloud = void 0;
 const got_1 = __importDefault(__webpack_require__(3061));
 const core = __importStar(__webpack_require__(2186));
 const form_data_1 = __importDefault(__webpack_require__(4334));
 const utils_1 = __webpack_require__(918);
-class Xray {
+const xray_utils_1 = __webpack_require__(7249);
+class XrayCloud {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
         this.xrayProtocol = 'https';
         this.xrayBaseUrl = 'xray.cloud.xpand-it.com';
         this.token = '';
-        this.createSearchParams();
-    }
-    updateTestExecKey(testExecKey) {
-        this.xrayImportOptions.testExecKey = testExecKey;
-        this.createSearchParams();
-    }
-    createSearchParams() {
-        // prepare params
-        const elements = [
-            ['projectKey', this.xrayImportOptions.projectKey]
-        ];
-        if (this.xrayImportOptions.testExecKey) {
-            elements.push(['testExecKey', this.xrayImportOptions.testExecKey]);
-        }
-        if (this.xrayImportOptions.testPlanKey) {
-            elements.push(['testPlanKey', this.xrayImportOptions.testPlanKey]);
-        }
-        if (this.xrayImportOptions.testEnvironments) {
-            elements.push([
-                'testEnvironments',
-                this.xrayImportOptions.testEnvironments
-            ]);
-        }
-        if (this.xrayImportOptions.revision) {
-            elements.push(['revision', this.xrayImportOptions.revision]);
-        }
-        if (this.xrayImportOptions.fixVersion) {
-            elements.push(['fixVersion', this.xrayImportOptions.fixVersion]);
-        }
-        this.searchParams = new URLSearchParams(elements);
-    }
-    updateTestExecJson(testExecutionJson) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const testExecJson = testExecutionJson;
-        if (!testExecJson['fields']) {
-            testExecJson['fields'] = {};
-        }
-        if (!testExecJson['fields']['project']) {
-            testExecJson['fields']['project'] = {};
-        }
-        testExecJson['fields']['project']['key'] = this.xrayImportOptions.projectKey;
-        if (!testExecJson['xrayFields']) {
-            testExecJson['xrayFields'] = {};
-        }
-        if (this.xrayImportOptions.testExecKey) {
-            testExecJson['xrayFields']['testExecKey'] = this.xrayImportOptions.testExecKey;
-        }
-        if (this.xrayImportOptions.testPlanKey) {
-            testExecJson['xrayFields']['testPlanKey'] = this.xrayImportOptions.testPlanKey;
-        }
-        if (this.xrayImportOptions.testEnvironments) {
-            testExecJson['xrayFields']['testEnvironments'] = this.xrayImportOptions.testEnvironments;
-        }
-        if (this.xrayImportOptions.revision) {
-            testExecJson['xrayFields']['revision'] = this.xrayImportOptions.revision;
-        }
-        if (this.xrayImportOptions.fixVersion) {
-            testExecJson['xrayFields']['fixVersion'] = this.xrayImportOptions.fixVersion;
-        }
+        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
     }
     auth() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -458,6 +414,10 @@ class Xray {
             core.setSecret(this.token);
         });
     }
+    updateTestExecKey(testExecKey) {
+        this.xrayImportOptions.testExecKey = testExecKey;
+        return xray_utils_1.createSearchParams(this.xrayImportOptions);
+    }
     import(data) {
         return __awaiter(this, void 0, void 0, function* () {
             // do import
@@ -468,7 +428,7 @@ class Xray {
             if (this.xrayImportOptions.testExecutionJson &&
                 !this.xrayImportOptions.testExecKey) {
                 const form = new form_data_1.default();
-                this.updateTestExecJson(this.xrayImportOptions.testExecutionJson);
+                xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
                     contentType: 'application/json',
                     filename: 'info.json',
@@ -531,7 +491,226 @@ class Xray {
         });
     }
 }
-exports.Xray = Xray;
+exports.XrayCloud = XrayCloud;
+
+
+/***/ }),
+
+/***/ 909:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.XrayServer = void 0;
+const got_1 = __importDefault(__webpack_require__(3061));
+const core = __importStar(__webpack_require__(2186));
+const form_data_1 = __importDefault(__webpack_require__(4334));
+const utils_1 = __webpack_require__(918);
+const xray_utils_1 = __webpack_require__(7249);
+class XrayServer {
+    constructor(xrayOptions, xrayImportOptions) {
+        this.xrayOptions = xrayOptions;
+        this.xrayImportOptions = xrayImportOptions;
+        this.xrayProtocol = 'https';
+        this.xrayBaseUrl = 'xray.cloud.xpand-it.com';
+        this.token = '';
+        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+    }
+    auth() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const authenticateResponse = yield got_1.default.post(`${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/authenticate`, {
+                json: {
+                    client_id: `${this.xrayOptions.username}`,
+                    client_secret: `${this.xrayOptions.password}`
+                },
+                responseType: 'json',
+                timeout: 30000,
+                retry: 2,
+                http2: true // try to allow http2 requests
+            });
+            this.token = authenticateResponse.body;
+            core.setSecret(this.token);
+        });
+    }
+    updateTestExecKey(testExecKey) {
+        this.xrayImportOptions.testExecKey = testExecKey;
+        return xray_utils_1.createSearchParams(this.xrayImportOptions);
+    }
+    import(data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // do import
+            let format = this.xrayImportOptions.testFormat;
+            if (format === 'xray') {
+                format = ''; // xray format has no subpath
+            }
+            if (this.xrayImportOptions.testExecutionJson &&
+                !this.xrayImportOptions.testExecKey) {
+                const form = new form_data_1.default();
+                xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
+                form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
+                    contentType: 'application/json',
+                    filename: 'info.json',
+                    filepath: 'info.json'
+                });
+                form.append('results', data.toString('utf-8'), {
+                    contentType: 'text/xml',
+                    filename: 'test.xml',
+                    filepath: 'test.xml'
+                });
+                form.append('testInfo', JSON.stringify({
+                    fields: {
+                        project: {
+                            key: this.xrayImportOptions.projectKey
+                        }
+                    }
+                }), {
+                    contentType: 'application/json',
+                    filename: 'testInfo.json',
+                    filepath: 'testInfo.json'
+                });
+                core.debug(`Using multipart endpoint: ${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}/multipart`);
+                const importResponse = yield utils_1.doFormDataRequest(form, {
+                    host: this.xrayBaseUrl,
+                    path: `/api/v1/import/execution/${format}/multipart`,
+                    headers: { Authorization: `Bearer ${this.token}` }
+                });
+                try {
+                    return importResponse.key;
+                }
+                catch (error) {
+                    core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse)}`);
+                    return '';
+                }
+            }
+            else {
+                const endpoint = `${this.xrayProtocol}://${this.xrayBaseUrl}/api/v1/import/execution/${format}`;
+                core.debug(`Using endpoint: ${endpoint}`);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const importResponse = yield got_1.default.post(endpoint, {
+                    searchParams: this.searchParams,
+                    headers: {
+                        'Content-Type': 'text/xml',
+                        Authorization: `Bearer ${this.token}`
+                    },
+                    body: data,
+                    responseType: 'json',
+                    timeout: 60000,
+                    retry: 2,
+                    http2: true // try to allow http2 requests
+                });
+                try {
+                    return importResponse.body.key;
+                }
+                catch (error) {
+                    core.warning(`🔥 Response did not match expected format: ${JSON.stringify(importResponse.body || importResponse)}`);
+                    return '';
+                }
+            }
+        });
+    }
+}
+exports.XrayServer = XrayServer;
+
+
+/***/ }),
+
+/***/ 7249:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.updateTestExecJson = exports.createSearchParams = void 0;
+/**
+ *
+ */
+function createSearchParams(xrayImportOptions) {
+    // prepare params
+    const elements = [['projectKey', xrayImportOptions.projectKey]];
+    if (xrayImportOptions.testExecKey) {
+        elements.push(['testExecKey', xrayImportOptions.testExecKey]);
+    }
+    if (xrayImportOptions.testPlanKey) {
+        elements.push(['testPlanKey', xrayImportOptions.testPlanKey]);
+    }
+    if (xrayImportOptions.testEnvironments) {
+        elements.push(['testEnvironments', xrayImportOptions.testEnvironments]);
+    }
+    if (xrayImportOptions.revision) {
+        elements.push(['revision', xrayImportOptions.revision]);
+    }
+    if (xrayImportOptions.fixVersion) {
+        elements.push(['fixVersion', xrayImportOptions.fixVersion]);
+    }
+    return new URLSearchParams(elements);
+}
+exports.createSearchParams = createSearchParams;
+/**
+ *
+ */
+function updateTestExecJson(xrayImportOptions, testExecutionJson) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const testExecJson = testExecutionJson;
+    if (!testExecJson['fields']) {
+        testExecJson['fields'] = {};
+    }
+    if (!testExecJson['fields']['project']) {
+        testExecJson['fields']['project'] = {};
+    }
+    testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    if (!testExecJson['xrayFields']) {
+        testExecJson['xrayFields'] = {};
+    }
+    if (xrayImportOptions.testExecKey) {
+        testExecJson['xrayFields']['testExecKey'] = xrayImportOptions.testExecKey;
+    }
+    if (xrayImportOptions.testPlanKey) {
+        testExecJson['xrayFields']['testPlanKey'] = xrayImportOptions.testPlanKey;
+    }
+    if (xrayImportOptions.testEnvironments) {
+        testExecJson['xrayFields']['testEnvironments'] =
+            xrayImportOptions.testEnvironments;
+    }
+    if (xrayImportOptions.revision) {
+        testExecJson['xrayFields']['revision'] = xrayImportOptions.revision;
+    }
+    if (xrayImportOptions.fixVersion) {
+        testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion;
+    }
+}
+exports.updateTestExecJson = updateTestExecJson;
 
 
 /***/ }),

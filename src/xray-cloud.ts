@@ -3,8 +3,8 @@ import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'
 import {doFormDataRequest} from './utils'
-import { createSearchParams, updateTestExecJson } from './xray-utils';
-import { Xray } from './xray'
+import {createSearchParams, updateTestExecJson} from './xray-utils'
+import {Xray} from './xray'
 
 export class XrayCloud implements Xray {
   xrayProtocol = 'https'
@@ -36,10 +36,10 @@ export class XrayCloud implements Xray {
     this.token = authenticateResponse.body
     core.setSecret(this.token)
   }
-  
+
   updateTestExecKey(testExecKey: string): URLSearchParams {
-      this.xrayImportOptions.testExecKey = testExecKey
-      return createSearchParams(this.xrayImportOptions)
+    this.xrayImportOptions.testExecKey = testExecKey
+    return createSearchParams(this.xrayImportOptions)
   }
 
   async import(data: Buffer): Promise<string> {
@@ -54,7 +54,10 @@ export class XrayCloud implements Xray {
       !this.xrayImportOptions.testExecKey
     ) {
       const form = new FormData()
-      updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson)
+      updateTestExecJson(
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
+      )
       form.append(
         'info',
         JSON.stringify(this.xrayImportOptions.testExecutionJson),
