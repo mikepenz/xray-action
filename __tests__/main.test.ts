@@ -35,22 +35,21 @@ test('import test results server', async () => {
   expect(result).toEqual(false)
 })
 
-/*
 test('import test results server', async () => {
-  
+
   const processor = new Processor(
     {
       cloud: false,
-      baseUrl: new URL("https://sandbox.xpand-it.com"),
-      username: "x",
-      password: "y"
+      baseUrl: new URL("https://xray-demo3.xpand-it.com"),
+      username: process.env.XRAY_USERNAME || "",
+      password: process.env.XRAY_PASSWORD || ""
     },
     {
       testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
       testExecKey: "",
       projectKey: "GHXA",
-      testPlanKey: "",
+      testPlanKey: "GHXA-1",
       testEnvironments: "",
       revision: "",
       fixVersion: "",
@@ -72,6 +71,7 @@ test('import test results server', async () => {
   
 })
 
+/*
 test('import test results cloud', async () => {
   
   const processor = new Processor(

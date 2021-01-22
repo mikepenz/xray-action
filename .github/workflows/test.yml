@@ -20,6 +20,8 @@ jobs:
           npm run all
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          XRAY_USERNAME: ${{ secrets.XRAY_USERNAME }}
+          XRAY_PASSWORD: ${{ secrets.XRAY_PASSWORD }}
           
   test:
     if: github.event_name  == 'pull_request'
@@ -28,11 +30,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-#      - name: "Run imports"
-#        id: minimal_release
-#        uses: ./
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Run imports"
+        uses: ./
+        with:
+          username: ${{ secrets.XRAY_USERNAME }}
+          password: ${{ secrets.XRAY_PASSWORD }}
+          xrayCloud: "false"
+          xrayBaseUrl: "https://xray-demo3.xpand-it.com"
+          testFormat: "junit"
+          testPaths: "marathon_tests/*.xml"
+          testExecKey: "GHXA-9"
+          projectKey: "GHXA"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
