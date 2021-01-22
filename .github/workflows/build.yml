@@ -39,7 +39,7 @@ jobs:
           xrayBaseUrl: "https://xray-demo3.xpand-it.com"
           testFormat: "junit"
           testPaths: "marathon_tests/*.xml"
-          testExecKey: "GHXA-9"
+          testPlanKey: "GHXA-9"
           projectKey: "GHXA"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
