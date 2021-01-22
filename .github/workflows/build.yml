@@ -41,6 +41,7 @@ jobs:
           testPaths: "marathon_tests/*.xml"
           testPlanKey: "GHXA-9"
           projectKey: "GHXA"
+          combineInSingleTestExec: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
