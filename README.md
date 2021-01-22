@@ -150,6 +150,12 @@ $ npm run lint -- --fix
  * [mikepenz.com](http://mikepenz.com) - <mikepenz@gmail.com>
  * [paypal.me/mikepenz](http://paypal.me/mikepenz)
 
+## Other actions
+
+- [release-changelog-builder-action](https://github.com/mikepenz/release-changelog-builder-action)
+- [action-junit-report](https://github.com/mikepenz/action-junit-report)
+- [jira-release-composition-action](https://github.com/mikepenz/jira-release-composite-action)
+
 ## License
 
     Copyright 2021 Mike Penz
