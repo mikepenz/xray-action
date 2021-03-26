@@ -5114,12 +5114,14 @@ module.exports = (fromStream, toStream) => {
 /***/ }),
 
 /***/ 6214:
-/***/ ((module, exports, __nccwpck_require__) => {
+/***/ ((module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const tls_1 = __nccwpck_require__(4016);
+function isTLSSocket(socket) {
+    return socket.encrypted;
+}
 const deferToConnect = (socket, fn) => {
     let listeners;
     if (typeof fn === 'function') {
@@ -5136,7 +5138,7 @@ const deferToConnect = (socket, fn) => {
         if (hasConnectListener) {
             listeners.connect();
         }
-        if (socket instanceof tls_1.TLSSocket && hasSecureConnectListener) {
+        if (isTLSSocket(socket) && hasSecureConnectListener) {
             if (socket.authorized) {
                 listeners.secureConnect();
             }
@@ -5391,6 +5393,7 @@ var http = __nccwpck_require__(8605);
 var https = __nccwpck_require__(7211);
 var parseUrl = __nccwpck_require__(8835).parse;
 var fs = __nccwpck_require__(5747);
+var Stream = __nccwpck_require__(2413).Stream;
 var mime = __nccwpck_require__(3583);
 var asynckit = __nccwpck_require__(4812);
 var populate = __nccwpck_require__(7142);
@@ -5486,8 +5489,8 @@ FormData.prototype._trackLength = function(header, value, options) {
     Buffer.byteLength(header) +
     FormData.LINE_BREAK.length;
 
-  // empty or either doesn't have path or not an http response
-  if (!value || ( !value.path && !(value.readable && value.hasOwnProperty('httpVersion')) )) {
+  // empty or either doesn't have path or not an http response or not a stream
+  if (!value || ( !value.path && !(value.readable && value.hasOwnProperty('httpVersion')) && !(value instanceof Stream))) {
     return;
   }
 
@@ -5691,6 +5694,10 @@ FormData.prototype.getHeaders = function(userHeaders) {
   return formHeaders;
 };
 
+FormData.prototype.setBoundary = function(boundary) {
+  this._boundary = boundary;
+};
+
 FormData.prototype.getBoundary = function() {
   if (!this._boundary) {
     this._generateBoundary();
@@ -5838,13 +5845,15 @@ FormData.prototype.submit = function(params, cb) {
 
   // get content length and fire away
   this.getLength(function(err, length) {
-    if (err) {
+    if (err && err !== 'Unknown stream') {
       this._error(err);
       return;
     }
 
     // add content length
-    request.setHeader('Content-Length', length);
+    if (length) {
+      request.setHeader('Content-Length', length);
+    }
 
     this.pipe(request);
     if (cb) {
@@ -6487,7 +6496,7 @@ const is_response_ok_1 = __nccwpck_require__(9298);
 const deprecation_warning_1 = __nccwpck_require__(397);
 const normalize_arguments_1 = __nccwpck_require__(1048);
 const calculate_retry_delay_1 = __nccwpck_require__(3462);
-const globalDnsCache = new cacheable_lookup_1.default();
+let globalDnsCache;
 const kRequest = Symbol('request');
 const kResponse = Symbol('response');
 const kResponseSize = Symbol('responseSize');
@@ -7044,6 +7053,9 @@ class Request extends stream_1.Duplex {
         options.cacheOptions = { ...options.cacheOptions };
         // `options.dnsCache`
         if (options.dnsCache === true) {
+            if (!globalDnsCache) {
+                globalDnsCache = new cacheable_lookup_1.default();
+            }
             options.dnsCache = globalDnsCache;
         }
         else if (!is_1.default.undefined(options.dnsCache) && !options.dnsCache.lookup) {
