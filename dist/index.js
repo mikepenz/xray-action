@@ -774,14 +774,27 @@ exports.updateTestExecJson = updateTestExecJson;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.issue = exports.issueCommand = void 0;
 const os = __importStar(__nccwpck_require__(2087));
 const utils_1 = __nccwpck_require__(5278);
 /**
@@ -860,6 +873,25 @@ function escapeProperty(s) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -869,14 +901,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __nccwpck_require__(7351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
@@ -943,7 +969,9 @@ function addPath(inputPath) {
 }
 exports.addPath = addPath;
 /**
- * Gets the value of an input.  The value is also trimmed.
+ * Gets the value of an input.
+ * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+ * Returns an empty string if the value is not defined.
  *
  * @param     name     name of the input to get
  * @param     options  optional. See InputOptions.
@@ -954,9 +982,34 @@ function getInput(name, options) {
     if (options && options.required && !val) {
         throw new Error(`Input required and not supplied: ${name}`);
     }
+    if (options && options.trimWhitespace === false) {
+        return val;
+    }
     return val.trim();
 }
 exports.getInput = getInput;
+/**
+ * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+ * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+ * The return value is also in boolean type.
+ * ref: https://yaml.org/spec/1.2/spec.html#id2804923
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   boolean
+ */
+function getBooleanInput(name, options) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    const val = getInput(name, options);
+    if (trueValue.includes(val))
+        return true;
+    if (falseValue.includes(val))
+        return false;
+    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+exports.getBooleanInput = getBooleanInput;
 /**
  * Sets the value of an output.
  *
@@ -965,6 +1018,7 @@ exports.getInput = getInput;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setOutput(name, value) {
+    process.stdout.write(os.EOL);
     command_1.issueCommand('set-output', { name }, value);
 }
 exports.setOutput = setOutput;
@@ -1106,14 +1160,27 @@ exports.getState = getState;
 "use strict";
 
 // For internal use, subject to change.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.issueCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__nccwpck_require__(5747));
@@ -1144,6 +1211,7 @@ exports.issueCommand = issueCommand;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -1177,6 +1245,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.create = void 0;
 const internal_globber_1 = __nccwpck_require__(8298);
 /**
  * Constructs a globber
@@ -1199,14 +1268,27 @@ exports.create = create;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getOptions = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 /**
  * Returns a copy with defaults filled in.
@@ -1243,6 +1325,25 @@ exports.getOptions = getOptions;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -1271,14 +1372,8 @@ var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _ar
     function reject(value) { resume("throw", value); }
     function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.DefaultGlobber = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const fs = __importStar(__nccwpck_require__(5747));
 const globOptionsHelper = __importStar(__nccwpck_require__(1026));
@@ -1329,7 +1424,7 @@ class DefaultGlobber {
                 if (options.implicitDescendants &&
                     (pattern.trailingSeparator ||
                         pattern.segments[pattern.segments.length - 1] !== '**')) {
-                    patterns.push(new internal_pattern_1.Pattern(pattern.negate, pattern.segments.concat('**')));
+                    patterns.push(new internal_pattern_1.Pattern(pattern.negate, true, pattern.segments.concat('**')));
                 }
             }
             // Push the search paths
@@ -1473,6 +1568,7 @@ exports.DefaultGlobber = DefaultGlobber;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.MatchKind = void 0;
 /**
  * Indicates whether a pattern matches a path
  */
@@ -1496,17 +1592,30 @@ var MatchKind;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.safeTrimTrailingSeparator = exports.normalizeSeparators = exports.hasRoot = exports.hasAbsoluteRoot = exports.ensureAbsoluteRoot = exports.dirname = void 0;
 const path = __importStar(__nccwpck_require__(5622));
 const assert_1 = __importDefault(__nccwpck_require__(2357));
 const IS_WINDOWS = process.platform === 'win32';
@@ -1688,17 +1797,30 @@ exports.safeTrimTrailingSeparator = safeTrimTrailingSeparator;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Path = void 0;
 const path = __importStar(__nccwpck_require__(5622));
 const pathHelper = __importStar(__nccwpck_require__(1849));
 const assert_1 = __importDefault(__nccwpck_require__(2357));
@@ -1795,14 +1917,27 @@ exports.Path = Path;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.partialMatch = exports.match = exports.getSearchPaths = void 0;
 const pathHelper = __importStar(__nccwpck_require__(1849));
 const internal_match_kind_1 = __nccwpck_require__(1063);
 const IS_WINDOWS = process.platform === 'win32';
@@ -1883,17 +2018,30 @@ exports.partialMatch = partialMatch;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Pattern = void 0;
 const os = __importStar(__nccwpck_require__(2087));
 const path = __importStar(__nccwpck_require__(5622));
 const pathHelper = __importStar(__nccwpck_require__(1849));
@@ -1903,7 +2051,7 @@ const internal_match_kind_1 = __nccwpck_require__(1063);
 const internal_path_1 = __nccwpck_require__(6836);
 const IS_WINDOWS = process.platform === 'win32';
 class Pattern {
-    constructor(patternOrNegate, segments, homedir) {
+    constructor(patternOrNegate, isImplicitPattern = false, segments, homedir) {
         /**
          * Indicates whether matches should be excluded from the result set
          */
@@ -1947,6 +2095,7 @@ class Pattern {
         this.searchPath = new internal_path_1.Path(searchSegments).toString();
         // Root RegExp (required when determining partial match)
         this.rootRegExp = new RegExp(Pattern.regExpEscape(searchSegments[0]), IS_WINDOWS ? 'i' : '');
+        this.isImplicitPattern = isImplicitPattern;
         // Create minimatch
         const minimatchOptions = {
             dot: true,
@@ -1970,7 +2119,7 @@ class Pattern {
             // Append a trailing slash. Otherwise Minimatch will not match the directory immediately
             // preceding the globstar. For example, given the pattern `/foo/**`, Minimatch returns
             // false for `/foo` but returns true for `/foo/`. Append a trailing slash to handle that quirk.
-            if (!itemPath.endsWith(path.sep)) {
+            if (!itemPath.endsWith(path.sep) && this.isImplicitPattern === false) {
                 // Note, this is safe because the constructor ensures the pattern has an absolute root.
                 // For example, formats like C: and C:foo on Windows are resolved to an absolute root.
                 itemPath = `${itemPath}${path.sep}`;
@@ -2132,6 +2281,7 @@ exports.Pattern = Pattern;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SearchState = void 0;
 class SearchState {
     constructor(path, level) {
         this.path = path;
@@ -2349,7 +2499,7 @@ is.primitive = (value) => is.null_(value) || isPrimitiveTypeName(typeof value);
 is.integer = (value) => Number.isInteger(value);
 is.safeInteger = (value) => Number.isSafeInteger(value);
 is.plainObject = (value) => {
-    // From: https://github.com/sindresorhus/is-plain-obj/blob/master/index.js
+    // From: https://github.com/sindresorhus/is-plain-obj/blob/main/index.js
     if (toString.call(value) !== '[object Object]') {
         return false;
     }
@@ -2431,9 +2581,15 @@ is.any = (predicate, ...values) => {
     return predicates.some(singlePredicate => predicateOnArray(Array.prototype.some, singlePredicate, values));
 };
 is.all = (predicate, ...values) => predicateOnArray(Array.prototype.every, predicate, values);
-const assertType = (condition, description, value) => {
+const assertType = (condition, description, value, options = {}) => {
     if (!condition) {
-        throw new TypeError(`Expected value which is \`${description}\`, received value of type \`${is(value)}\`.`);
+        const { multipleValues } = options;
+        const valuesMessage = multipleValues ?
+            `received values of types ${[
+                ...new Set(value.map(singleValue => `\`${is(singleValue)}\``))
+            ].join(', ')}` :
+            `received value of type \`${is(value)}\``;
+        throw new TypeError(`Expected value which is \`${description}\`, ${valuesMessage}.`);
     }
 };
 exports.assert = {
@@ -2525,8 +2681,10 @@ exports.assert = {
     directInstanceOf: (instance, class_) => assertType(is.directInstanceOf(instance, class_), "T" /* directInstanceOf */, instance),
     inRange: (value, range) => assertType(is.inRange(value, range), "in range" /* inRange */, value),
     // Variadic functions.
-    any: (predicate, ...values) => assertType(is.any(predicate, ...values), "predicate returns truthy for any value" /* any */, values),
-    all: (predicate, ...values) => assertType(is.all(predicate, ...values), "predicate returns truthy for all values" /* all */, values)
+    any: (predicate, ...values) => {
+        return assertType(is.any(predicate, ...values), "predicate returns truthy for any value" /* any */, values, { multipleValues: true });
+    },
+    all: (predicate, ...values) => assertType(is.all(predicate, ...values), "predicate returns truthy for all values" /* all */, values, { multipleValues: true })
 };
 // Some few keywords are reserved, but we'll populate them for Node.js users
 // See https://github.com/Microsoft/TypeScript/issues/2536
@@ -2557,310 +2715,6 @@ exports.default = is;
 module.exports = is;
 module.exports.default = is;
 module.exports.assert = exports.assert;
-
-
-/***/ }),
-
-/***/ 4274:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Goodies = void 0;
-class Goodies {
-    /**
-     * Handles the tap call and delegates it either to an async tap
-     * handler or to a sync tap handler.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    tap(value, callback) {
-        if (this.isPromise(value)) {
-            return this.tapAsync(value, callback);
-        }
-        if (this.isAsyncFunction(callback)) {
-            return this.tapAsync(value, callback);
-        }
-        return this.tapSync(value, callback);
-    }
-    /**
-     * Calls the given `callback` function with the
-     * given `value` and returns `value`.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    tapSync(value, callback) {
-        if (!callback) {
-            return value;
-        }
-        if (this.isFunction(callback)) {
-            callback(value);
-        }
-        return value;
-    }
-    /**
-    * Calls the given `callback` function with the given `value`
-    * and returns `value`. It resolves the `value` before
-    * passing it to the callback in case it is a Promise.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    async tapAsync(value, callback) {
-        if (!callback) {
-            return value;
-        }
-        if (this.isPromise(value)) {
-            value = await value;
-        }
-        if (this.isFunction(callback)) {
-            await callback(value);
-        }
-        return value;
-    }
-    /**
-     * Calls the given `callback` function with the given `value` and returns
-     * the result of the callback. It resolves the `value` before passing
-     * it to the callback in case it is a Promise.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    upon(value, callback) {
-        if (this.isPromise(value)) {
-            return this.uponAsync(value, callback);
-        }
-        if (this.isAsyncFunction(callback)) {
-            return this.uponAsync(value, callback);
-        }
-        return this.uponSync(value, callback);
-    }
-    /**
-     * Calls the given `callback` function with the given `value` and returns
-     * the result of the callback.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    uponSync(value, callback) {
-        if (!callback) {
-            return value;
-        }
-        return this.isFunction(callback)
-            ? callback(value)
-            : value;
-    }
-    /**
-     * Calls the given `callback` function with the given `value` and returns
-     * the result of the callback. It resolves the `value` before passing
-     * it to the callback in case it is a Promise.
-     *
-     * @param {*} value
-     * @param {Function} callback
-     *
-     * @returns {*} value
-     */
-    async uponAsync(value, callback) {
-        if (!callback) {
-            return value;
-        }
-        if (this.isPromise(value)) {
-            value = await value;
-        }
-        return this.isFunction(callback)
-            ? callback(value)
-            : value;
-    }
-    /**
-     * Determine whether the given `promise` is a Promise.
-     *
-     * @param {*} promise
-     *
-     * @returns {Boolean}
-     */
-    isPromise(promise) {
-        return !!promise && this.isFunction(promise.then);
-    }
-    /**
-     * Determine whether the given `input` is a function.
-     *
-     * @param {*} input
-     *
-     * @returns {Boolean}
-     */
-    isFunction(input) {
-        return typeof input === 'function';
-    }
-    /**
-     * Determine whether the given `func` is an async function.
-     *
-     * @param {*} input
-     *
-     * @returns {Boolean}
-     */
-    isAsyncFunction(input) {
-        return this.isFunction(input) && input.constructor.name === 'AsyncFunction';
-    }
-    /**
-     * Runs the given `callback` if the `predicate` is `null` or `undefined`.
-     *
-     * @param {Boolean} predicate
-     * @param {Function} callback
-     *
-     * @returns {*}
-     */
-    ifNullish(predicate, callback) {
-        if (this.isNullish(predicate)) {
-            return callback();
-        }
-    }
-    /**
-     * Determine whether the given `input` is `null` or `undefined`.
-     *
-     * @param {*} input
-     *
-     * @returns {Boolean}
-     */
-    isNullish(input) {
-        return input === undefined || input === null;
-    }
-    /**
-     * Returns the resolved ESM default exports and CommonJS (module) exports.
-     *
-     * @param input
-     *
-     * @returns {*}
-     */
-    esmResolve(input) {
-        return (input === null || input === void 0 ? void 0 : input.default) ? input.default
-            : input;
-    }
-    /**
-     * Returns the required and resolved ESM default exports and CommonJS (module) exports.
-     *
-     * @param {String} path
-     *
-     * @returns {*}
-     */
-    esmRequire(path) {
-        return this.esmResolve(require(path));
-    }
-}
-exports.Goodies = Goodies;
-
-
-/***/ }),
-
-/***/ 8596:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.esmRequire = exports.esmResolve = exports.isNullish = exports.ifNullish = exports.isAsyncFunction = exports.isPromise = exports.isFunction = exports.upon = exports.tap = void 0;
-const goodies_1 = __nccwpck_require__(4274);
-function tap(value, callback) {
-    return new goodies_1.Goodies().tap(value, callback);
-}
-exports.tap = tap;
-function upon(value, callback) {
-    return new goodies_1.Goodies().upon(value, callback);
-}
-exports.upon = upon;
-/**
- * Determine whether the given `input` is a function.
- *
- * @param {*} input
- *
- * @returns {Boolean}
- *
- * @example
- * isFunction('no') // false
- * isFunction(() => {}) // true
- * isFunction(function () {}) // true
- */
-function isFunction(input) {
-    return new goodies_1.Goodies().isFunction(input);
-}
-exports.isFunction = isFunction;
-/**
- * Determine whether the given `promise` is a Promise.
- *
- * @param {*} promise
- *
- * @returns {Boolean}
- *
- * @example
- * isPromise('no') // false
- * isPromise(new Promise(() => {})) // true
- */
-function isPromise(promise) {
-    return new goodies_1.Goodies().isPromise(promise);
-}
-exports.isPromise = isPromise;
-/**
- * Determine whether the given `input` is an async function.
- *
- * @param {*} input
- *
- * @returns {Boolean}
- */
-function isAsyncFunction(input) {
-    return new goodies_1.Goodies().isAsyncFunction(input);
-}
-exports.isAsyncFunction = isAsyncFunction;
-function ifNullish(input, callback) {
-    return new goodies_1.Goodies().ifNullish(input, callback);
-}
-exports.ifNullish = ifNullish;
-/**
- * Runs the given `callback` if the `predicate` is `null` or `undefined`.
- *
- * @param {Boolean} predicate
- * @param {Function} callback
- *
- * @returns {*}
- */
-function isNullish(input) {
-    return new goodies_1.Goodies().isNullish(input);
-}
-exports.isNullish = isNullish;
-/**
- * Returns the resolved ESM default exports and CommonJS (module) exports.
- *
- * @param {*} input
- *
- * @returns {*}
- */
-function esmResolve(input) {
-    return new goodies_1.Goodies().esmResolve(input);
-}
-exports.esmResolve = esmResolve;
-/**
- * `require`s with the given `path` and returns the resolved
- * ESM default exports and CommonJS (module) exports.
- *
- * @param {String} path
- *
- * @returns {*}
- */
-function esmRequire(path) {
-    return new goodies_1.Goodies().esmRequire(path);
-}
-exports.esmRequire = esmRequire;
 
 
 /***/ }),
@@ -2929,7 +2783,6 @@ exports.PromisePoolError = PromisePoolError;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.PromisePoolExecutor = void 0;
-const goodies_1 = __nccwpck_require__(8596);
 const promise_pool_error_1 = __nccwpck_require__(1705);
 class PromisePoolExecutor {
     /**
@@ -2952,9 +2805,8 @@ class PromisePoolExecutor {
      * @returns {PromisePoolExecutor}
      */
     withConcurrency(concurrency) {
-        return goodies_1.tap(this, () => {
-            this.concurrency = concurrency;
-        });
+        this.concurrency = concurrency;
+        return this;
     }
     /**
      * Set the items to be processed in the promise pool.
@@ -2964,9 +2816,8 @@ class PromisePoolExecutor {
      * @returns {PromisePoolExecutor}
      */
     for(items) {
-        return goodies_1.tap(this, () => {
-            this.items = items;
-        });
+        this.items = items;
+        return this;
     }
     /**
      * Set the handler that is applied to each item.
@@ -2976,9 +2827,8 @@ class PromisePoolExecutor {
      * @returns {PromisePoolExecutor}
      */
     withHandler(action) {
-        return goodies_1.tap(this, () => {
-            this.handler = action;
-        });
+        this.handler = action;
+        return this;
     }
     /**
      * Set the error handler function to execute when an error occurs.
@@ -2988,9 +2838,8 @@ class PromisePoolExecutor {
      * @returns {PromisePoolExecutor}
      */
     handleError(handler) {
-        return goodies_1.tap(this, () => {
-            this.errorHandler = handler;
-        });
+        this.errorHandler = handler;
+        return this;
     }
     /**
      * Determines whether the number of active tasks is greater or equal to the concurrency limit.
@@ -3014,9 +2863,8 @@ class PromisePoolExecutor {
      * @returns {Array}
      */
     async start() {
-        return goodies_1.upon(this.validateInputs(), async () => {
-            return this.process();
-        });
+        this.validateInputs();
+        return await this.process();
     }
     /**
      * Ensure valid inputs and throw otherwise.
@@ -3133,7 +2981,6 @@ exports.PromisePoolExecutor = PromisePoolExecutor;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.PromisePool = void 0;
-const goodies_1 = __nccwpck_require__(8596);
 const promise_pool_executor_1 = __nccwpck_require__(6331);
 class PromisePool {
     /**
@@ -3154,9 +3001,8 @@ class PromisePool {
      * @returns {PromisePool}
      */
     withConcurrency(concurrency) {
-        return goodies_1.tap(this, () => {
-            this.concurrency = concurrency;
-        });
+        this.concurrency = concurrency;
+        return this;
     }
     /**
      * Set the number of tasks to process concurrently in the promise pool.
@@ -3166,9 +3012,7 @@ class PromisePool {
      * @returns {PromisePool}
      */
     static withConcurrency(concurrency) {
-        return goodies_1.tap(this, () => {
-            this.concurrency = concurrency;
-        });
+        return new this().withConcurrency(concurrency);
     }
     /**
      * Set the items to be processed in the promise pool.
@@ -3188,9 +3032,7 @@ class PromisePool {
      * @returns {PromisePool}
      */
     static for(items) {
-        return new this()
-            .for(items)
-            .withConcurrency(this.concurrency);
+        return new this().for(items);
     }
     /**
      * Set the error handler function to execute when an error occurs.
@@ -3200,9 +3042,8 @@ class PromisePool {
      * @returns {PromisePool}
      */
     handleError(handler) {
-        return goodies_1.tap(this, () => {
-            this.errorHandler = handler;
-        });
+        this.errorHandler = handler;
+        return this;
     }
     /**
      * Starts processing the promise pool by iterating over the items
@@ -12532,7 +12373,7 @@ const testParameter = (name, filters) => {
 };
 
 const normalizeDataURL = (urlString, {stripHash}) => {
-	const parts = urlString.match(/^data:(.*?),(.*?)(?:#(.*))?$/);
+	const parts = urlString.match(/^data:([^,]*?),([^#]*?)(?:#(.*))?$/);
 
 	if (!parts) {
 		throw new Error(`Invalid URL: ${urlString}`);
@@ -13140,17 +12981,34 @@ module.exports = QuickLRU;
 const tls = __nccwpck_require__(4016);
 
 module.exports = (options = {}) => new Promise((resolve, reject) => {
-	const socket = tls.connect(options, () => {
+	let timeout = false;
+
+	const callback = async () => {
+		socket.off('timeout', onTimeout);
+		socket.off('error', reject);
+
 		if (options.resolveSocket) {
-			socket.off('error', reject);
-			resolve({alpnProtocol: socket.alpnProtocol, socket});
+			resolve({alpnProtocol: socket.alpnProtocol, socket, timeout});
+
+			if (timeout) {
+				await Promise.resolve();
+				socket.emit('timeout');
+			}
 		} else {
 			socket.destroy();
-			resolve({alpnProtocol: socket.alpnProtocol});
+			resolve({alpnProtocol: socket.alpnProtocol, timeout});
 		}
-	});
+	};
+
+	const onTimeout = async () => {
+		timeout = true;
+		callback();
+	};
+
+	const socket = tls.connect(options, callback);
 
 	socket.on('error', reject);
+	socket.once('timeout', onTimeout);
 });
 
 
