@@ -38,7 +38,7 @@
     "@types/mime-types": "^2.1.0",
     "form-data": "^4.0.0",
     "got": "^11.8.2",
-    "webpack": "^5.47.0"
+    "webpack": "^5.47.1"
   },
   "devDependencies": {
     "@types/jest": "^26.0.24",
