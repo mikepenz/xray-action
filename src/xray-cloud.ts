@@ -1,4 +1,4 @@
-import {XrayOptions, XrayImportOptions} from './processor'
+import {XrayImportOptions, XrayOptions} from './processor'
 import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'

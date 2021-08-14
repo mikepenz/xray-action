@@ -8,6 +8,9 @@
       "project": "./tsconfig.json"
     },
     "rules": {
+      "filenames/match-regex": "off",
+      "sort-imports": "off",
+      "i18n-text/no-en": "off",  
       "eslint-comments/no-use": "off",
       "import/no-namespace": "off",
       "no-unused-vars": "off",
