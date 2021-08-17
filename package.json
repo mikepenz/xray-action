@@ -35,7 +35,7 @@
     "@actions/core": "^1.4.0",
     "@actions/glob": "^0.2.0",
     "@supercharge/promise-pool": "^1.7.0",
-    "@types/mime-types": "^2.1.0",
+    "@types/mime-types": "^2.1.1",
     "form-data": "^4.0.0",
     "got": "^11.8.2",
     "webpack": "^5.50.0"
