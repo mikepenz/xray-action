@@ -420,7 +420,6 @@ const core = __importStar(__nccwpck_require__(2186));
 const form_data_1 = __importDefault(__nccwpck_require__(4334));
 const utils_1 = __nccwpck_require__(918);
 const xray_utils_1 = __nccwpck_require__(7249);
-const xray_utils_2 = __nccwpck_require__(7249);
 class XrayCloud {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
@@ -468,7 +467,7 @@ class XrayCloud {
                 this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
                 (0, xray_utils_1.updateTestExecJson)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
-                (0, xray_utils_2.updateTestExecJsonCloud)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
+                (0, xray_utils_1.updateTestExecJsonCloud)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
                     contentType: 'application/json',
                     filename: 'info.json',
@@ -617,7 +616,16 @@ class XrayServer {
                     filename: 'info.json',
                     filepath: 'info.json'
                 });
-                form.append('file', data.toString('utf-8'), {
+                let apiPartName;
+                if (format === 'cucumber') {
+                    // workaround for cucumber, see for more details:
+                    // https://github.com/Xray-App/xray-code-snippets/blob/649be6d73d3213a22ef31a52bf6e2ac7d557330d/use_cases/import_automation_results/java/xray-code-snippets/src/main/java/com/idera/xray/XrayResultsImporter.java#L205
+                    apiPartName = 'result';
+                }
+                else {
+                    apiPartName = 'file';
+                }
+                form.append(apiPartName, data.toString('utf-8'), {
                     contentType: mimeType,
                     filename: 'report.xml',
                     filepath: 'report.xml'
