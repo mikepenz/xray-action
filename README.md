@@ -81,7 +81,8 @@ If you're using Xray server/DC, you'll need to set xrayCloud as "false", use Jir
 | `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 | `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 2)                                                                                             |              |
-| `testExecutionJson`       | File path to a json file, containing the meta information to create the xray ticket.                                                                           |              |
+| `testExecutionJson`       | File path to a json file, containing the meta information to create the xray test execution ticket.                                                                           |              |
+| `testJson`       | File path to a json file, containing the meta information to create the xray test ticket.                                                                           |              |
 
 #### Test execution json
 

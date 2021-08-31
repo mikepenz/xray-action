@@ -15,6 +15,10 @@ async function run(): Promise<void> {
       testExecutionJsonInput
     )
 
+    // read in test config file if possible
+    const testJsonInput: string = core.getInput('testJson')
+    const testJson = resolveJson(repositoryPath, testJsonInput)
+
     // credentials for xray
     const cloud: boolean = core.getInput('xrayCloud') === 'true'
     const xrayBaseUrl: string = core.getInput('xrayBaseUrl')
@@ -65,7 +69,8 @@ async function run(): Promise<void> {
         testEnvironments,
         revision,
         fixVersion,
-        testExecutionJson
+        testExecutionJson,
+        testJson
       },
       {
         combineInSingleTestExec,

@@ -47,6 +47,9 @@ function run() {
             // read in test exec config file if possible
             const testExecutionJsonInput = core.getInput('testExecutionJson');
             const testExecutionJson = (0, utils_1.resolveJson)(repositoryPath, testExecutionJsonInput);
+            // read in test config file if possible
+            const testJsonInput = core.getInput('testJson');
+            const testJson = (0, utils_1.resolveJson)(repositoryPath, testJsonInput);
             // credentials for xray
             const cloud = core.getInput('xrayCloud') === 'true';
             const xrayBaseUrl = core.getInput('xrayBaseUrl');
@@ -89,7 +92,8 @@ function run() {
                 testEnvironments,
                 revision,
                 fixVersion,
-                testExecutionJson
+                testExecutionJson,
+                testJson
             }, {
                 combineInSingleTestExec,
                 failOnImportError,
@@ -473,13 +477,8 @@ class XrayCloud {
                     filename: 'test.xml',
                     filepath: 'test.xml'
                 });
-                form.append('testInfo', JSON.stringify({
-                    fields: {
-                        project: {
-                            key: this.xrayImportOptions.projectKey
-                        }
-                    }
-                }), {
+                (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
+                form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
                     contentType: 'application/json',
                     filename: 'testInfo.json',
                     filepath: 'testInfo.json'
@@ -621,13 +620,8 @@ class XrayServer {
                     filename: 'report.xml',
                     filepath: 'report.xml'
                 });
-                form.append('testInfo', JSON.stringify({
-                    fields: {
-                        project: {
-                            key: this.xrayImportOptions.projectKey
-                        }
-                    }
-                }), {
+                (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
+                form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
                     contentType: 'application/json',
                     filename: 'testInfo.json',
                     filepath: 'testInfo.json'
@@ -706,7 +700,7 @@ exports.XrayServer = XrayServer;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.updateTestExecJson = exports.createSearchParams = void 0;
+exports.updateTestJson = exports.updateTestExecJson = exports.createSearchParams = void 0;
 /**
  *
  */
@@ -763,8 +757,31 @@ function updateTestExecJson(xrayImportOptions, testExecutionJson) {
     if (xrayImportOptions.fixVersion) {
         testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion;
     }
+    xrayImportOptions.testExecutionJson = testExecJson;
 }
 exports.updateTestExecJson = updateTestExecJson;
+/**
+ *
+ */
+function updateTestJson(xrayImportOptions, testJson) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tJson;
+    if (testJson === undefined) {
+        tJson = {};
+    }
+    else {
+        tJson = testJson;
+    }
+    if (!tJson['fields']) {
+        tJson['fields'] = {};
+    }
+    if (!tJson['fields']['project']) {
+        tJson['fields']['project'] = {};
+    }
+    tJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    xrayImportOptions.testJson = tJson;
+}
+exports.updateTestJson = updateTestJson;
 
 
 /***/ }),
