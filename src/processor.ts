@@ -23,7 +23,8 @@ export interface XrayImportOptions {
   testEnvironments: string
   revision: string
   fixVersion: string
-  testExecutionJson: Object | undefined
+  testExecutionJson: Object | undefined // only used in case of multipart API
+  testJson: Object | undefined // only used in case of multipart API
 }
 
 export interface ImportOptions {

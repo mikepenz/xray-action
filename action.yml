@@ -62,6 +62,9 @@ inputs:
   testExecutionJson:
     description: 'Links to a json file, defining the meta information to create the test execution ticket.'
     required: false
+  testJson:
+    description: 'Links to a json file, defining the meta information to create the test tickets.'
+    required: false
 outputs:
   count:
     description: 'The count of imported files.'

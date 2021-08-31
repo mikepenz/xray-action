@@ -3,7 +3,11 @@ import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'
 import {doFormDataRequest} from './utils'
-import {createSearchParams, updateTestExecJson} from './xray-utils'
+import {
+  createSearchParams,
+  updateTestExecJson,
+  updateTestJson
+} from './xray-utils'
 import {Xray} from './xray'
 
 export class XrayCloud implements Xray {
@@ -61,6 +65,7 @@ export class XrayCloud implements Xray {
       this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
+
       updateTestExecJson(
         this.xrayImportOptions,
         this.xrayImportOptions.testExecutionJson
@@ -79,21 +84,13 @@ export class XrayCloud implements Xray {
         filename: 'test.xml',
         filepath: 'test.xml'
       })
-      form.append(
-        'testInfo',
-        JSON.stringify({
-          fields: {
-            project: {
-              key: this.xrayImportOptions.projectKey
-            }
-          }
-        }),
-        {
-          contentType: 'application/json',
-          filename: 'testInfo.json',
-          filepath: 'testInfo.json'
-        }
-      )
+
+      updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
+      form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
+        contentType: 'application/json',
+        filename: 'testInfo.json',
+        filepath: 'testInfo.json'
+      })
 
       core.debug(
         `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`

@@ -62,4 +62,29 @@ export function updateTestExecJson(
   if (xrayImportOptions.fixVersion) {
     testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion
   }
+  xrayImportOptions.testExecutionJson = testExecJson
+}
+
+/**
+ *
+ */
+export function updateTestJson(
+  xrayImportOptions: XrayImportOptions,
+  testJson: Object | undefined
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tJson: any
+  if (testJson === undefined) {
+    tJson = {}
+  } else {
+    tJson = testJson
+  }
+  if (!tJson['fields']) {
+    tJson['fields'] = {}
+  }
+  if (!tJson['fields']['project']) {
+    tJson['fields']['project'] = {}
+  }
+  tJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  xrayImportOptions.testJson = tJson
 }

@@ -20,7 +20,8 @@ test('import test results server', async () => {
       testEnvironments: "",
       revision: "",
       fixVersion: "",
-      testExecutionJson: undefined
+      testExecutionJson: undefined,
+      testJson: undefined,
     },
     {
       combineInSingleTestExec: true,
@@ -59,6 +60,7 @@ test('import test results server', async () => {
             "description": "This test execution covers the Android section of things"
         }
       },
+      testJson: undefined,
     },
     {
       combineInSingleTestExec: true,
@@ -103,6 +105,7 @@ test('import test results cloud', async () => {
             }
         }
       },
+      testJson: undefined,
     },
     {
       combineInSingleTestExec: true,

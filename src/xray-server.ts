@@ -3,7 +3,11 @@ import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'
 import {doFormDataRequest} from './utils'
-import {createSearchParams, updateTestExecJson} from './xray-utils'
+import {
+  createSearchParams,
+  updateTestExecJson,
+  updateTestJson
+} from './xray-utils'
 import {Xray} from './xray'
 
 export class XrayServer implements Xray {
@@ -67,21 +71,13 @@ export class XrayServer implements Xray {
         filename: 'report.xml',
         filepath: 'report.xml'
       })
-      form.append(
-        'testInfo',
-        JSON.stringify({
-          fields: {
-            project: {
-              key: this.xrayImportOptions.projectKey
-            }
-          }
-        }),
-        {
-          contentType: 'application/json',
-          filename: 'testInfo.json',
-          filepath: 'testInfo.json'
-        }
-      )
+
+      updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
+      form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
+        contentType: 'application/json',
+        filename: 'testInfo.json',
+        filepath: 'testInfo.json'
+      })
 
       core.debug(
         `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`
