@@ -705,12 +705,32 @@ exports.XrayServer = XrayServer;
 /***/ }),
 
 /***/ 7249:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.updateTestJson = exports.updateTestExecJsonCloud = exports.updateTestExecJson = exports.createSearchParams = void 0;
+const core = __importStar(__nccwpck_require__(2186));
 /**
  *
  */
@@ -747,7 +767,12 @@ function updateTestExecJson(xrayImportOptions, testExecutionJson) {
     if (!testExecJson['fields']['project']) {
         testExecJson['fields']['project'] = {};
     }
-    testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    if (xrayImportOptions.projectKey) {
+        testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    }
+    else {
+        core.debug(`No "projectKey" passed via configuration. Using ${JSON.stringify(testExecJson['fields']['project'])}`);
+    }
     xrayImportOptions.testExecutionJson = testExecJson;
 }
 exports.updateTestExecJson = updateTestExecJson;
@@ -803,7 +828,12 @@ function updateTestJson(xrayImportOptions, testJson) {
     if (!tJson['fields']['project']) {
         tJson['fields']['project'] = {};
     }
-    tJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    if (xrayImportOptions.projectKey) {
+        tJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    }
+    else {
+        core.debug(`No "projectKey" passed via configuration. Using ${JSON.stringify(tJson['fields']['project'])}`);
+    }
     xrayImportOptions.testJson = tJson;
 }
 exports.updateTestJson = updateTestJson;

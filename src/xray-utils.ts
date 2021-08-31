@@ -1,4 +1,5 @@
 import {XrayImportOptions} from './processor'
+import * as core from '@actions/core'
 
 /**
  *
@@ -41,7 +42,17 @@ export function updateTestExecJson(
   if (!testExecJson['fields']['project']) {
     testExecJson['fields']['project'] = {}
   }
-  testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey
+
+  if (xrayImportOptions.projectKey) {
+    testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  } else {
+    core.debug(
+      `No "projectKey" passed via configuration. Using ${JSON.stringify(
+        testExecJson['fields']['project']
+      )}`
+    )
+  }
+
   xrayImportOptions.testExecutionJson = testExecJson
 }
 
@@ -104,6 +115,14 @@ export function updateTestJson(
   if (!tJson['fields']['project']) {
     tJson['fields']['project'] = {}
   }
-  tJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  if (xrayImportOptions.projectKey) {
+    tJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  } else {
+    core.debug(
+      `No "projectKey" passed via configuration. Using ${JSON.stringify(
+        tJson['fields']['project']
+      )}`
+    )
+  }
   xrayImportOptions.testJson = tJson
 }
