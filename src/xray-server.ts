@@ -5,6 +5,7 @@ import FormData from 'form-data'
 import {doFormDataRequest} from './utils'
 import {
   createSearchParams,
+  retrieveFileExtension,
   updateTestExecJson,
   updateTestJson
 } from './xray-utils'
@@ -76,10 +77,11 @@ export class XrayServer implements Xray {
         apiPartName = 'file'
       }
 
+      const fileExtension = retrieveFileExtension(mimeType)
       form.append(apiPartName, data.toString('utf-8'), {
         contentType: mimeType,
-        filename: 'report.xml',
-        filepath: 'report.xml'
+        filename: `report.${fileExtension}`,
+        filepath: `report.${fileExtension}`
       })
 
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)

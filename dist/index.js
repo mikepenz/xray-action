@@ -473,10 +473,11 @@ class XrayCloud {
                     filename: 'info.json',
                     filepath: 'info.json'
                 });
+                const fileExtension = (0, xray_utils_1.retrieveFileExtension)(mimeType);
                 form.append('results', data.toString('utf-8'), {
                     contentType: mimeType,
-                    filename: 'test.xml',
-                    filepath: 'test.xml'
+                    filename: `test.${fileExtension}`,
+                    filepath: `test.${fileExtension}`
                 });
                 (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
                 form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
@@ -625,10 +626,11 @@ class XrayServer {
                 else {
                     apiPartName = 'file';
                 }
+                const fileExtension = (0, xray_utils_1.retrieveFileExtension)(mimeType);
                 form.append(apiPartName, data.toString('utf-8'), {
                     contentType: mimeType,
-                    filename: 'report.xml',
-                    filepath: 'report.xml'
+                    filename: `report.${fileExtension}`,
+                    filepath: `report.${fileExtension}`
                 });
                 (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
                 form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
@@ -729,8 +731,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.updateTestJson = exports.updateTestExecJsonCloud = exports.updateTestExecJson = exports.createSearchParams = void 0;
+exports.retrieveFileExtension = exports.updateTestJson = exports.updateTestExecJsonCloud = exports.updateTestExecJson = exports.createSearchParams = void 0;
 const core = __importStar(__nccwpck_require__(2186));
+const mime_types_1 = __nccwpck_require__(3583);
 /**
  *
  */
@@ -837,6 +840,14 @@ function updateTestJson(xrayImportOptions, testJson) {
     xrayImportOptions.testJson = tJson;
 }
 exports.updateTestJson = updateTestJson;
+/**
+ * Resolves the file extension based on the mime type.
+ * Falls back to xml if not identified.
+ */
+function retrieveFileExtension(mimeType) {
+    return (0, mime_types_1.extension)(mimeType) || 'xml';
+}
+exports.retrieveFileExtension = retrieveFileExtension;
 
 
 /***/ }),

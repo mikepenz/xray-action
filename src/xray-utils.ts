@@ -1,5 +1,6 @@
 import {XrayImportOptions} from './processor'
 import * as core from '@actions/core'
+import {extension} from 'mime-types'
 
 /**
  *
@@ -125,4 +126,12 @@ export function updateTestJson(
     )
   }
   xrayImportOptions.testJson = tJson
+}
+
+/**
+ * Resolves the file extension based on the mime type.
+ * Falls back to xml if not identified.
+ */
+export function retrieveFileExtension(mimeType: string): string {
+  return extension(mimeType) || 'xml'
 }
