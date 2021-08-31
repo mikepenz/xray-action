@@ -129,7 +129,7 @@ The test execution json should the meta information in the following format:
 <summary>Xray Server/DC</summary>
 <p>
 
-⚠️ For Xray Server/DC environments  are required to be provided via their custom fields. See the [official API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart) for more details.
+⚠️ For Xray Server/DC environments `test plan`, `test env`, `revision` fields are required to be provided via their custom field. See the [official API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart) for more details.
 
 ```json
 {
