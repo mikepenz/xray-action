@@ -42,6 +42,24 @@ export function updateTestExecJson(
     testExecJson['fields']['project'] = {}
   }
   testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  xrayImportOptions.testExecutionJson = testExecJson
+}
+
+/**
+ * only the cloud API uses the `xrayFields` to define test exec key, test plan key, etc.
+ *
+ * CLOUD
+ * https://docs.getxray.app/display/XRAYCLOUD/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ *
+ * SERVER
+ * https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ */
+export function updateTestExecJsonCloud(
+  xrayImportOptions: XrayImportOptions,
+  testExecutionJson: Object
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const testExecJson: any = testExecutionJson
 
   if (!testExecJson['xrayFields']) {
     testExecJson['xrayFields'] = {}
@@ -62,6 +80,7 @@ export function updateTestExecJson(
   if (xrayImportOptions.fixVersion) {
     testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion
   }
+
   xrayImportOptions.testExecutionJson = testExecJson
 }
 

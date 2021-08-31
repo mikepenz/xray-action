@@ -420,6 +420,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const form_data_1 = __importDefault(__nccwpck_require__(4334));
 const utils_1 = __nccwpck_require__(918);
 const xray_utils_1 = __nccwpck_require__(7249);
+const xray_utils_2 = __nccwpck_require__(7249);
 class XrayCloud {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
@@ -467,6 +468,7 @@ class XrayCloud {
                 this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
                 (0, xray_utils_1.updateTestExecJson)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
+                (0, xray_utils_2.updateTestExecJsonCloud)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
                     contentType: 'application/json',
                     filename: 'info.json',
@@ -700,7 +702,7 @@ exports.XrayServer = XrayServer;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.updateTestJson = exports.updateTestExecJson = exports.createSearchParams = void 0;
+exports.updateTestJson = exports.updateTestExecJsonCloud = exports.updateTestExecJson = exports.createSearchParams = void 0;
 /**
  *
  */
@@ -738,6 +740,21 @@ function updateTestExecJson(xrayImportOptions, testExecutionJson) {
         testExecJson['fields']['project'] = {};
     }
     testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+    xrayImportOptions.testExecutionJson = testExecJson;
+}
+exports.updateTestExecJson = updateTestExecJson;
+/**
+ * only the cloud API uses the `xrayFields` to define test exec key, test plan key, etc.
+ *
+ * CLOUD
+ * https://docs.getxray.app/display/XRAYCLOUD/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ *
+ * SERVER
+ * https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ */
+function updateTestExecJsonCloud(xrayImportOptions, testExecutionJson) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const testExecJson = testExecutionJson;
     if (!testExecJson['xrayFields']) {
         testExecJson['xrayFields'] = {};
     }
@@ -759,7 +776,7 @@ function updateTestExecJson(xrayImportOptions, testExecutionJson) {
     }
     xrayImportOptions.testExecutionJson = testExecJson;
 }
-exports.updateTestExecJson = updateTestExecJson;
+exports.updateTestExecJsonCloud = updateTestExecJsonCloud;
 /**
  *
  */

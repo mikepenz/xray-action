@@ -6,7 +6,8 @@ import {doFormDataRequest} from './utils'
 import {
   createSearchParams,
   updateTestExecJson,
-  updateTestJson
+  updateTestJson,
+  updateTestExecJsonCloud
 } from './xray-utils'
 import {Xray} from './xray'
 
@@ -67,6 +68,10 @@ export class XrayCloud implements Xray {
       const form = new FormData()
 
       updateTestExecJson(
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
+      )
+      updateTestExecJsonCloud(
         this.xrayImportOptions,
         this.xrayImportOptions.testExecutionJson
       )
