@@ -22,7 +22,7 @@ async function run(): Promise<void> {
     if (xrayBaseUrl !== '') {
       try {
         baseUrl = new URL(xrayBaseUrl)
-      } catch (error) {
+      } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
         core.setFailed(error.message)
       }
     }
@@ -74,7 +74,7 @@ async function run(): Promise<void> {
         importParallelism
       }
     ).process()
-  } catch (error) {
+  } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
     core.setFailed(error.message)
   }
 }

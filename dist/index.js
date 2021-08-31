@@ -43,10 +43,10 @@ function run() {
         try {
             // read in path specification, resolve github workspace, and repo path
             const inputPath = core.getInput('path');
-            const repositoryPath = utils_1.retrieveRepositoryPath(inputPath);
+            const repositoryPath = (0, utils_1.retrieveRepositoryPath)(inputPath);
             // read in test exec config file if possible
             const testExecutionJsonInput = core.getInput('testExecutionJson');
-            const testExecutionJson = utils_1.resolveJson(repositoryPath, testExecutionJsonInput);
+            const testExecutionJson = (0, utils_1.resolveJson)(repositoryPath, testExecutionJsonInput);
             // credentials for xray
             const cloud = core.getInput('xrayCloud') === 'true';
             const xrayBaseUrl = core.getInput('xrayBaseUrl');
@@ -55,7 +55,7 @@ function run() {
                 try {
                     baseUrl = new URL(xrayBaseUrl);
                 }
-                catch (error) {
+                catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
                     core.setFailed(error.message);
                 }
             }
@@ -97,7 +97,7 @@ function run() {
                 importParallelism
             }).process();
         }
-        catch (error) {
+        catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
             core.setFailed(error.message);
         }
     });
@@ -196,7 +196,7 @@ class Processor {
                         core.debug(`Try to import: ${file}`);
                         try {
                             // identify mimetype
-                            const tmpMime = mime_types_1.lookup(file);
+                            const tmpMime = (0, mime_types_1.lookup)(file);
                             let mimeType;
                             if (tmpMime === false) {
                                 mimeType = 'application/xml';
@@ -210,7 +210,7 @@ class Processor {
                             completed++;
                             return result;
                         }
-                        catch (error) {
+                        catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
                             core.warning(`🔥 Failed to import: ${file} (${error.message})`);
                             failed++;
                             if (!importOptions.continueOnImportError) {
@@ -240,7 +240,7 @@ class Processor {
                     .withConcurrency(this.importOptions.importParallelism)
                     .process((file) => __awaiter(this, void 0, void 0, function* () { return yield doImport(file); }));
             }
-            catch (error) {
+            catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
                 core.warning(`🔥 Stopped import (${error.message})`);
             }
             core.info(`ℹ️ Processed ${completed} of ${filesCount} elements. Failed to import: ${failed}`);
@@ -422,7 +422,7 @@ class XrayCloud {
         this.xrayImportOptions = xrayImportOptions;
         this.xrayBaseUrl = new URL('https://xray.cloud.xpand-it.com');
         this.token = '';
-        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
     }
     protocol() {
         if (this.xrayBaseUrl.protocol === 'http') {
@@ -450,7 +450,7 @@ class XrayCloud {
     }
     updateTestExecKey(testExecKey) {
         this.xrayImportOptions.testExecKey = testExecKey;
-        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
     }
     import(data, mimeType) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -462,7 +462,7 @@ class XrayCloud {
             if (this.xrayImportOptions.testExecutionJson &&
                 this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
-                xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
+                (0, xray_utils_1.updateTestExecJson)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
                     contentType: 'application/json',
                     filename: 'info.json',
@@ -485,7 +485,7 @@ class XrayCloud {
                     filepath: 'testInfo.json'
                 });
                 core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`);
-                const importResponse = yield utils_1.doFormDataRequest(form, {
+                const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
                     path: `${this.xrayBaseUrl.pathname}/api/v1/import/execution/${format}/multipart`,
@@ -581,7 +581,7 @@ class XrayServer {
         this.token = '';
         this.xrayBaseUrl =
             this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com');
-        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
     }
     protocol() {
         if (this.xrayBaseUrl.protocol === 'http') {
@@ -598,7 +598,7 @@ class XrayServer {
     }
     updateTestExecKey(testExecKey) {
         this.xrayImportOptions.testExecKey = testExecKey;
-        this.searchParams = xray_utils_1.createSearchParams(this.xrayImportOptions);
+        this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
     }
     import(data, mimeType) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -610,7 +610,7 @@ class XrayServer {
             if (this.xrayImportOptions.testExecutionJson &&
                 this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
-                xray_utils_1.updateTestExecJson(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
+                (0, xray_utils_1.updateTestExecJson)(this.xrayImportOptions, this.xrayImportOptions.testExecutionJson);
                 form.append('info', JSON.stringify(this.xrayImportOptions.testExecutionJson), {
                     contentType: 'application/json',
                     filename: 'info.json',
@@ -633,7 +633,7 @@ class XrayServer {
                     filepath: 'testInfo.json'
                 });
                 core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`);
-                const importResponse = yield utils_1.doFormDataRequest(form, {
+                const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
                     auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
@@ -655,7 +655,7 @@ class XrayServer {
                         filename: 'report.xml',
                         filepath: 'report.xml'
                     });
-                    const importResponse = yield utils_1.doFormDataRequest(form, {
+                    const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                         protocol: this.protocol(),
                         host: this.xrayBaseUrl.host,
                         auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
@@ -902,7 +902,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __nccwpck_require__(7351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
@@ -1080,19 +1080,30 @@ exports.debug = debug;
 /**
  * Adds an error issue
  * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function error(message) {
-    command_1.issue('error', message instanceof Error ? message.toString() : message);
+function error(message, properties = {}) {
+    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.error = error;
 /**
- * Adds an warning issue
+ * Adds a warning issue
  * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function warning(message) {
-    command_1.issue('warning', message instanceof Error ? message.toString() : message);
+function warning(message, properties = {}) {
+    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.warning = warning;
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.notice = notice;
 /**
  * Writes info to log with console.log.
  * @param message info message
@@ -1226,7 +1237,7 @@ exports.issueCommand = issueCommand;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.toCommandValue = void 0;
+exports.toCommandProperties = exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -1241,6 +1252,25 @@ function toCommandValue(input) {
     return JSON.stringify(input);
 }
 exports.toCommandValue = toCommandValue;
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),

@@ -101,7 +101,7 @@ export class Processor {
 
           completed++
           return result
-        } catch (error) {
+        } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
           core.warning(`🔥 Failed to import: ${file} (${error.message})`)
           failed++
 
@@ -136,7 +136,7 @@ export class Processor {
       const {results} = await PromisePool.for(files)
         .withConcurrency(this.importOptions.importParallelism)
         .process(async file => await doImport(file))
-    } catch (error) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       core.warning(`🔥 Stopped import (${error.message})`)
     }
 
