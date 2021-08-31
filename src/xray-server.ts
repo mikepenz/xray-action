@@ -66,7 +66,7 @@ export class XrayServer implements Xray {
           filepath: 'info.json'
         }
       )
-      form.append('file', data.toString('utf-8'), {
+      form.append('result', data.toString('utf-8'), {
         contentType: mimeType,
         filename: 'report.xml',
         filepath: 'report.xml'
