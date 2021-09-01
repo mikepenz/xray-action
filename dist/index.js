@@ -361,6 +361,7 @@ function doFormDataRequest(formData, params
                     });
                     res.on('end', () => {
                         try {
+                            core.debug(`Server response: ${responseBody}`);
                             resolve(JSON.parse(responseBody));
                         }
                         catch (error) {
