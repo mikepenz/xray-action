@@ -6,7 +6,9 @@ import {doFormDataRequest} from './utils'
 import {
   createSearchParams,
   updateTestExecJson,
-  updateTestJson
+  updateTestJson,
+  updateTestExecJsonCloud,
+  retrieveFileExtension
 } from './xray-utils'
 import {Xray} from './xray'
 
@@ -70,6 +72,10 @@ export class XrayCloud implements Xray {
         this.xrayImportOptions,
         this.xrayImportOptions.testExecutionJson
       )
+      updateTestExecJsonCloud(
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
+      )
       form.append(
         'info',
         JSON.stringify(this.xrayImportOptions.testExecutionJson),
@@ -79,18 +85,26 @@ export class XrayCloud implements Xray {
           filepath: 'info.json'
         }
       )
+
+      const fileExtension = retrieveFileExtension(mimeType)
       form.append('results', data.toString('utf-8'), {
         contentType: mimeType,
-        filename: 'test.xml',
-        filepath: 'test.xml'
+        filename: `test.${fileExtension}`,
+        filepath: `test.${fileExtension}`
       })
 
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
-      form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
-        contentType: 'application/json',
-        filename: 'testInfo.json',
-        filepath: 'testInfo.json'
-      })
+      if (this.xrayImportOptions.testJson) {
+        form.append(
+          'testInfo',
+          JSON.stringify(this.xrayImportOptions.testJson),
+          {
+            contentType: 'application/json',
+            filename: 'testInfo.json',
+            filepath: 'testInfo.json'
+          }
+        )
+      }
 
       core.debug(
         `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`

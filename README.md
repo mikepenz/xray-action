@@ -32,6 +32,10 @@
 
 Specify the action as part of your GitHub actions workflow, using a [Xray API key](https://docs.getxray.app/display/XRAYCLOUD/Global+Settings%3A+API+Keys) (i.e. a pair of client id and client secret):
 
+<details open>
+<summary>Xray Cloud</summary>
+<p>
+
 ```yml
 - name: "Import results to Xray"
   uses: mikepenz/xray-action@{latest-release}
@@ -44,7 +48,15 @@ Specify the action as part of your GitHub actions workflow, using a [Xray API ke
     projectKey: "TEST"
 ```
 
-If you're using Xray server/DC, you'll need to set xrayCloud as "false", use Jira credentials for authentication, and specify additional parameters.
+</p>
+</details>
+
+
+<details>
+<summary>Xray Server/DC</summary>
+<p>
+
+If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use Jira credentials for authentication, and specify additional parameters.
 
  ```yml
 - name: "Import results to Xray"
@@ -60,15 +72,20 @@ If you're using Xray server/DC, you'll need to set xrayCloud as "false", use Jir
     projectKey: "TEST"
 ```
 
+⚠️ Xray Server/DC requires `test plan`, `test env`, `revision` to be defined via their custom field. See additional details on passing a custom [test execution json](#test-execution-json).
+
+</p>
+</details>
+
 
 💡 Do not specify username and password in cleartext, instead prefer to read them from GitHub action secrets.
 
 | **Input**                 | **Description**                                                                                                                                                | **Required** |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
-| `xrayCloud`               | Defines which variant of Xray to target [cloud vs server/DC] (default="true")                                                                                  |              |
-| `xrayBaseUrl`             | Defines the base URL if Xray server/DC is chosen (only required if xrayCloud="false")                                                                          | x*           |
-| `username`                | Xray API client id (cloud) or Jira username (server/DC)                                                                                                        | x            |
-| `password`                | Xray API client secret (cloud) or Jira password (server/DC)                                                                                                    | x            |
+| `xrayCloud`               | Defines which variant of Xray to target [cloud vs Server/DC] (default="true")                                                                                  |              |
+| `xrayBaseUrl`             | Defines the base URL if Xray Server/DC is chosen (only required if xrayCloud="false")                                                                          | x*           |
+| `username`                | Xray API client id (cloud) or Jira username (Server/DC)                                                                                                        | x            |
+| `password`                | Xray API client secret (cloud) or Jira password (Server/DC)                                                                                                    | x            |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
 | `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to junit report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
 | `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
@@ -88,6 +105,10 @@ If you're using Xray server/DC, you'll need to set xrayCloud as "false", use Jir
 
 The test execution json should the meta information in the following format:
 
+<details open>
+<summary>Xray Cloud</summary>
+<p>
+
 ```json
 {
     "fields": {
@@ -100,6 +121,34 @@ The test execution json should the meta information in the following format:
     }
 }
 ```
+
+</p>
+</details>
+
+<details>
+<summary>Xray Server/DC</summary>
+<p>
+
+⚠️ For Xray Server/DC environments `test plan`, `test env`, `revision` fields are required to be provided via their custom field. See the [official API documentation](https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart) for more details.
+
+```json
+{
+    "fields": {
+        "summary": "Brand new Test execution",
+        "issuetype": { "id": "10007" },
+        "components" : [
+            { "name":"Interface" },
+            { "name":"Core" }
+        ],
+        "customfield_10032" : [
+            "TES-38"
+        ]
+    }
+}
+```
+
+</p>
+</details>  
 
 💡 The import will fail if the provided issueType for example does not exist. Please ensure correct information is provided.
 

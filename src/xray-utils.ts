@@ -1,4 +1,6 @@
 import {XrayImportOptions} from './processor'
+import * as core from '@actions/core'
+import {extension} from 'mime-types'
 
 /**
  *
@@ -41,7 +43,35 @@ export function updateTestExecJson(
   if (!testExecJson['fields']['project']) {
     testExecJson['fields']['project'] = {}
   }
-  testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey
+
+  if (xrayImportOptions.projectKey) {
+    testExecJson['fields']['project']['key'] = xrayImportOptions.projectKey
+  } else {
+    core.debug(
+      `No "projectKey" passed via configuration. Using ${JSON.stringify(
+        testExecJson['fields']['project']
+      )}`
+    )
+  }
+
+  xrayImportOptions.testExecutionJson = testExecJson
+}
+
+/**
+ * only the cloud API uses the `xrayFields` to define test exec key, test plan key, etc.
+ *
+ * CLOUD
+ * https://docs.getxray.app/display/XRAYCLOUD/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ *
+ * SERVER
+ * https://docs.getxray.app/display/XRAY/Import+Execution+Results+-+REST#ImportExecutionResultsREST-XrayJSONresultsMultipart
+ */
+export function updateTestExecJsonCloud(
+  xrayImportOptions: XrayImportOptions,
+  testExecutionJson: Object
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const testExecJson: any = testExecutionJson
 
   if (!testExecJson['xrayFields']) {
     testExecJson['xrayFields'] = {}
@@ -62,6 +92,7 @@ export function updateTestExecJson(
   if (xrayImportOptions.fixVersion) {
     testExecJson['xrayFields']['fixVersion'] = xrayImportOptions.fixVersion
   }
+
   xrayImportOptions.testExecutionJson = testExecJson
 }
 
@@ -74,17 +105,44 @@ export function updateTestJson(
 ): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let tJson: any
-  if (testJson === undefined) {
-    tJson = {}
+
+  if (
+    xrayImportOptions.projectKey ||
+    (tJson &&
+      tJson['fields'] &&
+      tJson['fields']['project'] &&
+      tJson['fields']['project']['key'])
+  ) {
+    if (testJson === undefined) {
+      tJson = {}
+    } else {
+      tJson = testJson
+    }
+    if (!tJson['fields']) {
+      tJson['fields'] = {}
+    }
+    if (!tJson['fields']['project']) {
+      tJson['fields']['project'] = {}
+    }
+    if (xrayImportOptions.projectKey) {
+      tJson['fields']['project']['key'] = xrayImportOptions.projectKey
+    } else {
+      core.debug(
+        `No "projectKey" passed via configuration. Using ${JSON.stringify(
+          tJson['fields']['project']
+        )}`
+      )
+    }
+    xrayImportOptions.testJson = tJson
   } else {
-    tJson = testJson
+    core.debug(`No "projectKey" passed via configuration nor test json.`)
   }
-  if (!tJson['fields']) {
-    tJson['fields'] = {}
-  }
-  if (!tJson['fields']['project']) {
-    tJson['fields']['project'] = {}
-  }
-  tJson['fields']['project']['key'] = xrayImportOptions.projectKey
-  xrayImportOptions.testJson = tJson
+}
+
+/**
+ * Resolves the file extension based on the mime type.
+ * Falls back to xml if not identified.
+ */
+export function retrieveFileExtension(mimeType: string): string {
+  return extension(mimeType) || 'xml'
 }

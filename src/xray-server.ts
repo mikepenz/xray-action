@@ -5,6 +5,7 @@ import FormData from 'form-data'
 import {doFormDataRequest} from './utils'
 import {
   createSearchParams,
+  retrieveFileExtension,
   updateTestExecJson,
   updateTestJson
 } from './xray-utils'
@@ -66,18 +67,35 @@ export class XrayServer implements Xray {
           filepath: 'info.json'
         }
       )
-      form.append('file', data.toString('utf-8'), {
+
+      let apiPartName: string
+      if (format === 'cucumber') {
+        // workaround for cucumber, see for more details:
+        // https://github.com/Xray-App/xray-code-snippets/blob/649be6d73d3213a22ef31a52bf6e2ac7d557330d/use_cases/import_automation_results/java/xray-code-snippets/src/main/java/com/idera/xray/XrayResultsImporter.java#L205
+        apiPartName = 'result'
+      } else {
+        apiPartName = 'file'
+      }
+
+      const fileExtension = retrieveFileExtension(mimeType)
+      form.append(apiPartName, data.toString('utf-8'), {
         contentType: mimeType,
-        filename: 'report.xml',
-        filepath: 'report.xml'
+        filename: `report.${fileExtension}`,
+        filepath: `report.${fileExtension}`
       })
 
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
-      form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
-        contentType: 'application/json',
-        filename: 'testInfo.json',
-        filepath: 'testInfo.json'
-      })
+      if (this.xrayImportOptions.testJson) {
+        form.append(
+          'testInfo',
+          JSON.stringify(this.xrayImportOptions.testJson),
+          {
+            contentType: 'application/json',
+            filename: 'testInfo.json',
+            filepath: 'testInfo.json'
+          }
+        )
+      }
 
       core.debug(
         `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`
