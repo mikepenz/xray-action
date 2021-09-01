@@ -94,11 +94,17 @@ export class XrayCloud implements Xray {
       })
 
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
-      form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
-        contentType: 'application/json',
-        filename: 'testInfo.json',
-        filepath: 'testInfo.json'
-      })
+      if (this.xrayImportOptions.testJson) {
+        form.append(
+          'testInfo',
+          JSON.stringify(this.xrayImportOptions.testJson),
+          {
+            contentType: 'application/json',
+            filename: 'testInfo.json',
+            filepath: 'testInfo.json'
+          }
+        )
+      }
 
       core.debug(
         `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`

@@ -481,11 +481,13 @@ class XrayCloud {
                     filepath: `test.${fileExtension}`
                 });
                 (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
-                form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
-                    contentType: 'application/json',
-                    filename: 'testInfo.json',
-                    filepath: 'testInfo.json'
-                });
+                if (this.xrayImportOptions.testJson) {
+                    form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
+                        contentType: 'application/json',
+                        filename: 'testInfo.json',
+                        filepath: 'testInfo.json'
+                    });
+                }
                 core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`);
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
@@ -634,11 +636,13 @@ class XrayServer {
                     filepath: `report.${fileExtension}`
                 });
                 (0, xray_utils_1.updateTestJson)(this.xrayImportOptions, this.xrayImportOptions.testJson);
-                form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
-                    contentType: 'application/json',
-                    filename: 'testInfo.json',
-                    filepath: 'testInfo.json'
-                });
+                if (this.xrayImportOptions.testJson) {
+                    form.append('testInfo', JSON.stringify(this.xrayImportOptions.testJson), {
+                        contentType: 'application/json',
+                        filename: 'testInfo.json',
+                        filepath: 'testInfo.json'
+                    });
+                }
                 core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`);
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
@@ -820,25 +824,30 @@ exports.updateTestExecJsonCloud = updateTestExecJsonCloud;
 function updateTestJson(xrayImportOptions, testJson) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let tJson;
-    if (testJson === undefined) {
-        tJson = {};
+    if (tJson['fields']['project']['key'] || xrayImportOptions.projectKey) {
+        if (testJson === undefined) {
+            tJson = {};
+        }
+        else {
+            tJson = testJson;
+        }
+        if (!tJson['fields']) {
+            tJson['fields'] = {};
+        }
+        if (!tJson['fields']['project']) {
+            tJson['fields']['project'] = {};
+        }
+        if (xrayImportOptions.projectKey) {
+            tJson['fields']['project']['key'] = xrayImportOptions.projectKey;
+        }
+        else {
+            core.debug(`No "projectKey" passed via configuration. Using ${JSON.stringify(tJson['fields']['project'])}`);
+        }
+        xrayImportOptions.testJson = tJson;
     }
     else {
-        tJson = testJson;
+        core.debug(`No "projectKey" passed via configuration nor test json.`);
     }
-    if (!tJson['fields']) {
-        tJson['fields'] = {};
-    }
-    if (!tJson['fields']['project']) {
-        tJson['fields']['project'] = {};
-    }
-    if (xrayImportOptions.projectKey) {
-        tJson['fields']['project']['key'] = xrayImportOptions.projectKey;
-    }
-    else {
-        core.debug(`No "projectKey" passed via configuration. Using ${JSON.stringify(tJson['fields']['project'])}`);
-    }
-    xrayImportOptions.testJson = tJson;
 }
 exports.updateTestJson = updateTestJson;
 /**

@@ -105,27 +105,32 @@ export function updateTestJson(
 ): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let tJson: any
-  if (testJson === undefined) {
-    tJson = {}
+
+  if (tJson['fields']['project']['key'] || xrayImportOptions.projectKey) {
+    if (testJson === undefined) {
+      tJson = {}
+    } else {
+      tJson = testJson
+    }
+    if (!tJson['fields']) {
+      tJson['fields'] = {}
+    }
+    if (!tJson['fields']['project']) {
+      tJson['fields']['project'] = {}
+    }
+    if (xrayImportOptions.projectKey) {
+      tJson['fields']['project']['key'] = xrayImportOptions.projectKey
+    } else {
+      core.debug(
+        `No "projectKey" passed via configuration. Using ${JSON.stringify(
+          tJson['fields']['project']
+        )}`
+      )
+    }
+    xrayImportOptions.testJson = tJson
   } else {
-    tJson = testJson
+    core.debug(`No "projectKey" passed via configuration nor test json.`)
   }
-  if (!tJson['fields']) {
-    tJson['fields'] = {}
-  }
-  if (!tJson['fields']['project']) {
-    tJson['fields']['project'] = {}
-  }
-  if (xrayImportOptions.projectKey) {
-    tJson['fields']['project']['key'] = xrayImportOptions.projectKey
-  } else {
-    core.debug(
-      `No "projectKey" passed via configuration. Using ${JSON.stringify(
-        tJson['fields']['project']
-      )}`
-    )
-  }
-  xrayImportOptions.testJson = tJson
 }
 
 /**
