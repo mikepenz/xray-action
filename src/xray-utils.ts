@@ -106,7 +106,13 @@ export function updateTestJson(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let tJson: any
 
-  if (tJson['fields']['project']['key'] || xrayImportOptions.projectKey) {
+  if (
+    xrayImportOptions.projectKey ||
+    (tJson &&
+      tJson['fields'] &&
+      tJson['fields']['project'] &&
+      tJson['fields']['project']['key'])
+  ) {
     if (testJson === undefined) {
       tJson = {}
     } else {

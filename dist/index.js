@@ -824,7 +824,11 @@ exports.updateTestExecJsonCloud = updateTestExecJsonCloud;
 function updateTestJson(xrayImportOptions, testJson) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let tJson;
-    if (tJson['fields']['project']['key'] || xrayImportOptions.projectKey) {
+    if (xrayImportOptions.projectKey ||
+        (tJson &&
+            tJson['fields'] &&
+            tJson['fields']['project'] &&
+            tJson['fields']['project']['key'])) {
         if (testJson === undefined) {
             tJson = {};
         }
