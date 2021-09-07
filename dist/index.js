@@ -63,7 +63,15 @@ function run() {
                 }
             }
             const username = core.getInput('username');
+            if (!username) {
+                core.setFailed('The required `username` is missing');
+                return;
+            }
             const password = core.getInput('password');
+            if (!password) {
+                core.setFailed('The required `password` is missing');
+                return;
+            }
             // params for xray
             const testPaths = core.getInput('testPaths');
             const testFormat = core.getInput('testFormat');
@@ -364,7 +372,8 @@ function doFormDataRequest(formData, params
                             core.debug(`Server response: ${responseBody}`);
                             resolve(JSON.parse(responseBody));
                         }
-                        catch (error) {
+                        catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+                            core.warning(`🔥 Server responded with error (${error.message}): ${responseBody}`);
                             reject(error);
                         }
                     });
