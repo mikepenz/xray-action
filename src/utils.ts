@@ -68,7 +68,10 @@ export async function doFormDataRequest(
           try {
             core.debug(`Server response: ${responseBody}`)
             resolve(JSON.parse(responseBody))
-          } catch (error) {
+          } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+            core.warning(
+              `🔥 Server responded with error (${error.message}): ${responseBody}`
+            )
             reject(error)
           }
         })

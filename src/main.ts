@@ -31,7 +31,15 @@ async function run(): Promise<void> {
       }
     }
     const username: string = core.getInput('username')
+    if (!username) {
+      core.setFailed('The required `username` is missing')
+      return
+    }
     const password: string = core.getInput('password')
+    if (!password) {
+      core.setFailed('The required `password` is missing')
+      return
+    }
 
     // params for xray
     const testPaths: string = core.getInput('testPaths')
