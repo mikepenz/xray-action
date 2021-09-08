@@ -333,11 +333,17 @@ exports.retrieveRepositoryPath = retrieveRepositoryPath;
  */
 function resolveJson(githubWorkspacePath, file) {
     if (file) {
-        if (fs.existsSync(path.resolve(file))) {
-            return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+        try {
+            if (fs.existsSync(path.resolve(file))) {
+                return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+            }
+            else {
+                return JSON.parse(fs.readFileSync(path.resolve(githubWorkspacePath, file), 'utf8'));
+            }
         }
-        else {
-            return JSON.parse(fs.readFileSync(path.resolve(githubWorkspacePath, file), 'utf8'));
+        catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+            core.error(`The provided json file (${file}) could not be parsed: ${error.message}`);
+            return;
         }
     }
     else {
@@ -448,7 +454,7 @@ class XrayCloud {
     }
     auth() {
         return __awaiter(this, void 0, void 0, function* () {
-            const authenticateResponse = yield got_1.default.post(`${this.xrayBaseUrl.href}/api/v1/authenticate`, {
+            const authenticateResponse = yield got_1.default.post(`${this.xrayBaseUrl.href}/api/v2/authenticate`, {
                 json: {
                     client_id: `${this.xrayOptions.username}`,
                     client_secret: `${this.xrayOptions.password}`
@@ -497,11 +503,11 @@ class XrayCloud {
                         filepath: 'testInfo.json'
                     });
                 }
-                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v1/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution/${format}/multipart`);
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
-                    path: `${this.xrayBaseUrl.pathname}/api/v1/import/execution/${format}/multipart`,
+                    path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution/${format}/multipart`,
                     headers: { Authorization: `Bearer ${this.token}` }
                 });
                 try {
@@ -513,7 +519,7 @@ class XrayCloud {
                 }
             }
             else {
-                const endpoint = `${this.xrayBaseUrl.href}/api/v1/import/execution/${format}`;
+                const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution/${format}`;
                 core.debug(`Using endpoint: ${endpoint}`);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const importResponse = yield got_1.default.post(endpoint, {

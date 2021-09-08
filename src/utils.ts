@@ -28,12 +28,19 @@ export function resolveJson(
   file: string
 ): Object | undefined {
   if (file) {
-    if (fs.existsSync(path.resolve(file))) {
-      return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'))
-    } else {
-      return JSON.parse(
-        fs.readFileSync(path.resolve(githubWorkspacePath, file), 'utf8')
+    try {
+      if (fs.existsSync(path.resolve(file))) {
+        return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'))
+      } else {
+        return JSON.parse(
+          fs.readFileSync(path.resolve(githubWorkspacePath, file), 'utf8')
+        )
+      }
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+      core.error(
+        `The provided json file (${file}) could not be parsed: ${error.message}`
       )
+      return
     }
   } else {
     return undefined
