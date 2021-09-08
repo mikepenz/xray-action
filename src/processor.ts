@@ -1,8 +1,8 @@
 import * as core from '@actions/core'
-import * as glob from '@actions/glob'
 import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
 import {lookup} from 'mime-types'
+import {retrieveTestFiles} from './utils'
 import {Xray} from './xray'
 import {XrayCloud} from './xray-cloud'
 import {XrayServer} from './xray-server'
@@ -17,6 +17,7 @@ export interface XrayOptions {
 export interface XrayImportOptions {
   testFormat: string
   testPaths: string
+  testMerge: boolean
   testExecKey: string
   projectKey: string
   testPlanKey: string
@@ -68,15 +69,16 @@ export class Processor {
     const importOptions = this.importOptions
     let completed = 0
     let failed = 0
-    const globber = await glob.create(this.xrayImportOptions.testPaths, {
-      followSymbolicLinks: false
-    })
 
     core.info(`ℹ️ Importing from: ${this.xrayImportOptions.testPaths}`)
     core.info(`ℹ️ Importing using format: ${this.xrayImportOptions.testFormat}`)
 
-    const files = await globber.glob()
-    const filesCount = files.length
+    // load the test files, this may merge the results into a single file
+    const files = await retrieveTestFiles(
+      this.xrayImportOptions.testMerge,
+      this.xrayImportOptions.testFormat,
+      this.xrayImportOptions.testPaths
+    )
 
     try {
       /* does a import for a specific file */
@@ -142,10 +144,10 @@ export class Processor {
     }
 
     core.info(
-      `ℹ️ Processed ${completed} of ${filesCount} elements. Failed to import: ${failed}`
+      `ℹ️ Processed ${completed} of ${files.length} elements. Failed to import: ${failed}`
     )
 
-    core.setOutput('count', filesCount)
+    core.setOutput('count', files.length)
     core.setOutput('completed', completed)
     core.setOutput('failed', failed)
 

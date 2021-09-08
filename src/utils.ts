@@ -2,6 +2,21 @@ import * as core from '@actions/core'
 import * as path from 'path'
 import * as fs from 'fs'
 import FormData from 'form-data'
+import {tmpdir} from 'os'
+import {randomBytes} from 'crypto'
+import {join} from 'path'
+import * as glob from '@actions/glob'
+import {mergeFiles} from 'junit-report-merger'
+
+/**
+ * Constructs a temporary file, with the given extension
+ */
+export function tmpFile(ext: string): string {
+  return join(
+    tmpdir(),
+    `tmp.${randomBytes(6).readUIntLE(0, 6).toString(36)}.${ext}`
+  )
+}
 
 /**
  * Resolves the repository path, relatively to the GITHUB_WORKSPACE
@@ -85,4 +100,39 @@ export async function doFormDataRequest(
       }
     })
   })
+}
+
+/**
+ * Retrieves the test result files given the provided globber.
+ * Automatically merges supported test result formats into a single file.
+ */
+export async function retrieveTestFiles(
+  testMerge: boolean,
+  testFormat: string,
+  testPaths: string
+): Promise<string[]> {
+  // match find the test files via the globber
+  const globber = await glob.create(testPaths, {
+    followSymbolicLinks: false
+  })
+  const files = await globber.glob()
+
+  // merge together the test result files if requested, and more than 1 file is found
+  if (files.length > 1 && testMerge) {
+    // supported for junit
+    if (testFormat === 'junit' && files.length > 1) {
+      const tmp = tmpFile('xml')
+      await mergeFiles(tmp, [testPaths])
+      core.info(
+        `ℹ️ Merged ${files.length} junit xml files into a single file: ${tmp}`
+      )
+      return [tmp]
+    } else {
+      core.info(
+        `ℹ️ ${testFormat} does currently not support test result merging`
+      )
+    }
+  }
+
+  return files
 }
