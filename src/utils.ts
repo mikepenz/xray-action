@@ -53,9 +53,9 @@ export function resolveJson(
       }
     } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       core.error(
-        `The provided json file (${file}) could not be parsed: ${error.message}`
+        `🔥 The provided json file (${file}) could not be parsed: ${error.message}`
       )
-      return
+      return undefined
     }
   } else {
     return undefined
@@ -120,13 +120,32 @@ export async function retrieveTestFiles(
   // merge together the test result files if requested, and more than 1 file is found
   if (files.length > 1 && testMerge) {
     // supported for junit
-    if (testFormat === 'junit' && files.length > 1) {
-      const tmp = tmpFile('xml')
-      await mergeFiles(tmp, [testPaths])
-      core.info(
-        `ℹ️ Merged ${files.length} junit xml files into a single file: ${tmp}`
-      )
-      return [tmp]
+    if (testFormat === 'junit') {
+      try {
+        const tmp = tmpFile('xml')
+        await mergeFiles(tmp, [testPaths])
+        core.info(
+          `ℹ️ Merged ${files.length} junit test reports into a single file: ${tmp}`
+        )
+        return [tmp]
+      } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+        core.warning(
+          `🔥 Failed to merge junit test report files: ${error.message}`
+        )
+      }
+    } else if (testFormat === 'cucumber') {
+      try {
+        const tmp = tmpFile('json')
+        fs.writeFileSync(tmp, mergeJsonFiles(files))
+        core.info(
+          `ℹ️ Merged ${files.length} cucumber test reports into a single file: ${tmp}`
+        )
+        return [tmp]
+      } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+        core.warning(
+          `🔥 Failed to merge cucumber test report files: ${error.message}`
+        )
+      }
     } else {
       core.info(
         `ℹ️ ${testFormat} does currently not support test result merging`
@@ -135,4 +154,32 @@ export async function retrieveTestFiles(
   }
 
   return files
+}
+
+/**
+ * Merges multiple json report files together.
+ * This works for `cucumber` test reports.
+ *
+ * Credits to:
+ * https://github.com/bitcoder/cucumber-json-merge/blob/master/lib/index.js#L41-L57
+ *
+ * Licensed as: Apache 2.0
+ * https://github.com/bitcoder/cucumber-json-merge/blob/master/LICENSE
+ */
+function mergeJsonFiles(files: string[]): string {
+  const mergedResults: string[] = []
+  for (const file of files) {
+    try {
+      const rawdata: string = fs.readFileSync(file, 'utf8')
+      const partialResults = JSON.parse(rawdata)
+      mergedResults.push(partialResults)
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        throw new Error('Invalid JSON content')
+      } else {
+        throw err
+      }
+    }
+  }
+  return JSON.stringify(mergedResults.concat.apply([], mergedResults))
 }
