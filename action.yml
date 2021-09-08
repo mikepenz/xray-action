@@ -22,6 +22,10 @@ inputs:
     required: true
     description: 'A `glob` pattern, to find all test results which should get imported.'
     default: "**/test-results/test/TEST-*.xml"
+  testMerge:
+    required: false
+    description: 'When multiple test reports are found, they will be automatically merged into a single test report file. Only supported for: ["junit"]'
+    default: "true"
   testFormat:
     description: 'The format of the to be imported data. ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"].'
     default: "junit"

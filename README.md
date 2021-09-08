@@ -87,7 +87,8 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | `username`                | Xray API client id (cloud) or Jira username (Server/DC)                                                                                                        | x            |
 | `password`                | Xray API client secret (cloud) or Jira password (Server/DC)                                                                                                    | x            |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
-| `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to report paths. The default is `**/junit-reports/TEST-*.xml`.           | x            |
+| `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to report paths. The default is `**/junit-reports/TEST-*.xml`.                 | x            |
+| `testMerge`               | Merges together multiple test report files into a single report. Supported for: ["junit"]. (Default: true)                                                     |              |
 | `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
 | `projectKey`              | Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created. | x            |
 | `testPlanKey`             | Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.                          |              |

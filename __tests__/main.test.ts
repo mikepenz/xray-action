@@ -14,6 +14,7 @@ test('import test results server', async () => {
     {
       testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
+      testMerge: false,
       testExecKey: "",
       projectKey: "GHXA",
       testPlanKey: "",
@@ -48,6 +49,7 @@ test('import test results server', async () => {
     {
       testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
+      testMerge: true,
       testExecKey: "",
       projectKey: "GHXA",
       testPlanKey: "GHXA-1",
@@ -60,7 +62,11 @@ test('import test results server', async () => {
             "description": "This test execution covers the Android section of things"
         }
       },
-      testJson: undefined,
+      testJson:  {
+        "fields": {
+            "labels": [ "test_label" ]
+        }
+      }
     },
     {
       combineInSingleTestExec: true,

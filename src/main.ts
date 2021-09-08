@@ -43,6 +43,7 @@ async function run(): Promise<void> {
 
     // params for xray
     const testPaths: string = core.getInput('testPaths')
+    const testMerge: boolean = core.getInput('testMerge') === 'true'
     const testFormat: string = core.getInput('testFormat')
     const testExecKey: string = core.getInput('testExecKey')
     const projectKey: string = core.getInput('projectKey')
@@ -71,6 +72,7 @@ async function run(): Promise<void> {
       {
         testFormat,
         testPaths,
+        testMerge,
         testExecKey,
         projectKey,
         testPlanKey,
