@@ -165,10 +165,12 @@ ${{steps.xray.outputs.count}}
 A full set list of possible output values for this action.
 
 
-| **Output** | **Description**              |
-|------------|------------------------------|
-| count      | The count of imported files. |
-| failed     | The count of failed imports. |
+| **Output**      | **Description**                        |
+|-----------------|----------------------------------------|
+| count           | The count of imported files.           |
+| completed       | The count of completed imports.        |
+| failed          | The count of failed imports.           |
+| testExecKey     | The key of the created test execution. |
 
 ## Contribute 🧬
 

@@ -127,6 +127,7 @@ export class Processor {
         const testExecKey = await doImport(files.shift()!)
         if (testExecKey) {
           xray.updateTestExecKey(testExecKey)
+          core.setOutput('testExecKey', testExecKey)
         } else {
           throw Error(
             "Couldn't retrieve the test exec key by importing one test"
