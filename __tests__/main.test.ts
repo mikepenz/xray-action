@@ -76,7 +76,48 @@ test('import test results server', async () => {
     }
   )
   const result = await processor.process()
-  
+})
+
+test('import cucumber test results server', async () => {
+
+  const processor = new Processor(
+    {
+      cloud: false,
+      baseUrl: new URL("https://xray-demo3.xpand-it.com"),
+      username: process.env.XRAY_USERNAME || "",
+      password: process.env.XRAY_PASSWORD || ""
+    },
+    {
+      testFormat: "cucumber",
+      testPaths: "cucumber_tests/*.json",
+      testMerge: true,
+      testExecKey: "",
+      projectKey: "GHXA",
+      testPlanKey: "GHXA-123",
+      testEnvironments: "",
+      revision: "",
+      fixVersion: "",
+      testExecutionJson: {
+        "fields": {
+            "summary": "Brand new Cucumber Test execution",
+            "description": "This cucumber test execution covers the Android section of things",
+            "labels": [ "cucumber_test_label" ]
+        }
+      },
+      testJson:  {
+        "fields": {
+            "labels": [ "cucumber_test_label" ]
+        }
+      }
+    },
+    {
+      combineInSingleTestExec: true,
+      failOnImportError: false,
+      continueOnImportError: true,
+      importParallelism: 2
+    }
+  )
+  const result = await processor.process()
 })
 
 /*
