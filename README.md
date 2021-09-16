@@ -84,8 +84,9 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
 | `xrayCloud`               | Defines which variant of Xray to target [cloud vs Server/DC] (default="true")                                                                                  |              |
 | `xrayBaseUrl`             | Defines the base URL if Xray Server/DC is chosen (only required if xrayCloud="false")                                                                          | x*           |
-| `username`                | Xray API client id (cloud) or Jira username (Server/DC)                                                                                                        | x            |
-| `password`                | Xray API client secret (cloud) or Jira password (Server/DC)                                                                                                    | x            |
+| `username`                | Xray API client id (cloud) or Jira username (Server/DC). (Required for xrayCloud)                                                                              | x*           |
+| `password`                | Xray API client secret (cloud) or Jira password (Server/DC). (Required for xrayCloud)                                                                          | x*           |
+| `xrayToken`               | Xray Personal Access Token. If provided username/password are ignored. (Xray Server/DC only)                                                                   |              |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
 | `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to report paths. The default is `**/junit-reports/TEST-*.xml`.                 | x            |
 | `testMerge`               | Merges together multiple test report files into a single report. Supported for: ["junit", "cucumber"]. (Default: true)                                                     |              |

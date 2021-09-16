@@ -62,13 +62,14 @@ function run() {
                     core.setFailed(error.message);
                 }
             }
+            const xrayToken = core.getInput('xrayToken');
             const username = core.getInput('username');
-            if (!username) {
+            const password = core.getInput('password');
+            if (!username && !xrayToken) {
                 core.setFailed('The required `username` is missing');
                 return;
             }
-            const password = core.getInput('password');
-            if (!password) {
+            else if (!password && !xrayToken) {
                 core.setFailed('The required `password` is missing');
                 return;
             }
@@ -91,7 +92,8 @@ function run() {
                 cloud,
                 baseUrl,
                 username,
-                password
+                password,
+                token: xrayToken
             }, {
                 testFormat,
                 testPaths,
@@ -181,14 +183,19 @@ class Processor {
                 xray = new xray_server_1.XrayServer(this.xrayOptions, this.xrayImportOptions);
                 core.info('ℹ️ Configured XrayServer');
             }
-            core.info('ℹ️ Start logging in procedure to xray');
-            try {
-                yield xray.auth();
-                core.info('ℹ️ Completed login and retrieved token');
+            if (xray.requiresAuth) {
+                core.info('ℹ️ Start logging in procedure to xray');
+                try {
+                    yield xray.auth();
+                    core.info('ℹ️ Completed login and retrieved token');
+                }
+                catch (error) {
+                    core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`);
+                    return false;
+                }
             }
-            catch (error) {
-                core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`);
-                return false;
+            else {
+                core.info('ℹ️ No authentication required, using Basic Auth or provided token');
             }
             core.endGroup();
             core.startGroup(`📝 Import test reports`);
@@ -527,6 +534,8 @@ class XrayCloud {
         this.xrayImportOptions = xrayImportOptions;
         this.xrayBaseUrl = new URL('http://xray.cloud.getxray.app');
         this.token = '';
+        // XrayCloud requires to authenticate with the given credentials first
+        this.requiresAuth = false;
         this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
     }
     protocol() {
@@ -683,6 +692,8 @@ class XrayServer {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
         this.token = '';
+        // XrayServer does not require authentication (uses BasicAuth or Token)
+        this.requiresAuth = false;
         this.xrayBaseUrl =
             this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com');
         this.searchParams = (0, xray_utils_1.createSearchParams)(this.xrayImportOptions);
@@ -710,6 +721,13 @@ class XrayServer {
             let format = this.xrayImportOptions.testFormat;
             if (format === 'xray') {
                 format = ''; // xray format has no subpath
+            }
+            let authString = '';
+            if (this.xrayOptions.token) {
+                authString = `Bearer ${this.xrayOptions.token}`;
+            }
+            else {
+                authString = `Basic ${Buffer.from(`${this.xrayOptions.username}:${this.xrayOptions.password}`).toString('base64')}`;
             }
             if (this.xrayImportOptions.testExecutionJson &&
                 this.xrayImportOptions.testExecKey === '') {
@@ -747,7 +765,9 @@ class XrayServer {
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
-                    auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+                    headers: {
+                        Authorization: authString
+                    },
                     path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}/multipart`
                 });
                 try {
@@ -769,7 +789,9 @@ class XrayServer {
                     const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                         protocol: this.protocol(),
                         host: this.xrayBaseUrl.host,
-                        auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+                        headers: {
+                            Authorization: authString
+                        },
                         path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
                     });
                     try {
@@ -787,7 +809,7 @@ class XrayServer {
                     const importResponse = yield got_1.default.post(endpoint, {
                         searchParams: this.searchParams,
                         headers: {
-                            Authorization: `Basic ${Buffer.from(`${this.xrayOptions.username}:${this.xrayOptions.password}`).toString('base64')}`,
+                            Authorization: authString,
                             'Content-Type': mimeType
                         },
                         body: data,
@@ -40096,7 +40118,10 @@ module.exports.mergeFiles = function (destFilePath, srcFilePathsOrGlobPatterns, 
       defaultEncoding: 'utf8',
       autoClose: true
     })
-    mergeStreams(destStream, srcStreams, {}, callback)
+    mergeStreams(destStream, srcStreams, {}, function () {
+      destStream.end()
+      callback()
+    })
   }, callback)
 
   return returnValue

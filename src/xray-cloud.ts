@@ -17,6 +17,9 @@ export class XrayCloud implements Xray {
   searchParams!: URLSearchParams
   token = ''
 
+  // XrayCloud requires to authenticate with the given credentials first
+  requiresAuth = false
+
   constructor(
     private xrayOptions: XrayOptions,
     private xrayImportOptions: XrayImportOptions

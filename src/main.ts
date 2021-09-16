@@ -30,13 +30,14 @@ async function run(): Promise<void> {
         core.setFailed(error.message)
       }
     }
+
+    const xrayToken: string = core.getInput('xrayToken')
     const username: string = core.getInput('username')
-    if (!username) {
+    const password: string = core.getInput('password')
+    if (!username && !xrayToken) {
       core.setFailed('The required `username` is missing')
       return
-    }
-    const password: string = core.getInput('password')
-    if (!password) {
+    } else if (!password && !xrayToken) {
       core.setFailed('The required `password` is missing')
       return
     }
@@ -67,7 +68,8 @@ async function run(): Promise<void> {
         cloud,
         baseUrl,
         username,
-        password
+        password,
+        token: xrayToken
       },
       {
         testFormat,

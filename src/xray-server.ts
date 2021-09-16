@@ -16,6 +16,9 @@ export class XrayServer implements Xray {
   searchParams!: URLSearchParams
   token = ''
 
+  // XrayServer does not require authentication (uses BasicAuth or Token)
+  requiresAuth = false
+
   constructor(
     private xrayOptions: XrayOptions,
     private xrayImportOptions: XrayImportOptions
@@ -47,6 +50,15 @@ export class XrayServer implements Xray {
     let format = this.xrayImportOptions.testFormat
     if (format === 'xray') {
       format = '' // xray format has no subpath
+    }
+
+    let authString = ''
+    if (this.xrayOptions.token) {
+      authString = `Bearer ${this.xrayOptions.token}`
+    } else {
+      authString = `Basic ${Buffer.from(
+        `${this.xrayOptions.username}:${this.xrayOptions.password}`
+      ).toString('base64')}`
     }
 
     if (
@@ -104,7 +116,9 @@ export class XrayServer implements Xray {
       const importResponse = await doFormDataRequest(form, {
         protocol: this.protocol(),
         host: this.xrayBaseUrl.host,
-        auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+        headers: {
+          Authorization: authString
+        },
         path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}/multipart`
       })
       try {
@@ -129,7 +143,9 @@ export class XrayServer implements Xray {
         const importResponse = await doFormDataRequest(form, {
           protocol: this.protocol(),
           host: this.xrayBaseUrl.host,
-          auth: `${this.xrayOptions.username}:${this.xrayOptions.password}`,
+          headers: {
+            Authorization: authString
+          },
           path: `${
             this.xrayBaseUrl.pathname
           }/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
@@ -152,9 +168,7 @@ export class XrayServer implements Xray {
         const importResponse = await got.post<any>(endpoint, {
           searchParams: this.searchParams,
           headers: {
-            Authorization: `Basic ${Buffer.from(
-              `${this.xrayOptions.username}:${this.xrayOptions.password}`
-            ).toString('base64')}`,
+            Authorization: authString,
             'Content-Type': mimeType
           },
           body: data,

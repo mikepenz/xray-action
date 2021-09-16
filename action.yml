@@ -8,16 +8,19 @@ inputs:
   xrayCloud:
     required: false
     default: "true"
-    description: 'Defines which variant of xray to target at [cloud vs server]'
+    description: 'Defines which variant of Xray to target at [cloud vs Server/DC]'
   xrayBaseUrl:
     required: false
-    description: 'The endpoint for an xray server instance. (Keep empty for cloud instances)'
+    description: 'The endpoint for an Xray Server/DC instance. (Keep empty for cloud instances)'
   username:
-    required: true
-    description: 'The username to login to xray.'
+    required: false
+    description: 'Xray API client id (cloud) or Jira username (Server/DC). (Required for xrayCoud)'
   password:
-    required: true
-    description: 'The password to login to xray.'
+    required: false
+    description: 'Xray API client secret (cloud) or Jira password (Server/DC). (Required for xrayCoud)'
+  xrayToken:
+    required: false
+    description: 'Xray Personal Access Token. If provided username/password are ignored. (Xray Server/DC only)'
   testPaths:
     required: true
     description: 'A `glob` pattern, to find all test results which should get imported.'
