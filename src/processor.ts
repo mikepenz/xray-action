@@ -9,9 +9,10 @@ import {XrayServer} from './xray-server'
 
 export interface XrayOptions {
   cloud: boolean
-  baseUrl: URL | undefined
-  username: string
-  password: string
+  baseUrl?: URL
+  username?: string
+  password?: string
+  token?: string
 }
 
 export interface XrayImportOptions {
@@ -24,8 +25,8 @@ export interface XrayImportOptions {
   testEnvironments: string
   revision: string
   fixVersion: string
-  testExecutionJson: Object | undefined // only used in case of multipart API
-  testJson: Object | undefined // only used in case of multipart API
+  testExecutionJson?: Object // only used in case of multipart API
+  testJson?: Object // only used in case of multipart API
 }
 
 export interface ImportOptions {
@@ -54,13 +55,19 @@ export class Processor {
       core.info('ℹ️ Configured XrayServer')
     }
 
-    core.info('ℹ️ Start logging in procedure to xray')
-    try {
-      await xray.auth()
-      core.info('ℹ️ Completed login and retrieved token')
-    } catch (error) {
-      core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`)
-      return false
+    if (xray.requiresAuth) {
+      core.info('ℹ️ Start logging in procedure to xray')
+      try {
+        await xray.auth()
+        core.info('ℹ️ Completed login and retrieved token')
+      } catch (error) {
+        core.setFailed(`🔥 Failed to authenticate with Xray: ${error}`)
+        return false
+      }
+    } else {
+      core.info(
+        'ℹ️ No authentication required, using Basic Auth or provided token'
+      )
     }
 
     core.endGroup()
