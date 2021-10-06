@@ -18,7 +18,7 @@ export class XrayCloud implements Xray {
   token = ''
 
   // XrayCloud requires to authenticate with the given credentials first
-  requiresAuth = false
+  requiresAuth = true
 
   constructor(
     private xrayOptions: XrayOptions,
