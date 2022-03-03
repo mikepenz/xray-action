@@ -122,9 +122,12 @@ export class Processor {
         return ''
       }
 
+      // all exec keys
+      const execKeys = []
+
       // if no test exec key was specified we wanna execute once and then update the testExec for the remaining imports
       if (
-        files.length > 0 &&
+        files.length > 1 &&
         !this.xrayImportOptions.testExecKey &&
         this.importOptions.combineInSingleTestExec
       ) {
@@ -134,7 +137,7 @@ export class Processor {
         const testExecKey = await doImport(files.shift()!)
         if (testExecKey) {
           xray.updateTestExecKey(testExecKey)
-          core.setOutput('testExecKey', testExecKey)
+          execKeys.push(testExecKey)
         } else {
           throw Error(
             "Couldn't retrieve the test exec key by importing one test"
@@ -144,11 +147,14 @@ export class Processor {
 
       if (files.length > 0) {
         // execute all remaining in parallel
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const {results} = await PromisePool.for(files)
           .withConcurrency(this.importOptions.importParallelism)
           .process(async file => await doImport(file))
+
+        execKeys.push(results)
       }
+
+      core.setOutput('testExecKey', execKeys.join(','))
     } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       core.warning(`🔥 Stopped import (${error.message})`)
     }
