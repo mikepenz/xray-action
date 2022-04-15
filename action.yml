@@ -78,5 +78,5 @@ outputs:
   failed:
     description: 'The count of failed imports.'
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
