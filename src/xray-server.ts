@@ -173,7 +173,7 @@ export class XrayServer implements Xray {
           },
           body: data,
           responseType: 'json',
-          timeout: 60000 // 60s timeout
+          timeout: {request: 60000} // 60s timeout
         })
         try {
           return importResponse.body.testExecIssue.key
