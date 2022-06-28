@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
-import {Processor} from './processor'
-import {resolveJson, retrieveRepositoryPath} from './utils'
+import {Processor} from './processor.js'
+import {resolveJson, retrieveRepositoryPath} from './utils.js'
 
 async function run(): Promise<void> {
   try {

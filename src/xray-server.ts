@@ -1,15 +1,15 @@
-import {XrayImportOptions, XrayOptions} from './processor'
-import got from 'got'
+import {XrayImportOptions, XrayOptions} from './processor.js'
 import * as core from '@actions/core'
 import FormData from 'form-data'
-import {doFormDataRequest} from './utils'
+import {doFormDataRequest} from './utils.js'
 import {
   createSearchParams,
   retrieveFileExtension,
   updateTestExecJson,
   updateTestJson
-} from './xray-utils'
-import {Xray} from './xray'
+} from './xray-utils.js'
+import {Xray} from './xray.js'
+import got from 'got'
 
 export class XrayServer implements Xray {
   xrayBaseUrl: URL

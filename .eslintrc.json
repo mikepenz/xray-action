@@ -8,7 +8,6 @@
       "project": "./tsconfig.json"
     },
     "rules": {
-      "import/no-unresolved": "off",
       "filenames/match-regex": "off",
       "sort-imports": "off",
       "i18n-text/no-en": "off",  

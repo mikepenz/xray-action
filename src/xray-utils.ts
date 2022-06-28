@@ -1,4 +1,4 @@
-import {XrayImportOptions} from './processor'
+import {XrayImportOptions} from './processor.js'
 import * as core from '@actions/core'
 import {extension} from 'mime-types'
 

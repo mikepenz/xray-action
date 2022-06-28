@@ -3,7 +3,8 @@
   "version": "2.0.0",
   "private": true,
   "description": "GitHub action to import test results into 'Xray' - A complete Test Management tool for Jira.",
-  "main": "lib/main.js",
+  "exports": "./index.js",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "format": "prettier --write **/*.ts",
