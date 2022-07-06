@@ -553,7 +553,7 @@ class XrayCloud {
     constructor(xrayOptions, xrayImportOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
-        this.xrayBaseUrl = new URL('http://xray.cloud.getxray.app');
+        this.xrayBaseUrl = new URL('https://xray.cloud.getxray.app');
         this.token = '';
         // XrayCloud requires to authenticate with the given credentials first
         this.requiresAuth = true;
