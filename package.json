@@ -32,7 +32,7 @@
   "author": "Mike Penz",
   "license": "Apache 2.0",
   "dependencies": {
-    "@actions/core": "^1.9.0",
+    "@actions/core": "^1.9.1",
     "@actions/glob": "^0.3.0",
     "@supercharge/promise-pool": "^2.3.0",
     "@types/mime-types": "^2.1.1",
