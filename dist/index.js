@@ -1156,7 +1156,6 @@ const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
 const os = __importStar(__nccwpck_require__(2037));
 const path = __importStar(__nccwpck_require__(1017));
-const uuid_1 = __nccwpck_require__(5840);
 const oidc_utils_1 = __nccwpck_require__(8041);
 /**
  * The code to exit an action
@@ -1186,20 +1185,9 @@ function exportVariable(name, val) {
     process.env[name] = convertedVal;
     const filePath = process.env['GITHUB_ENV'] || '';
     if (filePath) {
-        const delimiter = `ghadelimiter_${uuid_1.v4()}`;
-        // These should realistically never happen, but just in case someone finds a way to exploit uuid generation let's not allow keys or values that contain the delimiter.
-        if (name.includes(delimiter)) {
-            throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
-        }
-        if (convertedVal.includes(delimiter)) {
-            throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
-        }
-        const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
-        file_command_1.issueCommand('ENV', commandValue);
+        return file_command_1.issueFileCommand('ENV', file_command_1.prepareKeyValueMessage(name, val));
     }
-    else {
-        command_1.issueCommand('set-env', { name }, convertedVal);
-    }
+    command_1.issueCommand('set-env', { name }, convertedVal);
 }
 exports.exportVariable = exportVariable;
 /**
@@ -1217,7 +1205,7 @@ exports.setSecret = setSecret;
 function addPath(inputPath) {
     const filePath = process.env['GITHUB_PATH'] || '';
     if (filePath) {
-        file_command_1.issueCommand('PATH', inputPath);
+        file_command_1.issueFileCommand('PATH', inputPath);
     }
     else {
         command_1.issueCommand('add-path', {}, inputPath);
@@ -1257,7 +1245,10 @@ function getMultilineInput(name, options) {
     const inputs = getInput(name, options)
         .split('\n')
         .filter(x => x !== '');
-    return inputs;
+    if (options && options.trimWhitespace === false) {
+        return inputs;
+    }
+    return inputs.map(input => input.trim());
 }
 exports.getMultilineInput = getMultilineInput;
 /**
@@ -1290,8 +1281,12 @@ exports.getBooleanInput = getBooleanInput;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setOutput(name, value) {
+    const filePath = process.env['GITHUB_OUTPUT'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('OUTPUT', file_command_1.prepareKeyValueMessage(name, value));
+    }
     process.stdout.write(os.EOL);
-    command_1.issueCommand('set-output', { name }, value);
+    command_1.issueCommand('set-output', { name }, utils_1.toCommandValue(value));
 }
 exports.setOutput = setOutput;
 /**
@@ -1420,7 +1415,11 @@ exports.group = group;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function saveState(name, value) {
-    command_1.issueCommand('save-state', { name }, value);
+    const filePath = process.env['GITHUB_STATE'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('STATE', file_command_1.prepareKeyValueMessage(name, value));
+    }
+    command_1.issueCommand('save-state', { name }, utils_1.toCommandValue(value));
 }
 exports.saveState = saveState;
 /**
@@ -1486,13 +1485,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.issueCommand = void 0;
+exports.prepareKeyValueMessage = exports.issueFileCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__nccwpck_require__(7147));
 const os = __importStar(__nccwpck_require__(2037));
+const uuid_1 = __nccwpck_require__(5840);
 const utils_1 = __nccwpck_require__(5278);
-function issueCommand(command, message) {
+function issueFileCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
     if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
@@ -1504,7 +1504,22 @@ function issueCommand(command, message) {
         encoding: 'utf8'
     });
 }
-exports.issueCommand = issueCommand;
+exports.issueFileCommand = issueFileCommand;
+function prepareKeyValueMessage(key, value) {
+    const delimiter = `ghadelimiter_${uuid_1.v4()}`;
+    const convertedValue = utils_1.toCommandValue(value);
+    // These should realistically never happen, but just in case someone finds a
+    // way to exploit uuid generation let's not allow keys or values that contain
+    // the delimiter.
+    if (key.includes(delimiter)) {
+        throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
+    }
+    if (convertedValue.includes(delimiter)) {
+        throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
+    }
+    return `${key}<<${delimiter}${os.EOL}${convertedValue}${os.EOL}${delimiter}`;
+}
+exports.prepareKeyValueMessage = prepareKeyValueMessage;
 //# sourceMappingURL=file-command.js.map
 
 /***/ }),
@@ -33103,6 +33118,134 @@ module.exports["default"] = CacheableLookup;
 
 /***/ }),
 
+/***/ 4340:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const {PassThrough: PassThroughStream} = __nccwpck_require__(2781);
+
+module.exports = options => {
+	options = {...options};
+
+	const {array} = options;
+	let {encoding} = options;
+	const isBuffer = encoding === 'buffer';
+	let objectMode = false;
+
+	if (array) {
+		objectMode = !(encoding || isBuffer);
+	} else {
+		encoding = encoding || 'utf8';
+	}
+
+	if (isBuffer) {
+		encoding = null;
+	}
+
+	const stream = new PassThroughStream({objectMode});
+
+	if (encoding) {
+		stream.setEncoding(encoding);
+	}
+
+	let length = 0;
+	const chunks = [];
+
+	stream.on('data', chunk => {
+		chunks.push(chunk);
+
+		if (objectMode) {
+			length = chunks.length;
+		} else {
+			length += chunk.length;
+		}
+	});
+
+	stream.getBufferedValue = () => {
+		if (array) {
+			return chunks;
+		}
+
+		return isBuffer ? Buffer.concat(chunks, length) : chunks.join('');
+	};
+
+	stream.getBufferedLength = () => length;
+
+	return stream;
+};
+
+
+/***/ }),
+
+/***/ 7040:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const {constants: BufferConstants} = __nccwpck_require__(4300);
+const pump = __nccwpck_require__(8341);
+const bufferStream = __nccwpck_require__(4340);
+
+class MaxBufferError extends Error {
+	constructor() {
+		super('maxBuffer exceeded');
+		this.name = 'MaxBufferError';
+	}
+}
+
+async function getStream(inputStream, options) {
+	if (!inputStream) {
+		return Promise.reject(new Error('Expected a stream'));
+	}
+
+	options = {
+		maxBuffer: Infinity,
+		...options
+	};
+
+	const {maxBuffer} = options;
+
+	let stream;
+	await new Promise((resolve, reject) => {
+		const rejectPromise = error => {
+			// Don't retrieve an oversized buffer.
+			if (error && stream.getBufferedLength() <= BufferConstants.MAX_LENGTH) {
+				error.bufferedData = stream.getBufferedValue();
+			}
+
+			reject(error);
+		};
+
+		stream = pump(inputStream, bufferStream(options), error => {
+			if (error) {
+				rejectPromise(error);
+				return;
+			}
+
+			resolve();
+		});
+
+		stream.on('data', () => {
+			if (stream.getBufferedLength() > maxBuffer) {
+				rejectPromise(new MaxBufferError());
+			}
+		});
+	});
+
+	return stream.getBufferedValue();
+}
+
+module.exports = getStream;
+// TODO: Remove this for the next major release
+module.exports["default"] = getStream;
+module.exports.buffer = (stream, options) => getStream(stream, {...options, encoding: 'buffer'});
+module.exports.array = (stream, options) => getStream(stream, {...options, array: true});
+module.exports.MaxBufferError = MaxBufferError;
+
+
+/***/ }),
+
 /***/ 8116:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -33112,7 +33255,7 @@ module.exports["default"] = CacheableLookup;
 const EventEmitter = __nccwpck_require__(2361);
 const urlLib = __nccwpck_require__(7310);
 const normalizeUrl = __nccwpck_require__(7952);
-const getStream = __nccwpck_require__(1766);
+const getStream = __nccwpck_require__(7040);
 const CachePolicy = __nccwpck_require__(1002);
 const Response = __nccwpck_require__(9004);
 const lowercaseKeys = __nccwpck_require__(9662);
@@ -33598,85 +33741,6 @@ CombinedStream.prototype._emitError = function(err) {
   this._reset();
   this.emit('error', err);
 };
-
-
-/***/ }),
-
-/***/ 5728:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-const { promisify } = __nccwpck_require__(3837)
-const JSONB = __nccwpck_require__(2820)
-const zlib = __nccwpck_require__(9796)
-
-const mergeOptions = __nccwpck_require__(4968)
-
-const compress = promisify(zlib.brotliCompress)
-
-const decompress = promisify(zlib.brotliDecompress)
-
-const identity = val => val
-
-const createCompress = ({
-  enable = true,
-  serialize = JSONB.stringify,
-  deserialize = JSONB.parse,
-  compressOptions,
-  decompressOptions
-} = {}) => {
-  if (!enable) {
-    return { serialize, deserialize, decompress: identity, compress: identity }
-  }
-
-  return {
-    serialize,
-    deserialize,
-    compress: async (data, options = {}) => {
-      if (data === undefined) return data
-      const serializedData = serialize(data)
-      return compress(serializedData, mergeOptions(compressOptions, options))
-    },
-    decompress: async (data, options = {}) => {
-      if (data === undefined) return data
-      return deserialize(
-        await decompress(data, mergeOptions(decompressOptions, options))
-      )
-    }
-  }
-}
-
-module.exports = createCompress
-module.exports.stringify = JSONB.stringify
-module.exports.parse = JSONB.parse
-
-
-/***/ }),
-
-/***/ 4968:
-/***/ ((module) => {
-
-"use strict";
-
-
-module.exports = (defaultOptions = {}, options = {}) => {
-  const params = {
-    ...(defaultOptions.params || {}),
-    ...(options.params || {})
-  }
-
-  return {
-    ...defaultOptions,
-    ...options,
-    ...(Object.keys(params).length
-      ? {
-          params
-        }
-      : {})
-  }
-}
 
 
 /***/ }),
@@ -36474,134 +36538,6 @@ module.exports = function(dst, src) {
 
   return dst;
 };
-
-
-/***/ }),
-
-/***/ 1585:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-const {PassThrough: PassThroughStream} = __nccwpck_require__(2781);
-
-module.exports = options => {
-	options = {...options};
-
-	const {array} = options;
-	let {encoding} = options;
-	const isBuffer = encoding === 'buffer';
-	let objectMode = false;
-
-	if (array) {
-		objectMode = !(encoding || isBuffer);
-	} else {
-		encoding = encoding || 'utf8';
-	}
-
-	if (isBuffer) {
-		encoding = null;
-	}
-
-	const stream = new PassThroughStream({objectMode});
-
-	if (encoding) {
-		stream.setEncoding(encoding);
-	}
-
-	let length = 0;
-	const chunks = [];
-
-	stream.on('data', chunk => {
-		chunks.push(chunk);
-
-		if (objectMode) {
-			length = chunks.length;
-		} else {
-			length += chunk.length;
-		}
-	});
-
-	stream.getBufferedValue = () => {
-		if (array) {
-			return chunks;
-		}
-
-		return isBuffer ? Buffer.concat(chunks, length) : chunks.join('');
-	};
-
-	stream.getBufferedLength = () => length;
-
-	return stream;
-};
-
-
-/***/ }),
-
-/***/ 1766:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-const {constants: BufferConstants} = __nccwpck_require__(4300);
-const pump = __nccwpck_require__(8341);
-const bufferStream = __nccwpck_require__(1585);
-
-class MaxBufferError extends Error {
-	constructor() {
-		super('maxBuffer exceeded');
-		this.name = 'MaxBufferError';
-	}
-}
-
-async function getStream(inputStream, options) {
-	if (!inputStream) {
-		return Promise.reject(new Error('Expected a stream'));
-	}
-
-	options = {
-		maxBuffer: Infinity,
-		...options
-	};
-
-	const {maxBuffer} = options;
-
-	let stream;
-	await new Promise((resolve, reject) => {
-		const rejectPromise = error => {
-			// Don't retrieve an oversized buffer.
-			if (error && stream.getBufferedLength() <= BufferConstants.MAX_LENGTH) {
-				error.bufferedData = stream.getBufferedValue();
-			}
-
-			reject(error);
-		};
-
-		stream = pump(inputStream, bufferStream(options), error => {
-			if (error) {
-				rejectPromise(error);
-				return;
-			}
-
-			resolve();
-		});
-
-		stream.on('data', () => {
-			if (stream.getBufferedLength() > maxBuffer) {
-				rejectPromise(new MaxBufferError());
-			}
-		});
-	});
-
-	return stream.getBufferedValue();
-}
-
-module.exports = getStream;
-// TODO: Remove this for the next major release
-module.exports["default"] = getStream;
-module.exports.buffer = (stream, options) => getStream(stream, {...options, encoding: 'buffer'});
-module.exports.array = (stream, options) => getStream(stream, {...options, array: true});
-module.exports.MaxBufferError = MaxBufferError;
 
 
 /***/ }),
@@ -42177,7 +42113,6 @@ module.exports.mergeToString = function (srcStrings, options) {
 
 const EventEmitter = __nccwpck_require__(2361);
 const JSONB = __nccwpck_require__(2820);
-const compressBrotli = __nccwpck_require__(5728);
 
 const loadStore = options => {
 	const adapters = {
@@ -42226,13 +42161,10 @@ class Keyv extends EventEmitter {
 			this.opts.store = loadStore(adapterOptions);
 		}
 
-		if (this.opts.compress) {
-			const brotli = compressBrotli(this.opts.compress.opts);
-			this.opts.serialize = async ({value, expires}) => brotli.serialize({value: await brotli.compress(value), expires});
-			this.opts.deserialize = async data => {
-				const {value, expires} = brotli.deserialize(data);
-				return {value: await brotli.decompress(value), expires};
-			};
+		if (this.opts.compression) {
+			const compression = this.opts.compression;
+			this.opts.serialize = compression.serialize.bind(compression);
+			this.opts.deserialize = compression.deserialize.bind(compression);
 		}
 
 		if (typeof this.opts.store.on === 'function' && emitErrors) {
@@ -42297,7 +42229,7 @@ class Keyv extends EventEmitter {
 			for (const key of keyPrefixed) {
 				promises.push(Promise.resolve()
 					.then(() => store.get(key))
-					.then(data => (typeof data === 'string') ? this.opts.deserialize(data) : data)
+					.then(data => (typeof data === 'string') ? this.opts.deserialize(data) : (this.opts.compression ? this.opts.deserialize(data) : data))
 					.then(data => {
 						if (data === undefined || data === null) {
 							return undefined;
@@ -42319,13 +42251,13 @@ class Keyv extends EventEmitter {
 						data.push(value.value);
 					}
 
-					return data.every(x => x === undefined) ? [] : data;
+					return data;
 				});
 		}
 
 		return Promise.resolve()
 			.then(() => isArray ? store.getMany(keyPrefixed) : store.get(keyPrefixed))
-			.then(data => (typeof data === 'string') ? this.opts.deserialize(data) : data)
+			.then(data => (typeof data === 'string') ? this.opts.deserialize(data) : (this.opts.compression ? this.opts.deserialize(data) : data))
 			.then(data => {
 				if (data === undefined || data === null) {
 					return undefined;
@@ -42333,10 +42265,6 @@ class Keyv extends EventEmitter {
 
 				if (isArray) {
 					const result = [];
-
-					if (data.length === 0) {
-						return [];
-					}
 
 					for (let row of data) {
 						if ((typeof row === 'string')) {
@@ -42356,7 +42284,7 @@ class Keyv extends EventEmitter {
 						}
 					}
 
-					return result.every(x => x === undefined) ? [] : result;
+					return result;
 				}
 
 				if (typeof data.expires === 'number' && Date.now() > data.expires) {
