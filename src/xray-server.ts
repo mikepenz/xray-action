@@ -20,11 +20,11 @@ export class XrayServer implements Xray {
   requiresAuth = false
 
   constructor(
-    private xrayOptions: XrayOptions,
-    private xrayImportOptions: XrayImportOptions
+      private xrayOptions: XrayOptions,
+      private xrayImportOptions: XrayImportOptions
   ) {
     this.xrayBaseUrl =
-      this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com')
+        this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com')
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 
@@ -52,27 +52,27 @@ export class XrayServer implements Xray {
       authString = `Bearer ${this.xrayOptions.token}`
     } else {
       authString = `Basic ${Buffer.from(
-        `${this.xrayOptions.username}:${this.xrayOptions.password}`
+          `${this.xrayOptions.username}:${this.xrayOptions.password}`
       ).toString('base64')}`
     }
 
     if (
-      this.xrayImportOptions.testExecutionJson &&
-      this.xrayImportOptions.testExecKey === ''
+        this.xrayImportOptions.testExecutionJson &&
+        this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
       updateTestExecJson(
-        this.xrayImportOptions,
-        this.xrayImportOptions.testExecutionJson
+          this.xrayImportOptions,
+          this.xrayImportOptions.testExecutionJson
       )
       form.append(
-        'info',
-        JSON.stringify(this.xrayImportOptions.testExecutionJson),
-        {
-          contentType: 'application/json',
-          filename: 'info.json',
-          filepath: 'info.json'
-        }
+          'info',
+          JSON.stringify(this.xrayImportOptions.testExecutionJson),
+          {
+            contentType: 'application/json',
+            filename: 'info.json',
+            filepath: 'info.json'
+          }
       )
 
       const apiPartName = 'file'
@@ -87,18 +87,18 @@ export class XrayServer implements Xray {
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
       if (this.xrayImportOptions.testJson) {
         form.append(
-          'testInfo',
-          JSON.stringify(this.xrayImportOptions.testJson),
-          {
-            contentType: 'application/json',
-            filename: 'testInfo.json',
-            filepath: 'testInfo.json'
-          }
+            'testInfo',
+            JSON.stringify(this.xrayImportOptions.testJson),
+            {
+              contentType: 'application/json',
+              filename: 'testInfo.json',
+              filepath: 'testInfo.json'
+            }
         )
       }
 
       core.debug(
-        `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/multipart`
+          `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/multipart`
       )
 
       const importResponse = await doFormDataRequest(form, {
@@ -113,9 +113,9 @@ export class XrayServer implements Xray {
         return importResponse.testExecIssue.key
       } catch (error) {
         core.warning(
-          `🔥 Response did not match expected format: ${JSON.stringify(
-            importResponse
-          )}`
+            `🔥 Response did not match expected format: ${JSON.stringify(
+                importResponse
+            )}`
         )
         return ''
       }
@@ -135,16 +135,16 @@ export class XrayServer implements Xray {
             Authorization: authString
           },
           path: `${
-            this.xrayBaseUrl.pathname
+              this.xrayBaseUrl.pathname
           }/rest/raven/2.0/import/execution?${this.searchParams.toString()}`
         })
         try {
           return importResponse.testExecIssue.key
         } catch (error) {
           core.warning(
-            `🔥 Response did not match expected format: ${JSON.stringify(
-              importResponse
-            )}`
+              `🔥 Response did not match expected format: ${JSON.stringify(
+                  importResponse
+              )}`
           )
           return ''
         }
@@ -167,9 +167,9 @@ export class XrayServer implements Xray {
           return importResponse.body.testExecIssue.key
         } catch (error) {
           core.warning(
-            `🔥 Response did not match expected format: ${JSON.stringify(
-              importResponse.body || importResponse
-            )}`
+              `🔥 Response did not match expected format: ${JSON.stringify(
+                  importResponse.body || importResponse
+              )}`
           )
           return ''
         }
