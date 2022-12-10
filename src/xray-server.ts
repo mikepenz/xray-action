@@ -20,11 +20,11 @@ export class XrayServer implements Xray {
   requiresAuth = false
 
   constructor(
-      private xrayOptions: XrayOptions,
-      private xrayImportOptions: XrayImportOptions
+    private xrayOptions: XrayOptions,
+    private xrayImportOptions: XrayImportOptions
   ) {
     this.xrayBaseUrl =
-        this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com')
+      this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com')
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 
@@ -47,35 +47,49 @@ export class XrayServer implements Xray {
 
   async import(data: Buffer, mimeType: string): Promise<string> {
     // do import
+    let format = this.xrayImportOptions.testFormat
+    if (format === 'xray') {
+      format = '' // xray format has no subpath
+    } else {
+      format = '/' + format
+    }
+
     let authString = ''
     if (this.xrayOptions.token) {
       authString = `Bearer ${this.xrayOptions.token}`
     } else {
       authString = `Basic ${Buffer.from(
-          `${this.xrayOptions.username}:${this.xrayOptions.password}`
+        `${this.xrayOptions.username}:${this.xrayOptions.password}`
       ).toString('base64')}`
     }
 
     if (
-        this.xrayImportOptions.testExecutionJson &&
-        this.xrayImportOptions.testExecKey === ''
+      this.xrayImportOptions.testExecutionJson &&
+      this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
       updateTestExecJson(
-          this.xrayImportOptions,
-          this.xrayImportOptions.testExecutionJson
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
       )
       form.append(
-          'info',
-          JSON.stringify(this.xrayImportOptions.testExecutionJson),
-          {
-            contentType: 'application/json',
-            filename: 'info.json',
-            filepath: 'info.json'
-          }
+        'info',
+        JSON.stringify(this.xrayImportOptions.testExecutionJson),
+        {
+          contentType: 'application/json',
+          filename: 'info.json',
+          filepath: 'info.json'
+        }
       )
 
-      const apiPartName = 'file'
+      let apiPartName: string
+      if (format.contains('cucumber')) {
+        // workaround for cucumber, see for more details:
+        // https://github.com/Xray-App/xray-code-snippets/blob/649be6d73d3213a22ef31a52bf6e2ac7d557330d/use_cases/import_automation_results/java/xray-code-snippets/src/main/java/com/idera/xray/XrayResultsImporter.java#L205
+        apiPartName = 'result'
+      } else {
+        apiPartName = 'file'
+      }
 
       const fileExtension = retrieveFileExtension(mimeType)
       form.append(apiPartName, data.toString('utf-8'), {
@@ -87,18 +101,18 @@ export class XrayServer implements Xray {
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
       if (this.xrayImportOptions.testJson) {
         form.append(
-            'testInfo',
-            JSON.stringify(this.xrayImportOptions.testJson),
-            {
-              contentType: 'application/json',
-              filename: 'testInfo.json',
-              filepath: 'testInfo.json'
-            }
+          'testInfo',
+          JSON.stringify(this.xrayImportOptions.testJson),
+          {
+            contentType: 'application/json',
+            filename: 'testInfo.json',
+            filepath: 'testInfo.json'
+          }
         )
       }
 
       core.debug(
-          `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/multipart`
+        `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}/multipart`
       )
 
       const importResponse = await doFormDataRequest(form, {
@@ -107,15 +121,15 @@ export class XrayServer implements Xray {
         headers: {
           Authorization: authString
         },
-        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/multipart`
+        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
       })
       try {
         return importResponse.testExecIssue.key
       } catch (error) {
         core.warning(
-            `🔥 Response did not match expected format: ${JSON.stringify(
-                importResponse
-            )}`
+          `🔥 Response did not match expected format: ${JSON.stringify(
+            importResponse
+          )}`
         )
         return ''
       }
@@ -135,21 +149,21 @@ export class XrayServer implements Xray {
             Authorization: authString
           },
           path: `${
-              this.xrayBaseUrl.pathname
-          }/rest/raven/2.0/import/execution?${this.searchParams.toString()}`
+            this.xrayBaseUrl.pathname
+          }/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
         })
         try {
           return importResponse.testExecIssue.key
         } catch (error) {
           core.warning(
-              `🔥 Response did not match expected format: ${JSON.stringify(
-                  importResponse
-              )}`
+            `🔥 Response did not match expected format: ${JSON.stringify(
+              importResponse
+            )}`
           )
           return ''
         }
       } else {
-        const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution`
+        const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}`
         core.debug(`Using endpoint: ${endpoint}`)
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,9 +181,9 @@ export class XrayServer implements Xray {
           return importResponse.body.testExecIssue.key
         } catch (error) {
           core.warning(
-              `🔥 Response did not match expected format: ${JSON.stringify(
-                  importResponse.body || importResponse
-              )}`
+            `🔥 Response did not match expected format: ${JSON.stringify(
+              importResponse.body || importResponse
+            )}`
           )
           return ''
         }
