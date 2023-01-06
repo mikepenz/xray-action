@@ -36710,6 +36710,7 @@ function asPromise(normalizedOptions) {
                     request._beforeError(new types_1.HTTPError(response));
                     return;
                 }
+                request.destroy();
                 resolve(request.options.resolveBodyOnly ? response.body : response);
             });
             const onError = (error) => {
