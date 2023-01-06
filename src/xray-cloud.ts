@@ -63,6 +63,8 @@ export class XrayCloud implements Xray {
     let format = this.xrayImportOptions.testFormat
     if (format === 'xray') {
       format = '' // xray format has no subpath
+    } else {
+      format = `/${format}`
     }
 
     if (
@@ -110,12 +112,12 @@ export class XrayCloud implements Xray {
       }
 
       core.debug(
-        `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution/${format}/multipart`
+        `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution${format}/multipart`
       )
       const importResponse = await doFormDataRequest(form, {
         protocol: this.protocol(),
         host: this.xrayBaseUrl.host,
-        path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution/${format}/multipart`,
+        path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution${format}/multipart`,
         headers: {Authorization: `Bearer ${this.token}`}
       })
       try {
@@ -129,7 +131,7 @@ export class XrayCloud implements Xray {
         return ''
       }
     } else {
-      const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution/${format}`
+      const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution${format}`
       core.debug(`Using endpoint: ${endpoint}`)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

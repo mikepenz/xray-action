@@ -50,6 +50,8 @@ export class XrayServer implements Xray {
     let format = this.xrayImportOptions.testFormat
     if (format === 'xray') {
       format = '' // xray format has no subpath
+    } else {
+      format = `/${format}`
     }
 
     let authString = ''
@@ -110,7 +112,7 @@ export class XrayServer implements Xray {
       }
 
       core.debug(
-        `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`
+        `Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}/multipart`
       )
 
       const importResponse = await doFormDataRequest(form, {
@@ -119,7 +121,7 @@ export class XrayServer implements Xray {
         headers: {
           Authorization: authString
         },
-        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}/multipart`
+        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
       })
       try {
         return importResponse.testExecIssue.key
@@ -148,7 +150,7 @@ export class XrayServer implements Xray {
           },
           path: `${
             this.xrayBaseUrl.pathname
-          }/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
+          }/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
         })
         try {
           return importResponse.testExecIssue.key
@@ -161,7 +163,7 @@ export class XrayServer implements Xray {
           return ''
         }
       } else {
-        const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}`
+        const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}`
         core.debug(`Using endpoint: ${endpoint}`)
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
