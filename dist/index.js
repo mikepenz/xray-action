@@ -594,6 +594,9 @@ class XrayCloud {
             if (format === 'xray') {
                 format = ''; // xray format has no subpath
             }
+            else {
+                format = `/${format}`;
+            }
             if (this.xrayImportOptions.testExecutionJson &&
                 this.xrayImportOptions.testExecKey === '') {
                 const form = new form_data_1.default();
@@ -618,11 +621,11 @@ class XrayCloud {
                         filepath: 'testInfo.json'
                     });
                 }
-                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution${format}/multipart`);
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
-                    path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution/${format}/multipart`,
+                    path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution${format}/multipart`,
                     headers: { Authorization: `Bearer ${this.token}` }
                 });
                 try {
@@ -634,7 +637,7 @@ class XrayCloud {
                 }
             }
             else {
-                const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution/${format}`;
+                const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution${format}`;
                 core.debug(`Using endpoint: ${endpoint}`);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const importResponse = yield got_1.default.post(endpoint, {
@@ -747,6 +750,9 @@ class XrayServer {
             if (format === 'xray') {
                 format = ''; // xray format has no subpath
             }
+            else {
+                format = `/${format}`;
+            }
             let authString = '';
             if (this.xrayOptions.token) {
                 authString = `Bearer ${this.xrayOptions.token}`;
@@ -786,14 +792,14 @@ class XrayServer {
                         filepath: 'testInfo.json'
                     });
                 }
-                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}/multipart`);
+                core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}/multipart`);
                 const importResponse = yield (0, utils_1.doFormDataRequest)(form, {
                     protocol: this.protocol(),
                     host: this.xrayBaseUrl.host,
                     headers: {
                         Authorization: authString
                     },
-                    path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}/multipart`
+                    path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
                 });
                 try {
                     return importResponse.testExecIssue.key;
@@ -817,7 +823,7 @@ class XrayServer {
                         headers: {
                             Authorization: authString
                         },
-                        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution/${format}?${this.searchParams.toString()}`
+                        path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
                     });
                     try {
                         return importResponse.testExecIssue.key;
@@ -828,7 +834,7 @@ class XrayServer {
                     }
                 }
                 else {
-                    const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution/${format}`;
+                    const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}`;
                     core.debug(`Using endpoint: ${endpoint}`);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const importResponse = yield got_1.default.post(endpoint, {

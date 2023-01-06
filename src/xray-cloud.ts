@@ -21,8 +21,8 @@ export class XrayCloud implements Xray {
   requiresAuth = true
 
   constructor(
-      private xrayOptions: XrayOptions,
-      private xrayImportOptions: XrayImportOptions
+    private xrayOptions: XrayOptions,
+    private xrayImportOptions: XrayImportOptions
   ) {
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
@@ -37,17 +37,17 @@ export class XrayCloud implements Xray {
 
   async auth(): Promise<void> {
     const authenticateResponse = await got.post<string>(
-        `${this.xrayBaseUrl.href}/api/v2/authenticate`,
-        {
-          json: {
-            client_id: `${this.xrayOptions.username}`,
-            client_secret: `${this.xrayOptions.password}`
-          },
-          responseType: 'json',
-          timeout: 30000, // 30s timeout
-          retry: 2, // retry count for some requests
-          http2: true // try to allow http2 requests
-        }
+      `${this.xrayBaseUrl.href}/api/v2/authenticate`,
+      {
+        json: {
+          client_id: `${this.xrayOptions.username}`,
+          client_secret: `${this.xrayOptions.password}`
+        },
+        responseType: 'json',
+        timeout: 30000, // 30s timeout
+        retry: 2, // retry count for some requests
+        http2: true // try to allow http2 requests
+      }
     )
     this.token = authenticateResponse.body
     core.setSecret(this.token)
@@ -64,31 +64,31 @@ export class XrayCloud implements Xray {
     if (format === 'xray') {
       format = '' // xray format has no subpath
     } else {
-      format = '/' + format
+      format = `/${format}`
     }
 
     if (
-        this.xrayImportOptions.testExecutionJson &&
-        this.xrayImportOptions.testExecKey === ''
+      this.xrayImportOptions.testExecutionJson &&
+      this.xrayImportOptions.testExecKey === ''
     ) {
       const form = new FormData()
 
       updateTestExecJson(
-          this.xrayImportOptions,
-          this.xrayImportOptions.testExecutionJson
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
       )
       updateTestExecJsonCloud(
-          this.xrayImportOptions,
-          this.xrayImportOptions.testExecutionJson
+        this.xrayImportOptions,
+        this.xrayImportOptions.testExecutionJson
       )
       form.append(
-          'info',
-          JSON.stringify(this.xrayImportOptions.testExecutionJson),
-          {
-            contentType: 'application/json',
-            filename: 'info.json',
-            filepath: 'info.json'
-          }
+        'info',
+        JSON.stringify(this.xrayImportOptions.testExecutionJson),
+        {
+          contentType: 'application/json',
+          filename: 'info.json',
+          filepath: 'info.json'
+        }
       )
 
       const fileExtension = retrieveFileExtension(mimeType)
@@ -101,18 +101,18 @@ export class XrayCloud implements Xray {
       updateTestJson(this.xrayImportOptions, this.xrayImportOptions.testJson)
       if (this.xrayImportOptions.testJson) {
         form.append(
-            'testInfo',
-            JSON.stringify(this.xrayImportOptions.testJson),
-            {
-              contentType: 'application/json',
-              filename: 'testInfo.json',
-              filepath: 'testInfo.json'
-            }
+          'testInfo',
+          JSON.stringify(this.xrayImportOptions.testJson),
+          {
+            contentType: 'application/json',
+            filename: 'testInfo.json',
+            filepath: 'testInfo.json'
+          }
         )
       }
 
       core.debug(
-          `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution${format}/multipart`
+        `Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution${format}/multipart`
       )
       const importResponse = await doFormDataRequest(form, {
         protocol: this.protocol(),
@@ -124,9 +124,9 @@ export class XrayCloud implements Xray {
         return importResponse.key
       } catch (error) {
         core.warning(
-            `🔥 Response did not match expected format: ${JSON.stringify(
-                importResponse
-            )}`
+          `🔥 Response did not match expected format: ${JSON.stringify(
+            importResponse
+          )}`
         )
         return ''
       }
@@ -151,9 +151,9 @@ export class XrayCloud implements Xray {
         return importResponse.body.key
       } catch (error) {
         core.warning(
-            `🔥 Response did not match expected format: ${JSON.stringify(
-                importResponse.body || importResponse
-            )}`
+          `🔥 Response did not match expected format: ${JSON.stringify(
+            importResponse.body || importResponse
+          )}`
         )
         return ''
       }

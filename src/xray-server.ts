@@ -51,7 +51,7 @@ export class XrayServer implements Xray {
     if (format === 'xray') {
       format = '' // xray format has no subpath
     } else {
-      format = '/' + format
+      format = `/${format}`
     }
 
     let authString = ''
@@ -83,7 +83,7 @@ export class XrayServer implements Xray {
       )
 
       let apiPartName: string
-      if (format.contains('cucumber')) {
+      if (format === 'cucumber') {
         // workaround for cucumber, see for more details:
         // https://github.com/Xray-App/xray-code-snippets/blob/649be6d73d3213a22ef31a52bf6e2ac7d557330d/use_cases/import_automation_results/java/xray-code-snippets/src/main/java/com/idera/xray/XrayResultsImporter.java#L205
         apiPartName = 'result'
