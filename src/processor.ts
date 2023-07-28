@@ -112,7 +112,14 @@ export class Processor {
           completed++
           return result
         } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-          core.warning(`🔥 Failed to import: ${file} (${error.message})`)
+          core.warning(`🔥 Failed to import: ${file} (${error})`)
+
+          if (error.response && error.response.body) {
+            core.error(
+              `-- 🔥 Failed to import: ${file} (${error.response.body``})`
+            )
+          }
+
           failed++
 
           if (!importOptions.continueOnImportError) {
