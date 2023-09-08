@@ -115,9 +115,7 @@ export class Processor {
           core.warning(`🔥 Failed to import: ${file} (${error})`)
 
           if (error.response) {
-            core.error(
-              `-- 🔥 Failed to import: ${file} (${error.response``})`
-            )
+            core.error(`-- 🔥 Failed to import: ${file} (${error.response``})`)
           }
 
           failed++
