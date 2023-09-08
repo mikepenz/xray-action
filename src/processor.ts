@@ -114,9 +114,9 @@ export class Processor {
         } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
           core.warning(`🔥 Failed to import: ${file} (${error})`)
 
-          if (error.response && error.response.body) {
+          if (error.response) {
             core.error(
-              `-- 🔥 Failed to import: ${file} (${error.response.body``})`
+              `-- 🔥 Failed to import: ${file} (${error.response``})`
             )
           }
 
