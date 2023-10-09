@@ -124,6 +124,9 @@ export class XrayServer implements Xray {
         path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
       })
       try {
+        if (core.isDebug()) {
+          core.debug(`Retrieved response: ${importResponse.body}`)
+        }
         return importResponse.testExecIssue.key
       } catch (error) {
         core.warning(
@@ -153,6 +156,9 @@ export class XrayServer implements Xray {
           }/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
         })
         try {
+          if (core.isDebug()) {
+            core.debug(`Retrieved response: ${importResponse.body}`)
+          }
           return importResponse.testExecIssue.key
         } catch (error) {
           core.warning(
@@ -178,6 +184,9 @@ export class XrayServer implements Xray {
           timeout: 60000 // 60s timeout
         })
         try {
+          if (core.isDebug()) {
+            core.debug(`Retrieved response: ${importResponse.body}`)
+          }
           return importResponse.body.testExecIssue.key
         } catch (error) {
           core.warning(
