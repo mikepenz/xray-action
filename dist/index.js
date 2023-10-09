@@ -583,6 +583,9 @@ class XrayCloud {
                 headers: { Authorization: `Bearer ${this.token}` }
             });
             try {
+                if (core.isDebug()) {
+                    core.debug(`Retrieved response: ${importResponse}`);
+                }
                 return importResponse.key;
             }
             catch (error) {
@@ -607,6 +610,9 @@ class XrayCloud {
                 http2: true // try to allow http2 requests
             });
             try {
+                if (core.isDebug()) {
+                    core.debug(`Retrieved response: ${importResponse.body}`);
+                }
                 return importResponse.body.key;
             }
             catch (error) {
@@ -743,6 +749,9 @@ class XrayServer {
                 path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
             });
             try {
+                if (core.isDebug()) {
+                    core.debug(`Retrieved response: ${importResponse.body}`);
+                }
                 return importResponse.testExecIssue.key;
             }
             catch (error) {
@@ -767,6 +776,9 @@ class XrayServer {
                     path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
                 });
                 try {
+                    if (core.isDebug()) {
+                        core.debug(`Retrieved response: ${importResponse.body}`);
+                    }
                     return importResponse.testExecIssue.key;
                 }
                 catch (error) {
@@ -789,6 +801,9 @@ class XrayServer {
                     timeout: 60000 // 60s timeout
                 });
                 try {
+                    if (core.isDebug()) {
+                        core.debug(`Retrieved response: ${importResponse.body}`);
+                    }
                     return importResponse.body.testExecIssue.key;
                 }
                 catch (error) {

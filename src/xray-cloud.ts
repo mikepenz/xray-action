@@ -121,6 +121,9 @@ export class XrayCloud implements Xray {
         headers: {Authorization: `Bearer ${this.token}`}
       })
       try {
+        if (core.isDebug()) {
+          core.debug(`Retrieved response: ${importResponse}`)
+        }
         return importResponse.key
       } catch (error) {
         core.warning(
@@ -148,6 +151,9 @@ export class XrayCloud implements Xray {
         http2: true // try to allow http2 requests
       })
       try {
+        if (core.isDebug()) {
+          core.debug(`Retrieved response: ${importResponse.body}`)
+        }
         return importResponse.body.key
       } catch (error) {
         core.warning(
