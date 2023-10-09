@@ -1535,7 +1535,7 @@ class OidcClient {
                 .catch(error => {
                 throw new Error(`Failed to get ID Token. \n 
         Error Code : ${error.statusCode}\n 
-        Error Message: ${error.result.message}`);
+        Error Message: ${error.message}`);
             });
             const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
             if (!id_token) {
@@ -30674,20 +30674,25 @@ class PromisePoolExecutor {
         if (this.taskTimeout() === undefined) {
             return this.handler(item, index, this);
         }
+        const [timer, canceller] = this.createTaskTimeout(item);
         return Promise.race([
             this.handler(item, index, this),
-            this.createTaskTimeout(item)
-        ]);
+            timer(),
+        ]).finally(canceller);
     }
     /**
-     * Returns a promise that times-out after the configured task timeout.
+     * Returns a tuple of a timer function and a canceller function that
+     * times-out after the configured task timeout.
      */
-    async createTaskTimeout(item) {
-        return new Promise((_resolve, reject) => {
-            setTimeout(() => {
-                reject(new promise_pool_error_1.PromisePoolError(`Promise in pool timed out after ${this.taskTimeout()}ms`, item));
+    createTaskTimeout(item) {
+        let timerId;
+        const timer = async () => new Promise((_resolve, reject) => {
+            timerId = setTimeout(() => {
+                reject(new promise_pool_error_1.PromisePoolError(`Task in promise pool timed out after ${this.taskTimeout()}ms`, item));
             }, this.taskTimeout());
         });
+        const canceller = () => clearTimeout(timerId);
+        return [timer, canceller];
     }
     /**
      * Save the given calculation `result`, possibly at the provided `position`.
@@ -30845,11 +30850,11 @@ class PromisePool {
     constructor(items) {
         this.timeout = undefined;
         this.concurrency = 10;
-        this.shouldResultsCorrespond = false;
         this.items = items ?? [];
         this.errorHandler = undefined;
         this.onTaskStartedHandlers = [];
         this.onTaskFinishedHandlers = [];
+        this.shouldResultsCorrespond = false;
     }
     /**
      * Set the number of tasks to process concurrently in the promise pool.
@@ -30896,14 +30901,18 @@ class PromisePool {
     /**
      * Set the items to be processed in the promise pool.
      *
-     * @param {T[] | Iterable<T> | AsyncIterable<T>} items
+     * @param {SomeIterable<ItemType>} items
      *
      * @returns {PromisePool}
      */
     for(items) {
+        const pool = new PromisePool(items).withConcurrency(this.concurrency);
+        if (typeof this.errorHandler === 'function') {
+            pool.handleError(this.errorHandler);
+        }
         return typeof this.timeout === 'number'
-            ? new PromisePool(items).withConcurrency(this.concurrency).withTaskTimeout(this.timeout)
-            : new PromisePool(items).withConcurrency(this.concurrency);
+            ? pool.withTaskTimeout(this.timeout)
+            : pool;
     }
     /**
      * Set the items to be processed in the promise pool.
