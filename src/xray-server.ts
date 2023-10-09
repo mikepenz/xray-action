@@ -125,7 +125,7 @@ export class XrayServer implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${importResponse.body}`)
+          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.testExecIssue.key
       } catch (error) {
@@ -157,7 +157,7 @@ export class XrayServer implements Xray {
         })
         try {
           if (core.isDebug()) {
-            core.debug(`Retrieved response: ${importResponse.body}`)
+            core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
           }
           return importResponse.testExecIssue.key
         } catch (error) {
@@ -185,7 +185,7 @@ export class XrayServer implements Xray {
         })
         try {
           if (core.isDebug()) {
-            core.debug(`Retrieved response: ${importResponse.body}`)
+            core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
           }
           return importResponse.body.testExecIssue.key
         } catch (error) {

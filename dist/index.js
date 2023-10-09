@@ -584,7 +584,7 @@ class XrayCloud {
             });
             try {
                 if (core.isDebug()) {
-                    core.debug(`Retrieved response: ${importResponse}`);
+                    core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`);
                 }
                 return importResponse.key;
             }
@@ -611,7 +611,7 @@ class XrayCloud {
             });
             try {
                 if (core.isDebug()) {
-                    core.debug(`Retrieved response: ${importResponse.body}`);
+                    core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`);
                 }
                 return importResponse.body.key;
             }
@@ -750,7 +750,7 @@ class XrayServer {
             });
             try {
                 if (core.isDebug()) {
-                    core.debug(`Retrieved response: ${importResponse.body}`);
+                    core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`);
                 }
                 return importResponse.testExecIssue.key;
             }
@@ -777,7 +777,7 @@ class XrayServer {
                 });
                 try {
                     if (core.isDebug()) {
-                        core.debug(`Retrieved response: ${importResponse.body}`);
+                        core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`);
                     }
                     return importResponse.testExecIssue.key;
                 }
@@ -802,7 +802,7 @@ class XrayServer {
                 });
                 try {
                     if (core.isDebug()) {
-                        core.debug(`Retrieved response: ${importResponse.body}`);
+                        core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`);
                     }
                     return importResponse.body.testExecIssue.key;
                 }
