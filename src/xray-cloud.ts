@@ -122,7 +122,7 @@ export class XrayCloud implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${importResponse}`)
+          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.key
       } catch (error) {
@@ -152,7 +152,7 @@ export class XrayCloud implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${importResponse.body}`)
+          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.body.key
       } catch (error) {
