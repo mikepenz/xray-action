@@ -215,10 +215,7 @@ class Processor {
                     return result;
                 }
                 catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-                    core.warning(`🔥 Failed to import: ${file} (${error})`);
-                    if (error.response) {
-                        core.error(`-- 🔥 Failed to import: ${file} (${error.response ``})`);
-                    }
+                    core.error(`🔥 Failed to import: ${file} (${JSON.stringify(error)})`);
                     failed++;
                     if (!importOptions.continueOnImportError) {
                         throw error;
