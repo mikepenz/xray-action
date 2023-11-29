@@ -37,7 +37,7 @@
     "@supercharge/promise-pool": "^3.1.0",
     "@types/mime-types": "^2.1.4",
     "form-data": "^4.0.0",
-    "got": "11.8.6",
+    "got": "14.0.0",
     "junit-report-merger": "^6.0.3",
     "webpack": "^5.89.0"
   },
