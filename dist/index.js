@@ -522,7 +522,7 @@ class XrayCloud {
         }
     }
     async auth() {
-        const authenticateResponse = await got_1.default.post(`${this.xrayBaseUrl.href}/api/v2/authenticate`, {
+        const authenticateResponse = await got_1.default.post(`${this.xrayBaseUrl.href}api/v2/authenticate`, {
             json: {
                 client_id: `${this.xrayOptions.username}`,
                 client_secret: `${this.xrayOptions.password}`
@@ -572,11 +572,11 @@ class XrayCloud {
                     filepath: 'testInfo.json'
                 });
             }
-            core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/api/v2/import/execution${format}/multipart`);
+            core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}api/v2/import/execution${format}/multipart`);
             const importResponse = await (0, utils_1.doFormDataRequest)(form, {
                 protocol: this.protocol(),
                 host: this.xrayBaseUrl.host,
-                path: `${this.xrayBaseUrl.pathname}/api/v2/import/execution${format}/multipart`,
+                path: `${this.xrayBaseUrl.pathname}api/v2/import/execution${format}/multipart`,
                 headers: { Authorization: `Bearer ${this.token}` }
             });
             try {
@@ -591,7 +591,7 @@ class XrayCloud {
             }
         }
         else {
-            const endpoint = `${this.xrayBaseUrl.href}/api/v2/import/execution${format}`;
+            const endpoint = `${this.xrayBaseUrl.href}api/v2/import/execution${format}`;
             core.debug(`Using endpoint: ${endpoint}`);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const importResponse = await got_1.default.post(endpoint, {
@@ -736,14 +736,14 @@ class XrayServer {
                     filepath: 'testInfo.json'
                 });
             }
-            core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}/multipart`);
+            core.debug(`Using multipart endpoint: ${this.xrayBaseUrl.href}rest/raven/2.0/import/execution${format}/multipart`);
             const importResponse = await (0, utils_1.doFormDataRequest)(form, {
                 protocol: this.protocol(),
                 host: this.xrayBaseUrl.host,
                 headers: {
                     Authorization: authString
                 },
-                path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}/multipart`
+                path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}/multipart`
             });
             try {
                 if (core.isDebug()) {
@@ -770,7 +770,7 @@ class XrayServer {
                     headers: {
                         Authorization: authString
                     },
-                    path: `${this.xrayBaseUrl.pathname}/rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
+                    path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
                 });
                 try {
                     if (core.isDebug()) {
@@ -784,7 +784,7 @@ class XrayServer {
                 }
             }
             else {
-                const endpoint = `${this.xrayBaseUrl.href}/rest/raven/2.0/import/execution${format}`;
+                const endpoint = `${this.xrayBaseUrl.href}rest/raven/2.0/import/execution${format}`;
                 core.debug(`Using endpoint: ${endpoint}`);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const importResponse = await got_1.default.post(endpoint, {
