@@ -1,4 +1,4 @@
-import {XrayImportOptions, XrayOptions} from './processor'
+import {XrayImportOptions, XrayOptions, ImportOptions} from './processor'
 import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'
@@ -22,7 +22,8 @@ export class XrayCloud implements Xray {
 
   constructor(
     private xrayOptions: XrayOptions,
-    private xrayImportOptions: XrayImportOptions
+    private xrayImportOptions: XrayImportOptions,
+    private importOptions: ImportOptions
   ) {
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
@@ -61,6 +62,7 @@ export class XrayCloud implements Xray {
   async import(data: Buffer, mimeType: string): Promise<string> {
     // do import
     let format = this.xrayImportOptions.testFormat
+    const responseTimeout = this.importOptions.responseTimeout
     if (format === 'xray') {
       format = '' // xray format has no subpath
     } else {
@@ -146,7 +148,7 @@ export class XrayCloud implements Xray {
         },
         body: data,
         responseType: 'json',
-        timeout: 60000, // 60s timeout
+        timeout: responseTimeout, // default timeout 60s
         retry: 2, // retry count for some requests
         http2: true // try to allow http2 requests
       })

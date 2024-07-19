@@ -27,7 +27,8 @@ test('import test results server', async () => {
       combineInSingleTestExec: true,
       failOnImportError: true,
       continueOnImportError: true,
-      importParallelism: 2
+      importParallelism: 2,
+      responseTimeout: 60000
     }
   )
   const result = await processor.process()
@@ -71,7 +72,8 @@ test('import test results server', async () => {
       combineInSingleTestExec: true,
       failOnImportError: false,
       continueOnImportError: true,
-      importParallelism: 2
+      importParallelism: 2,
+      responseTimeout: 60000
     }
   )
   const result = await processor.process()
@@ -113,7 +115,8 @@ test('import cucumber test results server', async () => {
       combineInSingleTestExec: true,
       failOnImportError: false,
       continueOnImportError: true,
-      importParallelism: 2
+      importParallelism: 2,
+      responseTimeout: 60000
     }
   )
   const result = await processor.process()
@@ -121,7 +124,6 @@ test('import cucumber test results server', async () => {
 
 /*
 test('import test results cloud', async () => {
-  
   const processor = new Processor(
     {
       cloud: true,
@@ -132,6 +134,7 @@ test('import test results cloud', async () => {
     {
       testFormat: "junit",
       testPaths: "marathon_tests/*.xml",
+      testMerge: true,
       testExecKey: "",
       projectKey: "TA",
       testPlanKey: "TA-33",
@@ -157,7 +160,8 @@ test('import test results cloud', async () => {
       combineInSingleTestExec: true,
       failOnImportError: false,
       continueOnImportError: true,
-      importParallelism: 2
+      importParallelism: 2,
+      responseTimeout: 60000
     }
   )
   const result = await processor.process()

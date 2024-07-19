@@ -1,4 +1,4 @@
-import {XrayImportOptions, XrayOptions} from './processor'
+import {XrayImportOptions, XrayOptions, ImportOptions} from './processor'
 import got from 'got'
 import * as core from '@actions/core'
 import FormData from 'form-data'
@@ -21,7 +21,8 @@ export class XrayServer implements Xray {
 
   constructor(
     private xrayOptions: XrayOptions,
-    private xrayImportOptions: XrayImportOptions
+    private xrayImportOptions: XrayImportOptions,
+    private importOptions: ImportOptions
   ) {
     this.xrayBaseUrl =
       this.xrayOptions.baseUrl || new URL('https://sandbox.xpand-it.com')
@@ -48,6 +49,7 @@ export class XrayServer implements Xray {
   async import(data: Buffer, mimeType: string): Promise<string> {
     // do import
     let format = this.xrayImportOptions.testFormat
+    const responseTimeout = this.importOptions.responseTimeout
     if (format === 'xray') {
       format = '' // xray format has no subpath
     } else {
@@ -181,7 +183,7 @@ export class XrayServer implements Xray {
           },
           body: data,
           responseType: 'json',
-          timeout: 60000 // 60s timeout
+          timeout: responseTimeout // default timeout 60s
         })
         try {
           if (core.isDebug()) {

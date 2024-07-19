@@ -82,6 +82,7 @@ async function run() {
         const failOnImportError = core.getInput('failOnImportError') === 'true';
         const continueOnImportError = core.getInput('continueOnImportError') === 'true';
         const importParallelism = Number(core.getInput('importParallelism')) || 2; // by default go to 2 parallelism
+        const responseTimeout = Number(core.getInput('responseTimeout')) || 60000; // by default 60s
         await new processor_1.Processor({
             cloud,
             baseUrl,
@@ -104,7 +105,8 @@ async function run() {
             combineInSingleTestExec,
             failOnImportError,
             continueOnImportError,
-            importParallelism
+            importParallelism,
+            responseTimeout
         }).process();
     }
     catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
@@ -163,11 +165,11 @@ class Processor {
         core.startGroup(`🚀 Connect to xray`);
         let xray;
         if (this.xrayOptions.cloud) {
-            xray = new xray_cloud_1.XrayCloud(this.xrayOptions, this.xrayImportOptions);
+            xray = new xray_cloud_1.XrayCloud(this.xrayOptions, this.xrayImportOptions, this.importOptions);
             core.info('ℹ️ Configured XrayCloud');
         }
         else {
-            xray = new xray_server_1.XrayServer(this.xrayOptions, this.xrayImportOptions);
+            xray = new xray_server_1.XrayServer(this.xrayOptions, this.xrayImportOptions, this.importOptions);
             core.info('ℹ️ Configured XrayServer');
         }
         if (xray.requiresAuth) {
@@ -504,9 +506,10 @@ const form_data_1 = __importDefault(__nccwpck_require__(4334));
 const utils_1 = __nccwpck_require__(918);
 const xray_utils_1 = __nccwpck_require__(7249);
 class XrayCloud {
-    constructor(xrayOptions, xrayImportOptions) {
+    constructor(xrayOptions, xrayImportOptions, importOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
+        this.importOptions = importOptions;
         this.xrayBaseUrl = new URL('https://xray.cloud.getxray.app');
         this.token = '';
         // XrayCloud requires to authenticate with the given credentials first
@@ -542,6 +545,7 @@ class XrayCloud {
     async import(data, mimeType) {
         // do import
         let format = this.xrayImportOptions.testFormat;
+        const responseTimeout = this.importOptions.responseTimeout;
         if (format === 'xray') {
             format = ''; // xray format has no subpath
         }
@@ -602,7 +606,7 @@ class XrayCloud {
                 },
                 body: data,
                 responseType: 'json',
-                timeout: 60000, // 60s timeout
+                timeout: responseTimeout, // default timeout 60s
                 retry: 2, // retry count for some requests
                 http2: true // try to allow http2 requests
             });
@@ -663,9 +667,10 @@ const form_data_1 = __importDefault(__nccwpck_require__(4334));
 const utils_1 = __nccwpck_require__(918);
 const xray_utils_1 = __nccwpck_require__(7249);
 class XrayServer {
-    constructor(xrayOptions, xrayImportOptions) {
+    constructor(xrayOptions, xrayImportOptions, importOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
+        this.importOptions = importOptions;
         this.token = '';
         // XrayServer does not require authentication (uses BasicAuth or Token)
         this.requiresAuth = false;
@@ -691,6 +696,7 @@ class XrayServer {
     async import(data, mimeType) {
         // do import
         let format = this.xrayImportOptions.testFormat;
+        const responseTimeout = this.importOptions.responseTimeout;
         if (format === 'xray') {
             format = ''; // xray format has no subpath
         }
@@ -795,7 +801,7 @@ class XrayServer {
                     },
                     body: data,
                     responseType: 'json',
-                    timeout: 60000 // 60s timeout
+                    timeout: responseTimeout // default timeout 60s
                 });
                 try {
                     if (core.isDebug()) {
