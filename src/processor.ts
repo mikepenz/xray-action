@@ -34,6 +34,7 @@ export interface ImportOptions {
   failOnImportError: boolean
   continueOnImportError: boolean
   importParallelism: number
+  responseTimeout: number
 }
 
 export class Processor {
@@ -48,10 +49,18 @@ export class Processor {
 
     let xray: Xray
     if (this.xrayOptions.cloud) {
-      xray = new XrayCloud(this.xrayOptions, this.xrayImportOptions)
+      xray = new XrayCloud(
+        this.xrayOptions,
+        this.xrayImportOptions,
+        this.importOptions
+      )
       core.info('ℹ️ Configured XrayCloud')
     } else {
-      xray = new XrayServer(this.xrayOptions, this.xrayImportOptions)
+      xray = new XrayServer(
+        this.xrayOptions,
+        this.xrayImportOptions,
+        this.importOptions
+      )
       core.info('ℹ️ Configured XrayServer')
     }
 

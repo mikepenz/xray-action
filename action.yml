@@ -66,6 +66,10 @@ inputs:
     description: 'Specifies the level of parallelism to import to Xray.'
     required: false
     default: "2"
+  responseTimeout:
+    description: 'Specifies the maximum duration for a request (in milliseconds) to wait for a response to execute before timing out. The default is 60 seconds.'
+    required: false
+    default: "60000"
   testExecutionJson:
     description: 'Links to a json file, defining the meta information to create the test execution ticket.'
     required: false

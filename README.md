@@ -100,6 +100,7 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 | `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 2)                                                                                             |              |
+| `responseTimeout`       | Specifies the maximum duration for a request (in milliseconds) to wait for a response to execute before timing out. The default is 60000 milliseconds.                                                                                             |              |
 | `testExecutionJson`       | File path to a json file, containing the meta information to create the xray test execution ticket.                                                                           |              |
 | `testJson`       | File path to a json file, containing the meta information to create the xray test ticket.                                                                           |              |
 

@@ -62,6 +62,8 @@ async function run(): Promise<void> {
       core.getInput('continueOnImportError') === 'true'
     const importParallelism: number =
       Number(core.getInput('importParallelism')) || 2 // by default go to 2 parallelism
+    const responseTimeout: number =
+      Number(core.getInput('responseTimeout')) || 60000 // by default 60s
 
     await new Processor(
       {
@@ -88,7 +90,8 @@ async function run(): Promise<void> {
         combineInSingleTestExec,
         failOnImportError,
         continueOnImportError,
-        importParallelism
+        importParallelism,
+        responseTimeout
       }
     ).process()
   } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
