@@ -58,6 +58,6 @@
     "node-notifier": "^10.0.1",
     "prettier": "3.3.3",
     "ts-jest": "^29.2.3",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.4"
   }
 }
