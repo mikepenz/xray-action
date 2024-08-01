@@ -81,6 +81,12 @@ outputs:
     description: 'The count of imported files.'
   failed:
     description: 'The count of failed imports.'
+  completed:
+    description: 'The count of completed imports.'
+  errorMessage:
+    description: 'The message of failed imports.'
+  errorStatusCode:
+    description: 'The status code of failed imports.'
 runs:
   using: 'node20'
   main: 'dist/index.js'
