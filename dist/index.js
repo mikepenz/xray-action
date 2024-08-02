@@ -191,6 +191,8 @@ class Processor {
         const importOptions = this.importOptions;
         let completed = 0;
         let failed = 0;
+        let errorMessage;
+        let errorStatusCode;
         core.info(`ℹ️ Importing from: ${this.xrayImportOptions.testPaths}`);
         core.info(`ℹ️ Importing using format: ${this.xrayImportOptions.testFormat}`);
         // load the test files, this may merge the results into a single file
@@ -218,6 +220,13 @@ class Processor {
                 }
                 catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
                     core.error(`🔥 Failed to import: ${file} (${JSON.stringify(error)})`);
+                    if (error.response) {
+                        errorMessage = error.response.body.error;
+                        errorStatusCode = error.response.statusCode;
+                    }
+                    if (errorMessage && errorStatusCode !== undefined) {
+                        core.error(` Error details: ${errorMessage} and StatusCode: ${errorStatusCode}`);
+                    }
                     failed++;
                     if (!importOptions.continueOnImportError) {
                         throw error;
@@ -258,6 +267,8 @@ class Processor {
         core.setOutput('count', files.length);
         core.setOutput('completed', completed);
         core.setOutput('failed', failed);
+        core.setOutput('errorMessage', errorMessage);
+        core.setOutput('errorStatusCode', errorStatusCode);
         let success = true;
         if (failed > 0 && this.importOptions.failOnImportError) {
             core.setFailed(`🔥 ${failed} failed imports detected`);

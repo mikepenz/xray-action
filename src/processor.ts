@@ -125,14 +125,14 @@ export class Processor {
         } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
           core.error(`🔥 Failed to import: ${file} (${JSON.stringify(error)})`)
 
-          if (error.response) {
+          if (error.response && error.response.body) {
             errorMessage = error.response.body.error
             errorStatusCode = error.response.statusCode
           }
 
           if (errorMessage && errorStatusCode !== undefined) {
             core.error(
-              ` Error details: ${errorMessage} and StatusCode: ${errorStatusCode}`
+              `Error details: ${errorMessage} and StatusCode: ${errorStatusCode}`
             )
           }
 
