@@ -1,6 +1,6 @@
 {
   "name": "xray-action",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "description": "GitHub action to import test results into 'Xray' - A complete Test Management tool for Jira.",
   "main": "lib/main.js",
@@ -57,7 +57,7 @@
     "js-yaml": "^4.1.0",
     "node-notifier": "^10.0.1",
     "prettier": "3.3.3",
-    "ts-jest": "^29.2.3",
-    "typescript": "^5.5.3"
+    "ts-jest": "^29.2.4",
+    "typescript": "^5.5.4"
   }
 }
