@@ -172,6 +172,8 @@ A full set list of possible output values for this action.
 | count           | The count of imported files.           |
 | completed       | The count of completed imports.        |
 | failed          | The count of failed imports.           |
+| errorMessage    | The message of failed imports.         |
+| errorStatusCode | The status code of failed imports.     |
 | testExecKey     | The key of the created test execution. |
 
 ## Contribute 🧬
