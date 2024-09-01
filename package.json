@@ -36,6 +36,7 @@
     "@actions/glob": "^0.4.0",
     "@supercharge/promise-pool": "^3.2.0",
     "@types/mime-types": "^2.1.4",
+    "@xray-app/xray-automation": "^0.3.1",
     "form-data": "^4.0.0",
     "got": "11.8.6",
     "junit-report-merger": "^7.0.0",

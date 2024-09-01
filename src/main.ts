@@ -1,6 +1,14 @@
 import * as core from '@actions/core'
 import {Processor} from './processor'
 import {resolveJson, retrieveRepositoryPath} from './utils'
+import {
+  JUNIT_FORMAT,
+  ReportConfig,
+  XrayCloudClient,
+  XrayDatacenterClient,
+  XraySettings
+} from '@xray-app/xray-automation/dist/types'
+import { AnyRecord } from 'dns'
 
 async function run(): Promise<void> {
   try {
@@ -64,6 +72,37 @@ async function run(): Promise<void> {
       Number(core.getInput('importParallelism')) || 2 // by default go to 2 parallelism
     const responseTimeout: number =
       Number(core.getInput('responseTimeout')) || 60000 // by default 60s
+
+    const xrayCloudSettings: XraySettings = {
+      clientId: username,
+      clientSecret: password,
+      timeout: responseTimeout
+    }
+
+    let xrayClient: unknown
+    if (cloud) {
+      xrayClient = new XrayCloudClient(xrayCloudSettings)
+    } else {
+      const configUsingToken: XraySettings = {
+        jiraBaseUrl: baseUrl,
+        jiraToken: xrayToken,
+        timeout: responseTimeout
+      }
+      xrayClient = new XrayDatacenterClient(configUsingToken)
+    }
+
+    const reportFile = 'report.xml'
+    const reportConfig: ReportConfig = {
+      format: JUNIT_FORMAT,
+      projectKey,
+      version: '1.0',
+      revision: '123',
+      testPlanKey,
+      testExecKey,
+      testEnvironments: []
+    }
+
+    let res = await xrayClient.submitResults(reportFile, reportConfig)
 
     await new Processor(
       {
