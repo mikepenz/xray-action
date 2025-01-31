@@ -131,6 +131,7 @@ export class XrayCloud implements Xray {
           core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.key
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
@@ -165,6 +166,7 @@ export class XrayCloud implements Xray {
           core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.body.key
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(

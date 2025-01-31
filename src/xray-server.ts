@@ -130,6 +130,7 @@ export class XrayServer implements Xray {
           core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
         }
         return importResponse.testExecIssue.key
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
@@ -162,6 +163,7 @@ export class XrayServer implements Xray {
             core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
           }
           return importResponse.testExecIssue.key
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           core.warning(
             `🔥 Response did not match expected format: ${JSON.stringify(
@@ -192,6 +194,7 @@ export class XrayServer implements Xray {
             core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
           }
           return importResponse.body.testExecIssue.key
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           core.warning(
             `🔥 Response did not match expected format: ${JSON.stringify(
