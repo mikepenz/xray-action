@@ -13,11 +13,11 @@ import {Xray} from './xray.js'
 import got from 'got'
 
 export class XrayCloud implements Xray {
-  xrayBaseUrl = new URL('https://xray.cloud.getxray.app')
+  xrayBaseUrl: URL
   searchParams!: URLSearchParams
   token = ''
 
-  // XrayCloud requires to authenticate with the given credentials first
+  // XrayCloud requires you to authenticate with the given credentials first
   requiresAuth = true
 
   constructor(
@@ -25,6 +25,8 @@ export class XrayCloud implements Xray {
     private xrayImportOptions: XrayImportOptions,
     private importOptions: ImportOptions
   ) {
+    this.xrayBaseUrl =
+      this.xrayOptions.baseUrl || new URL('https://xray.cloud.getxray.app')
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 

@@ -86084,15 +86084,17 @@ class XrayCloud {
     xrayOptions;
     xrayImportOptions;
     importOptions;
-    xrayBaseUrl = new URL('https://xray.cloud.getxray.app');
+    xrayBaseUrl;
     searchParams;
     token = '';
-    // XrayCloud requires to authenticate with the given credentials first
+    // XrayCloud requires you to authenticate with the given credentials first
     requiresAuth = true;
     constructor(xrayOptions, xrayImportOptions, importOptions) {
         this.xrayOptions = xrayOptions;
         this.xrayImportOptions = xrayImportOptions;
         this.importOptions = importOptions;
+        this.xrayBaseUrl =
+            this.xrayOptions.baseUrl || new URL('https://xray.cloud.getxray.app');
         this.searchParams = createSearchParams(this.xrayImportOptions);
     }
     protocol() {
