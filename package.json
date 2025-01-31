@@ -62,5 +62,8 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3",
     "webpack": "^5.97.1"
+  },
+  "overrides": {
+    "glob": "11.0.1"
   }
 }
