@@ -1,4 +1,5 @@
 import {Processor} from '../src/processor.js'
+import {jest} from '@jest/globals'
 
 jest.setTimeout(180000)
 
