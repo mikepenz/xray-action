@@ -1,11 +1,12 @@
-module.exports = {
-  clearMocks: true,
-  moduleFileExtensions: ['js', 'ts'],
-  testEnvironment: 'node',
-  testMatch: ['**/*.test.ts'],
-  testRunner: 'jest-circus/runner',
-  transform: {
-    '^.+\\.ts$': 'ts-jest'
+// jest.config.js
+
+import { createDefaultEsmPreset } from "ts-jest";
+
+export default {
+  testEnvironment: "node",
+  extensionsToTreatAsEsm: [".ts"],
+  moduleNameMapper: {
+    "(.+)\\.js": "$1"
   },
-  verbose: true
-}
+  ...createDefaultEsmPreset()
+};
