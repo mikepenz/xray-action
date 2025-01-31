@@ -215,7 +215,7 @@ $ npm run lint -- --fix
 
 ## License
 
-    Copyright 2021 Mike Penz
+    Copyright 2025 Mike Penz
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
