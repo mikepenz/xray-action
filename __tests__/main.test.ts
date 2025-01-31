@@ -1,4 +1,4 @@
-import {Processor} from '../src/processor'
+import {Processor} from '../src/processor.js'
 
 jest.setTimeout(180000)
 

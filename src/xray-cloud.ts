@@ -1,16 +1,16 @@
-import {XrayImportOptions, XrayOptions, ImportOptions} from './processor'
-import got from 'got'
+import {XrayImportOptions, XrayOptions, ImportOptions} from './processor.js'
 import * as core from '@actions/core'
 import FormData from 'form-data'
-import {doFormDataRequest} from './utils'
+import {doFormDataRequest} from './utils.js'
 import {
   createSearchParams,
   updateTestExecJson,
   updateTestJson,
   updateTestExecJsonCloud,
   retrieveFileExtension
-} from './xray-utils'
-import {Xray} from './xray'
+} from './xray-utils.js'
+import {Xray} from './xray.js'
+import got from 'got'
 
 export class XrayCloud implements Xray {
   xrayBaseUrl = new URL('https://xray.cloud.getxray.app')
@@ -45,8 +45,12 @@ export class XrayCloud implements Xray {
           client_secret: `${this.xrayOptions.password}`
         },
         responseType: 'json',
-        timeout: 30000, // 30s timeout
-        retry: 2, // retry count for some requests
+        timeout: {
+          request: 30000 // 30s timeout
+        },
+        retry: {
+          limit: 2 // retry count for some requests
+        },
         http2: true // try to allow http2 requests
       }
     )
@@ -148,8 +152,12 @@ export class XrayCloud implements Xray {
         },
         body: data,
         responseType: 'json',
-        timeout: responseTimeout, // default timeout 60s
-        retry: 2, // retry count for some requests
+        timeout: {
+          request: responseTimeout // default timeout 60s
+        },
+        retry: {
+          limit: 2 // retry count for some requests
+        },
         http2: true // try to allow http2 requests
       })
       try {

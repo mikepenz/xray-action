@@ -1,11 +1,11 @@
 import * as core from '@actions/core'
-import {PromisePool} from '@supercharge/promise-pool/dist/promise-pool'
 import * as fs from 'fs'
 import {lookup} from 'mime-types'
-import {retrieveTestFiles} from './utils'
-import {Xray} from './xray'
-import {XrayCloud} from './xray-cloud'
-import {XrayServer} from './xray-server'
+import {retrieveTestFiles} from './utils.js'
+import {Xray} from './xray.js'
+import {XrayCloud} from './xray-cloud.js'
+import {XrayServer} from './xray-server.js'
+import {PromisePool} from '@supercharge/promise-pool'
 
 export interface XrayOptions {
   cloud: boolean
@@ -172,7 +172,7 @@ export class Processor {
         // execute all remaining in parallel
         const {results} = await PromisePool.for(files)
           .withConcurrency(this.importOptions.importParallelism)
-          .process(async file => await doImport(file))
+          .process(async (file: string) => await doImport(file))
 
         execKeys.push(results)
       }

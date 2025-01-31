@@ -1,15 +1,15 @@
-import {XrayImportOptions, XrayOptions, ImportOptions} from './processor'
-import got from 'got'
+import {XrayImportOptions, XrayOptions, ImportOptions} from './processor.js'
 import * as core from '@actions/core'
 import FormData from 'form-data'
-import {doFormDataRequest} from './utils'
+import {doFormDataRequest} from './utils.js'
 import {
   createSearchParams,
   retrieveFileExtension,
   updateTestExecJson,
   updateTestJson
-} from './xray-utils'
-import {Xray} from './xray'
+} from './xray-utils.js'
+import {Xray} from './xray.js'
+import got from 'got'
 
 export class XrayServer implements Xray {
   xrayBaseUrl: URL
@@ -183,7 +183,9 @@ export class XrayServer implements Xray {
           },
           body: data,
           responseType: 'json',
-          timeout: responseTimeout // default timeout 60s
+          timeout: {
+            request: responseTimeout // default timeout 60s
+          }
         })
         try {
           if (core.isDebug()) {
