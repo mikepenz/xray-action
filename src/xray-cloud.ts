@@ -13,7 +13,7 @@ import {Xray} from './xray.js'
 import got from 'got'
 
 export class XrayCloud implements Xray {
-  xrayBaseUrl = new URL('https://xray.cloud.getxray.app')
+  xrayBaseUrl: URL
   searchParams!: URLSearchParams
   token = ''
 
@@ -25,6 +25,7 @@ export class XrayCloud implements Xray {
     private xrayImportOptions: XrayImportOptions,
     private importOptions: ImportOptions
   ) {
+    this.xrayBaseUrl = this.xrayOptions.baseUrl || new URL('https://xray.cloud.getxray.app')
     this.searchParams = createSearchParams(this.xrayImportOptions)
   }
 

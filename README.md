@@ -83,7 +83,7 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | **Input**                 | **Description**                                                                                                                                                | **Required** |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
 | `xrayCloud`               | Defines which variant of Xray to target [cloud vs Server/DC] (default="true")                                                                                  |              |
-| `xrayBaseUrl`             | Defines the base URL if Xray Server/DC is chosen (only required if xrayCloud="false")                                                                          | x*           |
+| `xrayBaseUrl`             | Defines the base URL for Xray Server/DC, could be used to change XRay Data region for XRay Cloud (required if xrayCloud="false")                               | x*           |
 | `username`                | Xray API client id (cloud) or Jira username (Server/DC). (Required for xrayCloud)                                                                              | x*           |
 | `password`                | Xray API client secret (cloud) or Jira password (Server/DC). (Required for xrayCloud)                                                                          | x*           |
 | `xrayToken`               | Xray Personal Access Token. If provided username/password are ignored. (Xray Server/DC only)                                                                   |              |
