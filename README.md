@@ -89,7 +89,7 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | `xrayToken`               | Xray Personal Access Token. If provided username/password are ignored. (Xray Server/DC only)                                                                   |              |
 | `testFormat`              | Describes the import formats ["xray", "cucumber", "behave", "junit", "testng", "nunit", "xunit", "robot", "bundle"]                                            | x            |
 | `testPaths`               | [Glob](https://github.com/actions/toolkit/tree/master/packages/glob) expression to report paths. The default is `**/junit-reports/TEST-*.xml`.                 | x            |
-| `testMerge`               | Merges together multiple test report files into a single report. Supported for: ["junit", "cucumber"]. (Default: true)                                                     |              |
+| `testMerge`               | Merges together multiple test report files into a single report. Supported for: ["junit", "cucumber"]. (Default: true)                                         |              |
 | `testExecKey`             | Key of the Test Execution                                                                                                                                      | x            |
 | `projectKey`              | Key of the project where the Test Execution (if the testExecKey parameter wasn't provided) and the tests (if they aren't created yet) are going to be created. | x            |
 | `testPlanKey`             | Key of the Test Plan; if you specify the Test Plan, the Tests will be added automatically to the Test Plan if they're not part of it.                          |              |
@@ -100,9 +100,9 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | `failOnImportError`       | Defines if the action should fail if an import error occurred. (Default: false)                                                                                |              |
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 | `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 2)                                                                                             |              |
-| `responseTimeout`       | Specifies the maximum duration for a request (in milliseconds) to wait for a response to execute before timing out. The default is 60000 milliseconds.                                                                                             |              |
-| `testExecutionJson`       | File path to a json file, containing the meta information to create the xray test execution ticket.                                                                           |              |
-| `testJson`       | File path to a json file, containing the meta information to create the xray test ticket.                                                                           |              |
+| `responseTimeout`         | Specifies the maximum duration for a request (in milliseconds) to wait for a response to execute before timing out. The default is 60000 milliseconds.         |              |
+| `testExecutionJson`       | File path to a json file, containing the meta information to create the xray test execution ticket.                                                            |              |
+| `testJson`                | File path to a json file, containing the meta information to create the xray test ticket.                                                                      |              |
 
 #### Test execution json
 
