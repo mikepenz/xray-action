@@ -100,7 +100,7 @@ export class Processor {
 
     try {
       /* does a import for a specific file */
-      // eslint-disable-next-line no-inner-declarations
+
       async function doImport(file: string): Promise<string> {
         core.debug(`Try to import: ${file}`)
         try {
