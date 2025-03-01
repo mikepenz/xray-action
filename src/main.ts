@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import {Processor} from './processor.js'
-import {resolveJson, retrieveRepositoryPath} from './utils.js'
+import {addTrailingSlash, resolveJson, retrieveRepositoryPath} from './utils.js'
 
 async function run(): Promise<void> {
   try {
@@ -25,7 +25,7 @@ async function run(): Promise<void> {
     let baseUrl: URL | undefined = undefined
     if (xrayBaseUrl !== '') {
       try {
-        baseUrl = new URL(xrayBaseUrl)
+        baseUrl = addTrailingSlash(xrayBaseUrl)
       } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
         core.setFailed(error.message)
       }

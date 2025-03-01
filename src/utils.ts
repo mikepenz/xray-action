@@ -183,3 +183,15 @@ function mergeJsonFiles(files: string[]): string {
   }
   return JSON.stringify(mergedResults.concat.apply([], mergedResults))
 }
+
+/**
+ * Ensures a URL ends with a trailing slash
+ *
+ * @param {string} rawUrl - The URL string to process
+ * @returns {URL} A URL object with a trailing slash in its pathname
+ */
+export function addTrailingSlash(rawUrl: string): URL {
+  const url = new URL(rawUrl)
+  url.pathname += url.pathname.endsWith('/') ? '' : '/'
+  return new URL(url)
+}
