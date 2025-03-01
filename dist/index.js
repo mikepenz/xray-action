@@ -78862,6 +78862,17 @@ function mergeJsonFiles(files) {
     }
     return JSON.stringify(mergedResults.concat.apply([], mergedResults));
 }
+/**
+ * Ensures a URL ends with a trailing slash
+ *
+ * @param {string} rawUrl - The URL string to process
+ * @returns {URL} A URL object with a trailing slash in its pathname
+ */
+function addTrailingSlash(rawUrl) {
+    const url = new URL(rawUrl);
+    url.pathname += url.pathname.endsWith('/') ? '' : '/';
+    return new URL(url);
+}
 
 // EXTERNAL MODULE: ./node_modules/form-data/lib/form_data.js
 var form_data = __nccwpck_require__(6454);
@@ -86440,7 +86451,6 @@ class Processor {
         const files = await retrieveTestFiles(this.xrayImportOptions.testMerge, this.xrayImportOptions.testFormat, this.xrayImportOptions.testPaths);
         try {
             /* does a import for a specific file */
-            // eslint-disable-next-line no-inner-declarations
             async function doImport(file) {
                 core.debug(`Try to import: ${file}`);
                 try {
@@ -86541,7 +86551,7 @@ async function run() {
         let baseUrl = undefined;
         if (xrayBaseUrl !== '') {
             try {
-                baseUrl = new URL(xrayBaseUrl);
+                baseUrl = addTrailingSlash(xrayBaseUrl);
             }
             catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
                 core.setFailed(error.message);
