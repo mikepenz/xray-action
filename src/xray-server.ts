@@ -127,15 +127,26 @@ export class XrayServer implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
+          core.debug(
+            `Retrieved response: ${JSON.stringify(importResponse)} (21)`
+          )
         }
-        return importResponse.testExecIssue.key
+
+        if (importResponse.testExecIssue.key) {
+          return importResponse.testExecIssue.key
+        } else {
+          core.warning(
+            `🔥 Failed to import the file: ${importResponse.error} (21)`
+          )
+          return ''
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
             importResponse
-          )}`
+          )} (21)`
         )
         return ''
       }
@@ -160,15 +171,25 @@ export class XrayServer implements Xray {
         })
         try {
           if (core.isDebug()) {
-            core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
+            core.debug(
+              `Retrieved response: ${JSON.stringify(importResponse)} (22)`
+            )
           }
-          return importResponse.testExecIssue.key
+
+          if (importResponse.testExecIssue.key) {
+            return importResponse.testExecIssue.key
+          } else {
+            core.warning(
+              `🔥 Failed to import the file: ${importResponse.error} (22)`
+            )
+            return ''
+          }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           core.warning(
             `🔥 Response did not match expected format: ${JSON.stringify(
               importResponse
-            )}`
+            )} (22)`
           )
           return ''
         }
@@ -191,15 +212,25 @@ export class XrayServer implements Xray {
         })
         try {
           if (core.isDebug()) {
-            core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
+            core.debug(
+              `Retrieved response: ${JSON.stringify(importResponse)} (23)`
+            )
           }
-          return importResponse.body.testExecIssue.key
+
+          if (importResponse.body.testExecIssue.key) {
+            return importResponse.body.testExecIssue.key
+          } else {
+            core.warning(
+              `🔥 Failed to import the file: ${importResponse.body.error} (23)`
+            )
+            return ''
+          }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           core.warning(
             `🔥 Response did not match expected format: ${JSON.stringify(
               importResponse.body || importResponse
-            )}`
+            )} (23)`
           )
           return ''
         }

@@ -118,6 +118,9 @@ export class Processor {
             await fs.promises.readFile(file),
             mimeType
           )
+          if (!result) {
+            throw Error(`Import failed: ${file}`)
+          }
           core.info(`ℹ️ Imported: ${file} (${result})`)
 
           completed++

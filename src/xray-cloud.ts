@@ -130,15 +130,26 @@ export class XrayCloud implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
+          core.debug(
+            `Retrieved response: ${JSON.stringify(importResponse)} (11)`
+          )
         }
-        return importResponse.key
+
+        if (importResponse.key) {
+          return importResponse.key
+        } else {
+          core.warning(
+            `🔥 Failed to import the file: ${importResponse.error} (11)`
+          )
+          return ''
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
             importResponse
-          )}`
+          )} (11)`
         )
         return ''
       }
@@ -165,15 +176,26 @@ export class XrayCloud implements Xray {
       })
       try {
         if (core.isDebug()) {
-          core.debug(`Retrieved response: ${JSON.stringify(importResponse)}`)
+          core.debug(
+            `Retrieved response: ${JSON.stringify(importResponse)} (12)`
+          )
         }
-        return importResponse.body.key
+
+        if (importResponse.body.key) {
+          return importResponse.body.key
+        } else {
+          core.warning(
+            `🔥 Failed to import the file: ${importResponse.body.error} (12)`
+          )
+          return ''
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         core.warning(
           `🔥 Response did not match expected format: ${JSON.stringify(
             importResponse.body || importResponse
-          )}`
+          )} (12)`
         )
         return ''
       }
