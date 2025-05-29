@@ -87,10 +87,13 @@ export async function doFormDataRequest(
             )
             // Wait a bit before retrying (exponential backoff)
             setTimeout(
-              () => {
-                attemptRequest(attempt + 1)
-                  .then(resolve)
-                  .catch(reject)
+              async () => {
+                try {
+                  const result = await attemptRequest(attempt + 1)
+                  resolve(result)
+                } catch (retryError) {
+                  reject(retryError)
+                }
               },
               Math.pow(2, attempt) * 1000
             )
@@ -119,10 +122,13 @@ export async function doFormDataRequest(
                 )
                 // Wait a bit before retrying
                 setTimeout(
-                  () => {
-                    attemptRequest(attempt + 1)
-                      .then(resolve)
-                      .catch(reject)
+                  async () => {
+                    try {
+                      const result = await attemptRequest(attempt + 1)
+                      resolve(result)
+                    } catch (retryError) {
+                      reject(retryError)
+                    }
                   },
                   Math.pow(2, attempt) * 1000
                 )
@@ -141,10 +147,13 @@ export async function doFormDataRequest(
                 `🔄 Response error (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`
               )
               setTimeout(
-                () => {
-                  attemptRequest(attempt + 1)
-                    .then(resolve)
-                    .catch(reject)
+                async () => {
+                  try {
+                    const result = await attemptRequest(attempt + 1)
+                    resolve(result)
+                  } catch (retryError) {
+                    reject(retryError)
+                  }
                 },
                 Math.pow(2, attempt) * 1000
               )
