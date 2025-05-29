@@ -73,10 +73,11 @@ export function resolveJson(
 export async function doFormDataRequest(
   formData: FormData,
   params: string | FormData.SubmitOptions,
-  retryLimit: number = 2
+  retryLimit = 2
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
-  const attemptRequest = (attempt: number): Promise<any> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attemptRequest = async (attempt: number): Promise<any> => {
     return new Promise((resolve, reject) => {
       formData.submit(params, (err, res) => {
         if (err) {
@@ -85,9 +86,14 @@ export async function doFormDataRequest(
               `🔄 Request failed (attempt ${attempt + 1}/${retryLimit + 1}): ${err.message}. Retrying...`
             )
             // Wait a bit before retrying (exponential backoff)
-            setTimeout(() => {
-              attemptRequest(attempt + 1).then(resolve).catch(reject)
-            }, Math.pow(2, attempt) * 1000)
+            setTimeout(
+              () => {
+                attemptRequest(attempt + 1)
+                  .then(resolve)
+                  .catch(reject)
+              },
+              Math.pow(2, attempt) * 1000
+            )
           } else {
             core.warning(
               `🔥 Request failed after ${retryLimit + 1} attempts: ${err.message}`
@@ -112,9 +118,14 @@ export async function doFormDataRequest(
                   `🔄 Response parsing failed (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`
                 )
                 // Wait a bit before retrying
-                setTimeout(() => {
-                  attemptRequest(attempt + 1).then(resolve).catch(reject)
-                }, Math.pow(2, attempt) * 1000)
+                setTimeout(
+                  () => {
+                    attemptRequest(attempt + 1)
+                      .then(resolve)
+                      .catch(reject)
+                  },
+                  Math.pow(2, attempt) * 1000
+                )
               } else {
                 core.warning(
                   `🔥 Server responded with error after ${retryLimit + 1} attempts (${error.message}): ${responseBody}`
@@ -124,14 +135,19 @@ export async function doFormDataRequest(
             }
           })
 
-          res.on('error', (error) => {
+          res.on('error', error => {
             if (attempt < retryLimit) {
               core.warning(
                 `🔄 Response error (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`
               )
-              setTimeout(() => {
-                attemptRequest(attempt + 1).then(resolve).catch(reject)
-              }, Math.pow(2, attempt) * 1000)
+              setTimeout(
+                () => {
+                  attemptRequest(attempt + 1)
+                    .then(resolve)
+                    .catch(reject)
+                },
+                Math.pow(2, attempt) * 1000
+              )
             } else {
               core.warning(
                 `🔥 Response error after ${retryLimit + 1} attempts: ${error.message}`

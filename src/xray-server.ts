@@ -117,14 +117,18 @@ export class XrayServer implements Xray {
         `Using multipart endpoint: ${this.xrayBaseUrl.href}rest/raven/2.0/import/execution${format}/multipart`
       )
 
-      const importResponse = await doFormDataRequest(form, {
-        protocol: this.protocol(),
-        host: this.xrayBaseUrl.host,
-        headers: {
-          Authorization: authString
+      const importResponse = await doFormDataRequest(
+        form,
+        {
+          protocol: this.protocol(),
+          host: this.xrayBaseUrl.host,
+          headers: {
+            Authorization: authString
+          },
+          path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}/multipart`
         },
-        path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}/multipart`
-      }, this.importOptions.importRetryLimit)
+        this.importOptions.importRetryLimit
+      )
       try {
         if (core.isDebug()) {
           core.debug(
@@ -159,16 +163,20 @@ export class XrayServer implements Xray {
           filepath: 'report.xml'
         })
 
-        const importResponse = await doFormDataRequest(form, {
-          protocol: this.protocol(),
-          host: this.xrayBaseUrl.host,
-          headers: {
-            Authorization: authString
+        const importResponse = await doFormDataRequest(
+          form,
+          {
+            protocol: this.protocol(),
+            host: this.xrayBaseUrl.host,
+            headers: {
+              Authorization: authString
+            },
+            path: `${
+              this.xrayBaseUrl.pathname
+            }rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
           },
-          path: `${
-            this.xrayBaseUrl.pathname
-          }rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
-        }, this.importOptions.importRetryLimit)
+          this.importOptions.importRetryLimit
+        )
         try {
           if (core.isDebug()) {
             core.debug(
