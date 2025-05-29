@@ -124,7 +124,7 @@ export class XrayServer implements Xray {
           Authorization: authString
         },
         path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}/multipart`
-      })
+      }, this.importOptions.importRetryLimit)
       try {
         if (core.isDebug()) {
           core.debug(
@@ -168,7 +168,7 @@ export class XrayServer implements Xray {
           path: `${
             this.xrayBaseUrl.pathname
           }rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
-        })
+        }, this.importOptions.importRetryLimit)
         try {
           if (core.isDebug()) {
             core.debug(

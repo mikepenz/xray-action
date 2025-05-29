@@ -127,7 +127,7 @@ export class XrayCloud implements Xray {
         host: this.xrayBaseUrl.host,
         path: `${this.xrayBaseUrl.pathname}api/v2/import/execution${format}/multipart`,
         headers: {Authorization: `Bearer ${this.token}`}
-      })
+      }, this.importOptions.importRetryLimit)
       try {
         if (core.isDebug()) {
           core.debug(
