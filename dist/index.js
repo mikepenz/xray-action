@@ -80058,37 +80058,91 @@ function resolveJson(githubWorkspacePath, file) {
 /**
  * Do a request with options provided.
  *
- * @param {Object} options
- * @param {Object} data
+ * @param {FormData} formData - The form data to submit
+ * @param {string | FormData.SubmitOptions} params - The request parameters
+ * @param {number} retryLimit - Maximum number of retries (default: 2)
  * @return {Promise} a promise of request
  */
-async function doFormDataRequest(formData, params
+async function doFormDataRequest(formData, params, retryLimit = 2
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) {
-    return new Promise((resolve, reject) => {
-        formData.submit(params, (err, res) => {
-            if (err) {
-                reject(err);
-            }
-            else {
-                res.setEncoding('utf8');
-                let responseBody = '';
-                res.on('data', chunk => {
-                    responseBody += chunk;
-                });
-                res.on('end', () => {
-                    try {
-                        core.debug(`Server response: ${responseBody}`);
-                        resolve(JSON.parse(responseBody));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const attemptRequest = async (attempt) => {
+        return new Promise((resolve, reject) => {
+            formData.submit(params, (err, res) => {
+                if (err) {
+                    if (attempt < retryLimit) {
+                        core.warning(`🔄 Request failed (attempt ${attempt + 1}/${retryLimit + 1}): ${err.message}. Retrying...`);
+                        // Wait a bit before retrying (exponential backoff)
+                        setTimeout(async () => {
+                            try {
+                                const result = await attemptRequest(attempt + 1);
+                                resolve(result);
+                            }
+                            catch (retryError) {
+                                reject(retryError);
+                            }
+                        }, Math.pow(2, attempt) * 1000);
                     }
-                    catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
-                        core.warning(`🔥 Server responded with error (${error.message}): ${responseBody}`);
-                        reject(error);
+                    else {
+                        core.warning(`🔥 Request failed after ${retryLimit + 1} attempts: ${err.message}`);
+                        reject(err);
                     }
-                });
-            }
+                }
+                else {
+                    res.setEncoding('utf8');
+                    let responseBody = '';
+                    res.on('data', chunk => {
+                        responseBody += chunk;
+                    });
+                    res.on('end', () => {
+                        try {
+                            core.debug(`Server response: ${responseBody}`);
+                            resolve(JSON.parse(responseBody));
+                        }
+                        catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+                            if (attempt < retryLimit) {
+                                core.warning(`🔄 Response parsing failed (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`);
+                                // Wait a bit before retrying
+                                setTimeout(async () => {
+                                    try {
+                                        const result = await attemptRequest(attempt + 1);
+                                        resolve(result);
+                                    }
+                                    catch (retryError) {
+                                        reject(retryError);
+                                    }
+                                }, Math.pow(2, attempt) * 1000);
+                            }
+                            else {
+                                core.warning(`🔥 Server responded with error after ${retryLimit + 1} attempts (${error.message}): ${responseBody}`);
+                                reject(error);
+                            }
+                        }
+                    });
+                    res.on('error', error => {
+                        if (attempt < retryLimit) {
+                            core.warning(`🔄 Response error (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`);
+                            setTimeout(async () => {
+                                try {
+                                    const result = await attemptRequest(attempt + 1);
+                                    resolve(result);
+                                }
+                                catch (retryError) {
+                                    reject(retryError);
+                                }
+                            }, Math.pow(2, attempt) * 1000);
+                        }
+                        else {
+                            core.warning(`🔥 Response error after ${retryLimit + 1} attempts: ${error.message}`);
+                            reject(error);
+                        }
+                    });
+                }
+            });
         });
-    });
+    };
+    return attemptRequest(0);
 }
 /**
  * Retrieves the test result files given the provided globber.
@@ -87433,7 +87487,7 @@ class XrayCloud {
                 request: 30000 // 30s timeout
             },
             retry: {
-                limit: 2 // retry count for some requests
+                limit: this.importOptions.importRetryLimit // configurable retry count for authentication requests
             },
             http2: true // try to allow http2 requests
         });
@@ -87484,7 +87538,7 @@ class XrayCloud {
                 host: this.xrayBaseUrl.host,
                 path: `${this.xrayBaseUrl.pathname}api/v2/import/execution${format}/multipart`,
                 headers: { Authorization: `Bearer ${this.token}` }
-            });
+            }, this.importOptions.importRetryLimit);
             try {
                 if (core.isDebug()) {
                     core.debug(`Retrieved response: ${JSON.stringify(importResponse)} (11)`);
@@ -87519,7 +87573,7 @@ class XrayCloud {
                     request: responseTimeout // default timeout 60s
                 },
                 retry: {
-                    limit: 2 // retry count for some requests
+                    limit: this.importOptions.importRetryLimit // configurable retry count for import requests
                 },
                 http2: true // try to allow http2 requests
             });
@@ -87639,7 +87693,7 @@ class XrayServer {
                     Authorization: authString
                 },
                 path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}/multipart`
-            });
+            }, this.importOptions.importRetryLimit);
             try {
                 if (core.isDebug()) {
                     core.debug(`Retrieved response: ${JSON.stringify(importResponse)} (21)`);
@@ -87673,7 +87727,7 @@ class XrayServer {
                         Authorization: authString
                     },
                     path: `${this.xrayBaseUrl.pathname}rest/raven/2.0/import/execution${format}?${this.searchParams.toString()}`
-                });
+                }, this.importOptions.importRetryLimit);
                 try {
                     if (core.isDebug()) {
                         core.debug(`Retrieved response: ${JSON.stringify(importResponse)} (22)`);
@@ -87706,6 +87760,9 @@ class XrayServer {
                     responseType: 'json',
                     timeout: {
                         request: responseTimeout // default timeout 60s
+                    },
+                    retry: {
+                        limit: this.importOptions.importRetryLimit // configurable retry count for import requests
                     }
                 });
                 try {
@@ -87923,6 +87980,7 @@ async function run() {
         const continueOnImportError = core.getInput('continueOnImportError') === 'true';
         const importParallelism = Number(core.getInput('importParallelism')) || 2; // by default go to 2 parallelism
         const responseTimeout = Number(core.getInput('responseTimeout')) || 60000; // by default 60s
+        const importRetryLimit = Number(core.getInput('importRetryLimit')) || 2; // by default 2 retries
         await new Processor({
             cloud,
             baseUrl,
@@ -87946,7 +88004,8 @@ async function run() {
             failOnImportError,
             continueOnImportError,
             importParallelism,
-            responseTimeout
+            responseTimeout,
+            importRetryLimit
         }).process();
     }
     catch (error /* eslint-disable-line @typescript-eslint/no-explicit-any */) {

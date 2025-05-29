@@ -29,7 +29,8 @@ test('import test results server', async () => {
       failOnImportError: true,
       continueOnImportError: true,
       importParallelism: 2,
-      responseTimeout: 60000
+      responseTimeout: 60000,
+      importRetryLimit: 2
     }
   )
   const result = await processor.process()
@@ -74,7 +75,8 @@ test('import test results server', async () => {
       failOnImportError: false,
       continueOnImportError: true,
       importParallelism: 2,
-      responseTimeout: 60000
+      responseTimeout: 60000,
+      importRetryLimit: 2
     }
   )
   const result = await processor.process()
@@ -117,7 +119,8 @@ test('import cucumber test results server', async () => {
       failOnImportError: false,
       continueOnImportError: true,
       importParallelism: 2,
-      responseTimeout: 60000
+      responseTimeout: 60000,
+      importRetryLimit: 2
     }
   )
   const result = await processor.process()
@@ -162,7 +165,8 @@ test('import test results cloud', async () => {
       failOnImportError: false,
       continueOnImportError: true,
       importParallelism: 2,
-      responseTimeout: 60000
+      responseTimeout: 60000,
+      importRetryLimit: 2
     }
   )
   const result = await processor.process()

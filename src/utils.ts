@@ -65,41 +65,111 @@ export function resolveJson(
 /**
  * Do a request with options provided.
  *
- * @param {Object} options
- * @param {Object} data
+ * @param {FormData} formData - The form data to submit
+ * @param {string | FormData.SubmitOptions} params - The request parameters
+ * @param {number} retryLimit - Maximum number of retries (default: 2)
  * @return {Promise} a promise of request
  */
 export async function doFormDataRequest(
   formData: FormData,
-  params: string | FormData.SubmitOptions
+  params: string | FormData.SubmitOptions,
+  retryLimit = 2
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
-  return new Promise((resolve, reject) => {
-    formData.submit(params, (err, res) => {
-      if (err) {
-        reject(err)
-      } else {
-        res.setEncoding('utf8')
-        let responseBody = ''
-
-        res.on('data', chunk => {
-          responseBody += chunk
-        })
-
-        res.on('end', () => {
-          try {
-            core.debug(`Server response: ${responseBody}`)
-            resolve(JSON.parse(responseBody))
-          } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attemptRequest = async (attempt: number): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      formData.submit(params, (err, res) => {
+        if (err) {
+          if (attempt < retryLimit) {
             core.warning(
-              `🔥 Server responded with error (${error.message}): ${responseBody}`
+              `🔄 Request failed (attempt ${attempt + 1}/${retryLimit + 1}): ${err.message}. Retrying...`
             )
-            reject(error)
+            // Wait a bit before retrying (exponential backoff)
+            setTimeout(
+              async () => {
+                try {
+                  const result = await attemptRequest(attempt + 1)
+                  resolve(result)
+                } catch (retryError) {
+                  reject(retryError)
+                }
+              },
+              Math.pow(2, attempt) * 1000
+            )
+          } else {
+            core.warning(
+              `🔥 Request failed after ${retryLimit + 1} attempts: ${err.message}`
+            )
+            reject(err)
           }
-        })
-      }
+        } else {
+          res.setEncoding('utf8')
+          let responseBody = ''
+
+          res.on('data', chunk => {
+            responseBody += chunk
+          })
+
+          res.on('end', () => {
+            try {
+              core.debug(`Server response: ${responseBody}`)
+              resolve(JSON.parse(responseBody))
+            } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
+              if (attempt < retryLimit) {
+                core.warning(
+                  `🔄 Response parsing failed (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`
+                )
+                // Wait a bit before retrying
+                setTimeout(
+                  async () => {
+                    try {
+                      const result = await attemptRequest(attempt + 1)
+                      resolve(result)
+                    } catch (retryError) {
+                      reject(retryError)
+                    }
+                  },
+                  Math.pow(2, attempt) * 1000
+                )
+              } else {
+                core.warning(
+                  `🔥 Server responded with error after ${retryLimit + 1} attempts (${error.message}): ${responseBody}`
+                )
+                reject(error)
+              }
+            }
+          })
+
+          res.on('error', error => {
+            if (attempt < retryLimit) {
+              core.warning(
+                `🔄 Response error (attempt ${attempt + 1}/${retryLimit + 1}): ${error.message}. Retrying...`
+              )
+              setTimeout(
+                async () => {
+                  try {
+                    const result = await attemptRequest(attempt + 1)
+                    resolve(result)
+                  } catch (retryError) {
+                    reject(retryError)
+                  }
+                },
+                Math.pow(2, attempt) * 1000
+              )
+            } else {
+              core.warning(
+                `🔥 Response error after ${retryLimit + 1} attempts: ${error.message}`
+              )
+              reject(error)
+            }
+          })
+        }
+      })
     })
-  })
+  }
+
+  return attemptRequest(0)
 }
 
 /**

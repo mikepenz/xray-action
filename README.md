@@ -70,6 +70,8 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
     testPaths: "**/test/*.xml"
     testExecKey: "TEST-1"
     projectKey: "TEST"
+    importRetryLimit: "5"  # Retry up to 5 times on failure
+    responseTimeout: "120000"  # 2 minutes timeout
 ```
 
 ⚠️ Xray Server/DC requires `test plan`, `test env`, `revision` to be defined via their custom field. See additional details on passing a custom [test execution json](#test-execution-json).
@@ -101,6 +103,7 @@ If you're using Xray Server/DC, you'll need to set `xrayCloud` as "false", use J
 | `continueOnImportError`   | Defines if the action should continue after a single import error occurred. (Default: true)                                                                    |              |
 | `importParallelism`       | Specifies the level of parallelism to import to Xray. (Default: 2)                                                                                             |              |
 | `responseTimeout`         | Specifies the maximum duration for a request (in milliseconds) to wait for a response to execute before timing out. The default is 60000 milliseconds.         |              |
+| `importRetryLimit`        | Specifies the maximum number of retries for failed import requests. The default is 2.                                                                           |              |
 | `testExecutionJson`       | File path to a json file, containing the meta information to create the xray test execution ticket.                                                            |              |
 | `testJson`                | File path to a json file, containing the meta information to create the xray test ticket.                                                                      |              |
 
