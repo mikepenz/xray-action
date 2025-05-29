@@ -51,7 +51,7 @@ export class XrayCloud implements Xray {
           request: 30000 // 30s timeout
         },
         retry: {
-          limit: 2 // retry count for some requests
+          limit: this.importOptions.importRetryLimit // configurable retry count for authentication requests
         },
         http2: true // try to allow http2 requests
       }
@@ -170,7 +170,7 @@ export class XrayCloud implements Xray {
           request: responseTimeout // default timeout 60s
         },
         retry: {
-          limit: 2 // retry count for some requests
+          limit: this.importOptions.importRetryLimit // configurable retry count for import requests
         },
         http2: true // try to allow http2 requests
       })

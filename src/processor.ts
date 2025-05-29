@@ -35,6 +35,7 @@ export interface ImportOptions {
   continueOnImportError: boolean
   importParallelism: number
   responseTimeout: number
+  importRetryLimit: number
 }
 
 export class Processor {

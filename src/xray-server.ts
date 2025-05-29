@@ -208,6 +208,9 @@ export class XrayServer implements Xray {
           responseType: 'json',
           timeout: {
             request: responseTimeout // default timeout 60s
+          },
+          retry: {
+            limit: this.importOptions.importRetryLimit // configurable retry count for import requests
           }
         })
         try {
