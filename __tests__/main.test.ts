@@ -1,7 +1,5 @@
+import {expect, test} from 'vitest'
 import {Processor} from '../src/processor.js'
-import {jest} from '@jest/globals'
-
-jest.setTimeout(180000)
 
 test('import test results server', async () => {
   const processor = new Processor(

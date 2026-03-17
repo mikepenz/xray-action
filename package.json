@@ -12,8 +12,8 @@
     "format-fix": "eslint --fix src/**.ts",
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "all": "npm run build && npm run format && npm run lint && npm run package"
+    "test": "vitest --run --reporter=default",
+    "all": "npm run build && npm run format && npm run lint && npm run package && npm test"
   },
   "repository": {
     "type": "git",
@@ -34,8 +34,8 @@
   "author": "Mike Penz",
   "license": "Apache 2.0",
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/glob": "^0.5.0",
+    "@actions/core": "^3.0.0",
+    "@actions/glob": "^0.6.1",
     "@supercharge/promise-pool": "^3.2.0",
     "@types/mime-types": "^3.0.1",
     "form-data": "^4.0.4",
@@ -43,28 +43,25 @@
     "junit-report-merger": "^7.0.1"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.1.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
-    "@vercel/ncc": "^0.38.3",
-    "eslint": "^9.32.0",
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
+    "@types/eslint-scope": "^9.1.0",
+    "@types/node": "^25.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "@vercel/ncc": "^0.38.4",
+    "eslint": "^10.0.3",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-github": "^6.0.0",
     "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-jest": "^29.0.1",
-    "eslint-plugin-prettier": "^5.5.3",
-    "jest": "^30.0.5",
-    "jest-circus": "^30.0.5",
-    "js-yaml": "^4.1.0",
-    "node-notifier": "^10.0.1",
-    "prettier": "3.6.2",
-    "ts-jest": "^29.4.0",
-    "typescript": "^5.8.3",
-    "webpack": "^5.100.2"
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.4.0",
+    "js-yaml": "^4.1.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
   },
   "overrides": {
-    "glob": "11.0.1",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   }
 }
