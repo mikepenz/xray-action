@@ -92,5 +92,5 @@ outputs:
   errorStatusCode:
     description: 'The status code of failed imports.'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
