@@ -53629,6 +53629,12 @@ async function run() {
         const xrayToken = getInput('xrayToken');
         const username = getInput('username');
         const password = getInput('password');
+        if (xrayToken)
+            core_setSecret(xrayToken);
+        if (username)
+            core_setSecret(username);
+        if (password)
+            core_setSecret(password);
         if (!username && !xrayToken) {
             setFailed('The required `username` is missing');
             return;
