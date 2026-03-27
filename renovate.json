@@ -9,18 +9,21 @@
     "automerge": false,
     "minimumReleaseAge": "0 days"
   },
+  "labels": ["dependencies"],
   "packageRules": [
     {
       "matchUpdateTypes": ["patch", "minor"],
       "matchDepTypes": ["devDependencies"],
       "automerge": true,
       "platformAutomerge": true,
-      "groupName": "devDependency non-major updates"
+      "groupName": "devDependency non-major updates",
+      "labels": ["dependencies", "javascript"]
     },
     {
       "matchManagers": ["github-actions"],
       "automerge": false,
-      "groupName": "GitHub Actions updates"
+      "groupName": "GitHub Actions updates",
+      "labels": ["dependencies", "github-actions"]
     }
   ],
   "schedule": ["before 4am on Monday"],
