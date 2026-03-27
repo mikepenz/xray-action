@@ -54,8 +54,8 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "Mike penz"
+          git config user.email "opensource-bot@mikepenz.dev"
           git add dist/
           git diff --staged --quiet || (git commit -m "chore: rebuild dist" && git push origin "HEAD:${BRANCH}")
 
