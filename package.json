@@ -37,10 +37,10 @@
     "@actions/core": "^3.0.0",
     "@actions/glob": "^0.6.1",
     "@supercharge/promise-pool": "^3.2.0",
-    "@types/mime-types": "^3.0.1",
     "form-data": "^4.0.4",
     "got": "14.6.6",
-    "junit-report-merger": "^9.0.3"
+    "junit-report-merger": "^9.0.3",
+    "mime-types": "^2.1.35"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
@@ -59,9 +59,11 @@
     "js-yaml": "^4.1.1",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.2",
+    "@types/mime-types": "^3.0.1"
   },
   "overrides": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "brace-expansion": "^5.0.5"
   }
 }

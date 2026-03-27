@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "pinDigests": true,
+  "minimumReleaseAge": "7 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": false,
+    "minimumReleaseAge": "0 days"
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "minor"],
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "groupName": "devDependency non-major updates"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "automerge": false,
+      "groupName": "GitHub Actions updates"
+    }
+  ],
+  "schedule": ["before 4am on Monday"],
+  "timezone": "Europe/Berlin"
+}

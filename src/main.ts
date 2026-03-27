@@ -34,6 +34,9 @@ async function run(): Promise<void> {
     const xrayToken: string = core.getInput('xrayToken')
     const username: string = core.getInput('username')
     const password: string = core.getInput('password')
+    if (xrayToken) core.setSecret(xrayToken)
+    if (username) core.setSecret(username)
+    if (password) core.setSecret(password)
     if (!username && !xrayToken) {
       core.setFailed('The required `username` is missing')
       return
