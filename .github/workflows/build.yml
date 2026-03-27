@@ -35,7 +35,7 @@ jobs:
       github.event_name == 'pull_request' &&
       startsWith(github.head_ref, 'renovate/') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor == github.repository_owner
+      github.event.pull_request.user.login == 'renovate[bot]'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -52,14 +52,12 @@ jobs:
       - run: npm ci
       - run: npm run build && npm run package
       - name: Commit rebuilt dist
-        env:
-          BRANCH: ${{ github.head_ref }}
-          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
         run: |
-          git config user.name "Mike penz"
+          git config user.name "Mike Penz"
           git config user.email "opensource-bot@mikepenz.dev"
           git add dist/
-          git diff --staged --quiet || (git commit -m "chore: rebuild dist" && git push "https://x-access-token:${RENOVATE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${BRANCH}")
+          git diff --staged --quiet || git commit -m "chore: rebuild dist for renovate"
+          git push "https://x-access-token:${{ secrets.RENOVATE_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.event.pull_request.head.ref }}"
 
   test:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
