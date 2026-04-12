@@ -1,31 +1,6 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "pinDigests": true,
-  "minimumReleaseAge": "7 days",
-  "osvVulnerabilityAlerts": true,
-  "vulnerabilityAlerts": {
-    "labels": ["dependencies", "security"],
-    "automerge": false,
-    "minimumReleaseAge": "0 days"
-  },
-  "labels": ["dependencies"],
-  "packageRules": [
-    {
-      "matchUpdateTypes": ["patch", "minor"],
-      "matchDepTypes": ["devDependencies"],
-      "automerge": true,
-      "platformAutomerge": true,
-      "groupName": "devDependency non-major updates",
-      "labels": ["dependencies", "javascript"]
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "automerge": false,
-      "groupName": "GitHub Actions updates",
-      "labels": ["dependencies", "github-actions"]
-    }
-  ],
-  "schedule": ["before 4am on Monday"],
-  "timezone": "Europe/Berlin"
+    "$schema": "https://docs.renovateapp.com/renovate-schema.json",
+    "extends": [
+        "local>mikepenz/convention"
+    ]
 }
