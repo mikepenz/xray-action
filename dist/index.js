@@ -46032,13 +46032,13 @@ class RequestError extends Error {
         // Recover the original stacktrace
         if (distribution.string(error.stack) && distribution.string(this.stack)) {
             const indexOfMessage = this.stack.indexOf(this.message) + this.message.length;
-            const thisStackTrace = this.stack.slice(indexOfMessage).split('\n').reverse();
-            const errorStackTrace = error.stack.slice(error.stack.indexOf(error.message) + error.message.length).split('\n').reverse();
+            const thisStackTrace = this.stack.slice(indexOfMessage).split('\n').toReversed();
+            const errorStackTrace = error.stack.slice(error.stack.indexOf(error.message) + error.message.length).split('\n').toReversed();
             // Remove duplicated traces
             while (errorStackTrace.length > 0 && errorStackTrace[0] === thisStackTrace[0]) {
                 thisStackTrace.shift();
             }
-            this.stack = `${this.stack.slice(0, indexOfMessage)}${thisStackTrace.reverse().join('\n')}${errorStackTrace.reverse().join('\n')}`;
+            this.stack = `${this.stack.slice(0, indexOfMessage)}${thisStackTrace.toReversed().join('\n')}${errorStackTrace.toReversed().join('\n')}`;
         }
     }
 }
@@ -49350,7 +49350,7 @@ function timedOut(request, delays, options) {
             const { socketPath } = request;
             /* istanbul ignore next: hard to test */
             if (socket.connecting) {
-                const hasPath = Boolean(socketPath ?? external_node_net_.isIP(hostname ?? host ?? '') !== 0);
+                const hasPath = Boolean(socketPath ?? (external_node_net_.isIP(hostname ?? host ?? '') !== 0));
                 if (hasLookup && !hasPath && socket.address().address === undefined) {
                     const cancelTimeout = addTimeout(delays.lookup, timeoutHandler, 'lookup');
                     once(socket, 'lookup', cancelTimeout);
@@ -49980,8 +49980,7 @@ function parseLinkHeader(link) {
 }
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/is-unix-socket-url.js
-// eslint-disable-next-line @typescript-eslint/naming-convention
-function isUnixSocketURL(url) {
+function isUnixSocketUrl(url) {
     return url.protocol === 'unix:' || url.hostname === 'unix';
 }
 /**
@@ -50000,10 +49999,10 @@ getUnixSocketPath(new URL('http://example.com'));
 ```
 */
 function getUnixSocketPath(url) {
-    if (!isUnixSocketURL(url)) {
+    if (!isUnixSocketUrl(url)) {
         return undefined;
     }
-    return /(?<socketPath>.+?):(?<path>.+)/.exec(`${url.pathname}${url.search}`)?.groups?.socketPath;
+    return /^(?<socketPath>[^:]+):/v.exec(`${url.pathname}${url.search}`)?.groups?.socketPath;
 }
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/options.js
@@ -50077,8 +50076,8 @@ function hasCredentialInUrl(url, credential) {
 }
 const hasExplicitCredentialInUrlChange = (changedState, url, credential) => (changedState.has(credential)
     || (changedState.has('url') && url?.[credential] !== ''));
-const hasProtocolSlashes = (value) => /^[a-z][a-z\d+.-]*:\/\//i.test(value);
-const hasHttpProtocolWithoutSlashes = (value) => /^https?:(?!\/\/)/i.test(value);
+const hasProtocolSlashes = (value) => /^[a-z][\d+\-.a-z]*:\/\//iv.test(value);
+const hasHttpProtocolWithoutSlashes = (value) => /^https?:(?!\/\/)/iv.test(value);
 function applyUrlOverride(options, url, { username, password } = {}) {
     if (distribution.string(url) && options.url) {
         url = new URL(url, options.url).toString();
@@ -50495,7 +50494,7 @@ class Options {
         // would get merged. Instead we set the `searchParams` first, then
         // `url.searchParams` is overwritten as expected.
         //
-        /* eslint-disable no-unsafe-finally */
+        /* eslint-disable no-unsafe-finally -- `finally` is used intentionally here to ensure `url` is always set last, overwriting any merged searchParams */
         try {
             if (distribution.plainObject(input)) {
                 try {
@@ -50921,16 +50920,14 @@ class Options {
             this.#internals.cookieJar = undefined;
             return;
         }
-        let { setCookie, getCookieString } = value;
+        const { setCookie, getCookieString } = value;
         assert.function(setCookie);
         assert.function(getCookieString);
         /* istanbul ignore next: Horrible `tough-cookie` v3 check */
         if (setCookie.length === 4 && getCookieString.length === 0) {
-            setCookie = (0,external_node_util_.promisify)(setCookie.bind(value));
-            getCookieString = (0,external_node_util_.promisify)(getCookieString.bind(value));
             this.#internals.cookieJar = {
-                setCookie,
-                getCookieString: getCookieString,
+                setCookie: (0,external_node_util_.promisify)(setCookie.bind(value)),
+                getCookieString: (0,external_node_util_.promisify)(getCookieString.bind(value)),
             };
         }
         else {
@@ -51801,11 +51798,11 @@ class Options {
         this.#internals.resolveBodyOnly = value;
     }
     /**
-    @internal
     Returns a `Stream` instead of a `Promise`.
     Set internally by `got.stream()`.
 
     @default false
+    @internal
     */
     get isStream() {
         return this.#internals.isStream;
@@ -51954,7 +51951,7 @@ class Options {
         }
         let unixSocketGroups;
         if (unixSocketPath !== undefined) {
-            unixSocketGroups = /(?<socketPath>.+?):(?<path>.+)/.exec(`${url.pathname}${url.search}`)?.groups;
+            unixSocketGroups = /^(?<socketPath>[^:]+):(?<path>.+)$/v.exec(`${url.pathname}${url.search}`)?.groups;
         }
         const unixOptions = unixSocketGroups
             ? { socketPath: unixSocketGroups.socketPath, path: unixSocketGroups.path, host: '' }
@@ -53597,7 +53594,8 @@ class Request extends external_node_stream_.Duplex {
                 try {
                     const result = iterableBody.return();
                     if (result instanceof Promise) {
-                        result.catch(core_noop); // eslint-disable-line promise/prefer-await-to-then
+                        // eslint-disable-next-line promise/prefer-await-to-then
+                        result.catch(core_noop);
                     }
                 }
                 catch { }
@@ -53771,28 +53769,30 @@ class Request extends external_node_stream_.Duplex {
             });
             let request;
             // TODO: Fix `cacheable-response`. This is ugly.
-            const cacheRequest = cacheableStore.get(options.cache)(options, async (response) => {
-                response._readableState.autoDestroy = false;
-                if (request) {
-                    const fix = () => {
-                        // For ResponseLike objects from cache, set complete to true if not already set.
-                        // For real HTTP responses, copy from the underlying response.
-                        if (response.req) {
-                            response.complete = response.req.res.complete;
-                        }
-                        else if (response.complete === undefined) {
-                            // ResponseLike from cache should have complete = true
-                            response.complete = true;
-                        }
-                    };
-                    response.prependOnceListener('end', fix);
-                    fix();
-                    (await request).emit('cacheableResponse', response);
-                }
-                resolve(response);
+            const cacheRequest = cacheableStore.get(options.cache)(options, (response) => {
+                void (async () => {
+                    response._readableState.autoDestroy = false;
+                    if (request) {
+                        const fix = () => {
+                            // For ResponseLike objects from cache, set complete to true if not already set.
+                            // For real HTTP responses, copy from the underlying response.
+                            if (response.req) {
+                                response.complete = response.req.res.complete;
+                            }
+                            else if (response.complete === undefined) {
+                                // ResponseLike from cache should have complete = true
+                                response.complete = true;
+                            }
+                        };
+                        response.prependOnceListener('end', fix);
+                        fix();
+                        (await request).emit('cacheableResponse', response);
+                    }
+                    resolve(response);
+                })();
             });
             cacheRequest.once('error', reject);
-            cacheRequest.once('request', async (requestOrPromise) => {
+            cacheRequest.once('request', (requestOrPromise) => {
                 request = requestOrPromise;
                 resolve(request);
             });
@@ -54061,97 +54061,99 @@ function asPromise(firstRequest) {
             request.retryCount = retryCount;
             request._noPipe = true;
             globalRequest = request;
-            request.once('response', async (response) => {
-                // Parse body
-                const contentEncoding = (response.headers['content-encoding'] ?? '').toLowerCase();
-                const isCompressed = compressedEncodings.has(contentEncoding);
-                const { options } = request;
-                if (isCompressed && !options.decompress) {
-                    response.body = response.rawBody;
-                }
-                else {
-                    try {
-                        response.body = parseBody(response, options.responseType, options.parseJson, options.encoding);
+            request.once('response', (response) => {
+                void (async () => {
+                    // Parse body
+                    const contentEncoding = (response.headers['content-encoding'] ?? '').toLowerCase();
+                    const isCompressed = compressedEncodings.has(contentEncoding);
+                    const { options } = request;
+                    if (isCompressed && !options.decompress) {
+                        response.body = response.rawBody;
                     }
-                    catch (error) {
-                        // Fall back to `utf8`
+                    else {
                         try {
-                            response.body = decodeUint8Array(response.rawBody);
+                            response.body = parseBody(response, options.responseType, options.parseJson, options.encoding);
                         }
                         catch (error) {
-                            request._beforeError(new ParseError(normalizeError(error), response));
-                            return;
-                        }
-                        if (isResponseOk(response)) {
-                            request._beforeError(normalizeError(error));
-                            return;
+                            // Fall back to `utf8`
+                            try {
+                                response.body = decodeUint8Array(response.rawBody);
+                            }
+                            catch (error) {
+                                request._beforeError(new ParseError(normalizeError(error), response));
+                                return;
+                            }
+                            if (isResponseOk(response)) {
+                                request._beforeError(normalizeError(error));
+                                return;
+                            }
                         }
                     }
-                }
-                try {
-                    const hooks = options.hooks.afterResponse;
-                    for (const [index, hook] of hooks.entries()) {
-                        const previousUrl = options.url ? new URL(options.url) : undefined;
-                        const previousState = previousUrl ? snapshotCrossOriginState(options) : undefined;
-                        const requestOptions = response.request.options;
-                        const responseSnapshot = response;
-                        // @ts-expect-error TS doesn't notice that RequestPromise is a Promise
-                        // eslint-disable-next-line no-await-in-loop
-                        response = await requestOptions.trackStateMutations(async (changedState) => hook(responseSnapshot, async (updatedOptions) => {
-                            const preserveHooks = updatedOptions.preserveHooks ?? false;
-                            const reusesRequestOptions = updatedOptions === requestOptions;
-                            const hasExplicitBody = reusesRequestOptions
-                                ? changedState.has('body') || changedState.has('json') || changedState.has('form')
-                                : (Object.hasOwn(updatedOptions, 'body') && updatedOptions.body !== undefined)
-                                    || (Object.hasOwn(updatedOptions, 'json') && updatedOptions.json !== undefined)
-                                    || (Object.hasOwn(updatedOptions, 'form') && updatedOptions.form !== undefined);
-                            if (hasExplicitBody && !reusesRequestOptions) {
-                                options.clearBody();
-                            }
-                            if (!reusesRequestOptions) {
-                                options.merge(updatedOptions);
-                            }
-                            if (updatedOptions.url) {
-                                const nextUrl = reusesRequestOptions
-                                    ? options.url
-                                    : applyUrlOverride(options, updatedOptions.url, updatedOptions);
-                                if (previousUrl) {
-                                    if (reusesRequestOptions && !isSameOrigin(previousUrl, nextUrl)) {
-                                        options.stripUnchangedCrossOriginState(previousState, changedState, { clearBody: !hasExplicitBody });
-                                    }
-                                    else {
-                                        options.stripSensitiveHeaders(previousUrl, nextUrl, updatedOptions);
-                                        if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
-                                            options.clearBody();
+                    try {
+                        const hooks = options.hooks.afterResponse;
+                        for (const [index, hook] of hooks.entries()) {
+                            const previousUrl = options.url ? new URL(options.url) : undefined;
+                            const previousState = previousUrl ? snapshotCrossOriginState(options) : undefined;
+                            const requestOptions = response.request.options;
+                            const responseSnapshot = response;
+                            // @ts-expect-error TS doesn't notice that RequestPromise is a Promise
+                            // eslint-disable-next-line no-await-in-loop
+                            response = await requestOptions.trackStateMutations(async (changedState) => hook(responseSnapshot, async (updatedOptions) => {
+                                const preserveHooks = updatedOptions.preserveHooks ?? false;
+                                const reusesRequestOptions = updatedOptions === requestOptions;
+                                const hasExplicitBody = reusesRequestOptions
+                                    ? changedState.has('body') || changedState.has('json') || changedState.has('form')
+                                    : (Object.hasOwn(updatedOptions, 'body') && updatedOptions.body !== undefined)
+                                        || (Object.hasOwn(updatedOptions, 'json') && updatedOptions.json !== undefined)
+                                        || (Object.hasOwn(updatedOptions, 'form') && updatedOptions.form !== undefined);
+                                if (hasExplicitBody && !reusesRequestOptions) {
+                                    options.clearBody();
+                                }
+                                if (!reusesRequestOptions) {
+                                    options.merge(updatedOptions);
+                                }
+                                if (updatedOptions.url) {
+                                    const nextUrl = reusesRequestOptions
+                                        ? options.url
+                                        : applyUrlOverride(options, updatedOptions.url, updatedOptions);
+                                    if (previousUrl) {
+                                        if (reusesRequestOptions && !isSameOrigin(previousUrl, nextUrl)) {
+                                            options.stripUnchangedCrossOriginState(previousState, changedState, { clearBody: !hasExplicitBody });
+                                        }
+                                        else {
+                                            options.stripSensitiveHeaders(previousUrl, nextUrl, updatedOptions);
+                                            if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
+                                                options.clearBody();
+                                            }
                                         }
                                     }
                                 }
+                                // Remove any further hooks for that request, because we'll call them anyway.
+                                // The loop continues. We don't want duplicates (asPromise recursion).
+                                // Unless preserveHooks is true, in which case we keep the remaining hooks.
+                                if (!preserveHooks) {
+                                    options.hooks.afterResponse = options.hooks.afterResponse.slice(0, index);
+                                }
+                                throw new RetryError(request);
+                            }));
+                            if (!(distribution.object(response) && distribution.number(response.statusCode) && 'body' in response)) {
+                                throw new TypeError('The `afterResponse` hook returned an invalid value');
                             }
-                            // Remove any further hooks for that request, because we'll call them anyway.
-                            // The loop continues. We don't want duplicates (asPromise recursion).
-                            // Unless preserveHooks is true, in which case we keep the remaining hooks.
-                            if (!preserveHooks) {
-                                options.hooks.afterResponse = options.hooks.afterResponse.slice(0, index);
-                            }
-                            throw new RetryError(request);
-                        }));
-                        if (!(distribution.object(response) && distribution.number(response.statusCode) && 'body' in response)) {
-                            throw new TypeError('The `afterResponse` hook returned an invalid value');
                         }
                     }
-                }
-                catch (error) {
-                    request._beforeError(normalizeError(error));
-                    return;
-                }
-                globalResponse = response;
-                if (!isResponseOk(response)) {
-                    request._beforeError(new HTTPError(response));
-                    return;
-                }
-                request.destroy();
-                promiseSettled = true;
-                resolve(request.options.resolveBodyOnly ? response.body : response);
+                    catch (error) {
+                        request._beforeError(normalizeError(error));
+                        return;
+                    }
+                    globalResponse = response;
+                    if (!isResponseOk(response)) {
+                        request._beforeError(new HTTPError(response));
+                        return;
+                    }
+                    request.destroy();
+                    promiseSettled = true;
+                    resolve(request.options.resolveBodyOnly ? response.body : response);
+                })();
             });
             let handledFinalError = false;
             const onError = (error) => {
@@ -54228,7 +54230,7 @@ function asPromise(firstRequest) {
             const { options } = globalResponse.request;
             if (responseType === 'text') {
                 const text = decodeUint8Array(globalResponse.rawBody, options.encoding);
-                return (isUtf8Encoding(options.encoding) ? text.replace(/^\uFEFF/u, '') : text);
+                return (isUtf8Encoding(options.encoding) ? text.replace(/^\u{FEFF}/v, '') : text);
             }
             return parseBody(globalResponse, responseType, options.parseJson, options.encoding);
         })();
