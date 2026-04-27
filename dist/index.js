@@ -49945,12 +49945,59 @@ class CacheableLookup {
 // EXTERNAL MODULE: ./node_modules/http2-wrapper/source/index.js
 var source = __nccwpck_require__(4956);
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/parse-link-header.js
+const splitHeaderValue = (value, separator) => {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    let inReference = false;
+    let isEscaped = false;
+    for (const character of value) {
+        if (inQuotes && isEscaped) {
+            current += character;
+            isEscaped = false;
+            continue;
+        }
+        if (inQuotes && character === '\\') {
+            current += character;
+            isEscaped = true;
+            continue;
+        }
+        if (character === '"') {
+            inQuotes = !inQuotes;
+            current += character;
+            continue;
+        }
+        if (!inQuotes && character === '<') {
+            inReference = true;
+            current += character;
+            continue;
+        }
+        if (!inQuotes && character === '>') {
+            inReference = false;
+            current += character;
+            continue;
+        }
+        // Link headers use both quoted strings and <URI-reference> values, so raw
+        // splitting on `,` / `;` would break valid values containing those characters.
+        if (!inQuotes && !inReference && character === separator) {
+            values.push(current);
+            current = '';
+            continue;
+        }
+        current += character;
+    }
+    if (inQuotes || isEscaped) {
+        throw new Error(`Failed to parse Link header: ${value}`);
+    }
+    values.push(current);
+    return values;
+};
 function parseLinkHeader(link) {
     const parsed = [];
-    const items = link.split(',');
+    const items = splitHeaderValue(link, ',');
     for (const item of items) {
         // https://tools.ietf.org/html/rfc5988#section-5
-        const [rawUriReference, ...rawLinkParameters] = item.split(';');
+        const [rawUriReference, ...rawLinkParameters] = splitHeaderValue(item, ';');
         const trimmedUriReference = rawUriReference.trim();
         // eslint-disable-next-line @typescript-eslint/prefer-string-starts-ends-with
         if (trimmedUriReference[0] !== '<' || trimmedUriReference.at(-1) !== '>') {
@@ -49958,6 +50005,9 @@ function parseLinkHeader(link) {
         }
         const reference = trimmedUriReference.slice(1, -1);
         const parameters = {};
+        if (reference.includes('<') || reference.includes('>')) {
+            throw new Error(`Invalid format of the Link header reference: ${trimmedUriReference}`);
+        }
         if (rawLinkParameters.length === 0) {
             throw new Error(`Unexpected end of Link header parameters: ${rawLinkParameters.join(';')}`);
         }
@@ -51414,6 +51464,35 @@ class Options {
             this.deleteInternalHeader(header);
         }
     }
+    clearUnchangedCookieHeader(previousState, changedState) {
+        if (previousState?.hadCookieJar
+            && this.cookieJar === undefined
+            && !this.isHeaderExplicitlySet('cookie')
+            && !changedState?.has('cookie')
+            && this.headers.cookie === previousState.headers.cookie) {
+            this.deleteInternalHeader('cookie');
+        }
+    }
+    restoreCookieHeader(previousState, headers) {
+        if (!previousState) {
+            return;
+        }
+        if (Object.hasOwn(headers ?? {}, 'cookie')) {
+            return;
+        }
+        if (previousState.cookieWasExplicitlySet) {
+            this.headers.cookie = previousState.headers.cookie;
+            return;
+        }
+        delete this.headers.cookie;
+        if (previousState.headers.cookie !== undefined) {
+            this.setInternalHeader('cookie', previousState.headers.cookie);
+        }
+    }
+    syncCookieHeaderAfterMerge(previousState, headers) {
+        this.restoreCookieHeader(previousState, headers);
+        this.clearUnchangedCookieHeader(previousState);
+    }
     stripUnchangedCrossOriginState(previousState, changedState, { clearBody = true } = {}) {
         const headers = this.getInternalHeaders();
         const url = this.#internals.url;
@@ -52119,6 +52198,8 @@ class Options {
 }
 const snapshotCrossOriginState = (options) => ({
     headers: { ...options.getInternalHeaders() },
+    hadCookieJar: options.cookieJar !== undefined,
+    cookieWasExplicitlySet: options.isHeaderExplicitlySet('cookie'),
     username: options.username,
     password: options.password,
     body: options.body,
@@ -53000,6 +53081,40 @@ class Request extends external_node_stream_.Duplex {
                 }, this));
             }
         });
+        let canFinalizeResponse = false;
+        const handleResponseEnd = () => {
+            if (!canFinalizeResponse
+                || !response.readableEnded) {
+                return;
+            }
+            canFinalizeResponse = false;
+            if (this._stopReading) {
+                return;
+            }
+            // Validate content-length if it was provided
+            // Per RFC 9112: "If the sender closes the connection before the indicated number
+            // of octets are received, the recipient MUST consider the message to be incomplete"
+            if (this._checkContentLengthMismatch()) {
+                return;
+            }
+            this._responseSize = this._downloadedSize;
+            this.emit('downloadProgress', this.downloadProgress);
+            // Publish response end event
+            publishResponseEnd({
+                requestId: this._requestId,
+                url: typedResponse.url,
+                statusCode,
+                bodySize: this._downloadedSize,
+                timings: this.timings,
+            });
+            this.push(null);
+        };
+        if (!shouldFollowRedirect) {
+            // `set-cookie` handling below awaits the cookie jar. A fast response can fully
+            // end during that await, so we need to observe `end` early without completing
+            // the outward stream until cookie handling has finished.
+            response.once('end', handleResponseEnd);
+        }
         const noPipeCookieJarRawBodyPromise = this._noPipe
             && distribution.object(options.cookieJar)
             && !isRedirect
@@ -53103,6 +53218,7 @@ class Request extends external_node_stream_.Duplex {
                     }
                     return changedState;
                 });
+                updatedOptions.clearUnchangedCookieHeader(preHookState, changedState);
                 // If a beforeRedirect hook changed the URL to a different origin,
                 // strip sensitive headers that were preserved for the original origin.
                 // When isDifferentOrigin was already true, headers were already stripped above.
@@ -53111,15 +53227,7 @@ class Request extends external_node_stream_.Duplex {
                     const hookUrl = updatedOptions.url;
                     if (!isSameOrigin(state.url, hookUrl)) {
                         this._stripUnchangedCrossOriginState(updatedOptions, hookUrl, shouldDropBody, {
-                            headers: state.headers,
-                            username: state.username,
-                            password: state.password,
-                            body: state.body,
-                            json: state.json,
-                            form: state.form,
-                            bodySnapshot: state.bodySnapshot,
-                            jsonSnapshot: state.jsonSnapshot,
-                            formSnapshot: state.formSnapshot,
+                            ...state,
                             changedState,
                             preserveUsername: hasExplicitCredentialInUrlChange(changedState, hookUrl, 'username')
                                 || isCrossOriginCredentialChanged(state.url, hookUrl, 'username'),
@@ -53145,6 +53253,8 @@ class Request extends external_node_stream_.Duplex {
             }
             return;
         }
+        canFinalizeResponse = true;
+        handleResponseEnd();
         // `HTTPError`s always have `error.response.body` defined.
         // Therefore, we cannot retry if `options.throwHttpErrors` is false.
         // On the last retry, if `options.throwHttpErrors` is false, we would need to return the body,
@@ -53169,32 +53279,6 @@ class Request extends external_node_stream_.Duplex {
                 }
             }
         }
-        // Set up end listener AFTER redirect check to avoid emitting progress for redirect responses
-        let responseEndHandled = false;
-        const handleResponseEnd = () => {
-            if (responseEndHandled) {
-                return;
-            }
-            responseEndHandled = true;
-            // Validate content-length if it was provided
-            // Per RFC 9112: "If the sender closes the connection before the indicated number
-            // of octets are received, the recipient MUST consider the message to be incomplete"
-            if (this._checkContentLengthMismatch()) {
-                return;
-            }
-            this._responseSize = this._downloadedSize;
-            this.emit('downloadProgress', this.downloadProgress);
-            // Publish response end event
-            publishResponseEnd({
-                requestId: this._requestId,
-                url: typedResponse.url,
-                statusCode,
-                bodySize: this._downloadedSize,
-                timings: this.timings,
-            });
-            this.push(null);
-        };
-        response.once('end', handleResponseEnd);
         this.emit('downloadProgress', this.downloadProgress);
         response.on('readable', () => {
             if (this._triggerRead) {
@@ -53800,17 +53884,46 @@ class Request extends external_node_stream_.Duplex {
     }
     async _makeRequest() {
         const { options } = this;
-        const headers = options.getInternalHeaders();
-        const { username, password } = options;
-        const cookieJar = options.cookieJar;
-        for (const key in headers) {
-            if (distribution.undefined(headers[key])) {
-                options.deleteInternalHeader(key);
+        const initialHeaders = options.getInternalHeaders();
+        const explicitAuthorizationHeader = options.isHeaderExplicitlySet('authorization') ? initialHeaders.authorization : undefined;
+        const explicitCookieHeader = options.isHeaderExplicitlySet('cookie') ? initialHeaders.cookie : undefined;
+        const authorizationWasInitiallyOmitted = options.isHeaderExplicitlySet('authorization') && distribution.undefined(initialHeaders.authorization);
+        const cookieWasInitiallyOmitted = options.isHeaderExplicitlySet('cookie') && distribution.undefined(initialHeaders.cookie);
+        const shouldDeleteGeneratedHeader = (currentHeader, generatedHeader) => currentHeader === generatedHeader || distribution.undefined(currentHeader);
+        const syncGeneratedHeader = (name, { currentHeader, explicitHeader, nextHeader, staleGeneratedHeader, }) => {
+            if (!distribution.undefined(nextHeader)) {
+                options.setInternalHeader(name, nextHeader);
             }
-            else if (distribution.null(headers[key])) {
-                throw new TypeError(`Use \`undefined\` instead of \`null\` to delete the \`${key}\` header`);
+            else if (!distribution.undefined(explicitHeader) && currentHeader === staleGeneratedHeader) {
+                options.setInternalHeader(name, explicitHeader);
             }
-        }
+            else if (shouldDeleteGeneratedHeader(currentHeader, staleGeneratedHeader)) {
+                options.deleteInternalHeader(name);
+            }
+        };
+        const getAuthorizationHeader = (username, password, isExplicitlyOmitted) => !isExplicitlyOmitted && (username || password)
+            ? `Basic ${stringToBase64(`${username}:${password}`)}`
+            : undefined;
+        const sanitizeHeaders = () => {
+            const currentHeaders = options.getInternalHeaders();
+            for (const key in currentHeaders) {
+                if (distribution.undefined(currentHeaders[key])) {
+                    options.deleteInternalHeader(key);
+                }
+                else if (distribution.null(currentHeaders[key])) {
+                    throw new TypeError(`Use \`undefined\` instead of \`null\` to delete the \`${key}\` header`);
+                }
+            }
+            return currentHeaders;
+        };
+        const getCookieHeader = async (cookieJar) => {
+            if (!cookieJar) {
+                return undefined;
+            }
+            const cookieString = await cookieJar.getCookieString(options.url.toString());
+            return distribution.nonEmptyString(cookieString) ? cookieString : undefined;
+        };
+        const headers = sanitizeHeaders();
         if (options.decompress && distribution.undefined(headers['accept-encoding'])) {
             const encodings = ['gzip', 'deflate'];
             if (supportsBrotli) {
@@ -53821,34 +53934,93 @@ class Request extends external_node_stream_.Duplex {
             }
             options.setInternalHeader('accept-encoding', encodings.join(', '));
         }
-        if (username || password) {
-            const credentials = stringToBase64(`${username}:${password}`);
-            options.setInternalHeader('authorization', `Basic ${credentials}`);
+        const { username, password } = options;
+        const cookieJar = options.cookieJar;
+        const generatedAuthorizationHeader = getAuthorizationHeader(username, password, authorizationWasInitiallyOmitted);
+        let generatedCookieHeader;
+        if (!distribution.undefined(generatedAuthorizationHeader)) {
+            options.setInternalHeader('authorization', generatedAuthorizationHeader);
         }
-        // Set cookies
-        if (cookieJar) {
-            const cookieString = await cookieJar.getCookieString(options.url.toString());
-            if (distribution.nonEmptyString(cookieString)) {
-                options.setInternalHeader('cookie', cookieString);
+        if (!cookieWasInitiallyOmitted) {
+            generatedCookieHeader = await getCookieHeader(cookieJar);
+            if (!distribution.undefined(generatedCookieHeader)) {
+                options.setInternalHeader('cookie', generatedCookieHeader);
             }
         }
         let request;
-        for (const hook of options.hooks.beforeRequest) {
-            // eslint-disable-next-line no-await-in-loop
-            const result = await hook(options, { retryCount: this.retryCount });
-            if (!distribution.undefined(result)) {
-                // @ts-expect-error Skip the type mismatch to support abstract responses
-                request = () => result;
-                break;
+        let shouldOmitRequestUrlCredentials = false;
+        const changedState = await options.trackStateMutations(async (changedState) => {
+            for (const hook of options.hooks.beforeRequest) {
+                // eslint-disable-next-line no-await-in-loop
+                const result = await hook(options, { retryCount: this.retryCount });
+                if (!distribution.undefined(result)) {
+                    // @ts-expect-error Skip the type mismatch to support abstract responses
+                    request = () => result;
+                    break;
+                }
+            }
+            return changedState;
+        });
+        if (request === undefined) {
+            const currentHeaders = options.getInternalHeaders();
+            // `headers.authorization = undefined` / `headers.cookie = undefined` is an
+            // explicit opt-out. Respect that instead of regenerating values from URL
+            // credentials or the cookie jar later in request setup.
+            const isHeaderExplicitlyOmitted = (header) => options.isHeaderExplicitlySet(header) && distribution.undefined(currentHeaders[header]);
+            const authorizationWasExplicitlyOmitted = isHeaderExplicitlyOmitted('authorization');
+            const cookieWasExplicitlyOmitted = isHeaderExplicitlyOmitted('cookie');
+            const currentAuthorizationHeader = currentHeaders.authorization;
+            const currentCookieHeader = currentHeaders.cookie;
+            sanitizeHeaders();
+            if (!distribution.undefined(currentHeaders['transfer-encoding']) && !distribution.undefined(currentHeaders['content-length'])) {
+                options.deleteInternalHeader('content-length');
+            }
+            if (authorizationWasExplicitlyOmitted) {
+                shouldOmitRequestUrlCredentials = true;
+                options.deleteInternalHeader('authorization');
+                if (changedState.has('authorization') && distribution.undefined(explicitAuthorizationHeader) && !authorizationWasInitiallyOmitted) {
+                    delete options.headers.authorization;
+                }
+            }
+            const authorizationHeader = getAuthorizationHeader(options.username, options.password, authorizationWasExplicitlyOmitted);
+            const cookieJar = options.cookieJar;
+            if (changedState.has('authorization')) {
+                // A beforeRequest hook intentionally set the outgoing Authorization header.
+            }
+            else {
+                syncGeneratedHeader('authorization', {
+                    currentHeader: currentAuthorizationHeader,
+                    explicitHeader: explicitAuthorizationHeader,
+                    nextHeader: authorizationHeader,
+                    staleGeneratedHeader: generatedAuthorizationHeader,
+                });
+            }
+            if (cookieWasExplicitlyOmitted) {
+                options.deleteInternalHeader('cookie');
+                if (changedState.has('cookie') && distribution.undefined(explicitCookieHeader) && !cookieWasInitiallyOmitted) {
+                    delete options.headers.cookie;
+                }
+            }
+            else if (changedState.has('cookie')) {
+                // A beforeRequest hook intentionally set the outgoing Cookie header.
+            }
+            else {
+                syncGeneratedHeader('cookie', {
+                    currentHeader: currentCookieHeader,
+                    explicitHeader: explicitCookieHeader,
+                    nextHeader: await getCookieHeader(cookieJar),
+                    staleGeneratedHeader: generatedCookieHeader,
+                });
             }
         }
-        if (!distribution.undefined(headers['transfer-encoding']) && !distribution.undefined(headers['content-length'])) {
-            // TODO: Throw instead of silently dropping `content-length` in the next major version.
-            options.deleteInternalHeader('content-length');
-        }
         request ??= options.getRequestFunction();
-        const url = options.url;
+        const url = shouldOmitRequestUrlCredentials
+            ? new URL(stripUrlAuth(options.url))
+            : options.url;
         this._requestOptions = options.createNativeRequestOptions();
+        if (shouldOmitRequestUrlCredentials) {
+            this._requestOptions.auth = undefined;
+        }
         if (options.cache) {
             this._requestOptions._request = request;
             this._requestOptions.cache = options.cache;
@@ -54106,12 +54278,18 @@ function asPromise(firstRequest) {
                                     : (Object.hasOwn(updatedOptions, 'body') && updatedOptions.body !== undefined)
                                         || (Object.hasOwn(updatedOptions, 'json') && updatedOptions.json !== undefined)
                                         || (Object.hasOwn(updatedOptions, 'form') && updatedOptions.form !== undefined);
+                                const clearsCookieJar = Object.hasOwn(updatedOptions, 'cookieJar') && updatedOptions.cookieJar === undefined;
                                 if (hasExplicitBody && !reusesRequestOptions) {
                                     options.clearBody();
                                 }
+                                if (!reusesRequestOptions && clearsCookieJar) {
+                                    options.cookieJar = undefined;
+                                }
                                 if (!reusesRequestOptions) {
                                     options.merge(updatedOptions);
+                                    options.syncCookieHeaderAfterMerge(previousState, updatedOptions.headers);
                                 }
+                                options.clearUnchangedCookieHeader(previousState, reusesRequestOptions ? changedState : undefined);
                                 if (updatedOptions.url) {
                                     const nextUrl = reusesRequestOptions
                                         ? options.url
@@ -54443,6 +54621,7 @@ const create_create = (defaults) => {
             }
             if (optionsToMerge === response.request.options) {
                 normalizedOptions = response.request.options;
+                normalizedOptions.clearUnchangedCookieHeader(previousState, changedState);
                 if (previousUrl) {
                     const nextUrl = normalizedOptions.url;
                     if (nextUrl && !isSameOrigin(previousUrl, nextUrl)) {
@@ -54455,10 +54634,15 @@ const create_create = (defaults) => {
                 const hasExplicitBody = (Object.hasOwn(optionsToMerge, 'body') && optionsToMerge.body !== undefined)
                     || (Object.hasOwn(optionsToMerge, 'json') && optionsToMerge.json !== undefined)
                     || (Object.hasOwn(optionsToMerge, 'form') && optionsToMerge.form !== undefined);
+                const clearsCookieJar = Object.hasOwn(optionsToMerge, 'cookieJar') && optionsToMerge.cookieJar === undefined;
                 if (hasExplicitBody) {
                     normalizedOptions.clearBody();
                 }
+                if (clearsCookieJar) {
+                    normalizedOptions.cookieJar = undefined;
+                }
                 normalizedOptions.merge(optionsToMerge);
+                normalizedOptions.syncCookieHeaderAfterMerge(previousState, optionsToMerge.headers);
                 try {
                     assert.any([distribution.string, distribution.urlInstance, distribution.undefined], optionsToMerge.url);
                 }
