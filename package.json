@@ -34,7 +34,7 @@
   "author": "Mike Penz",
   "license": "Apache 2.0",
   "dependencies": {
-    "@actions/core": "3.0.0",
+    "@actions/core": "3.0.1",
     "@actions/glob": "0.6.1",
     "@supercharge/promise-pool": "3.3.0",
     "form-data": "4.0.5",
