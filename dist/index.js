@@ -44684,6 +44684,7 @@ function isPrimitiveTypeName(name) {
     return primitiveTypeNames.includes(name);
 }
 const assertionTypeDescriptions = [
+    'bound Function',
     'positive number',
     'negative number',
     'Class',
@@ -44718,7 +44719,13 @@ const assertionTypeDescriptions = [
     'non-empty map',
     'PropertyKey',
     'even integer',
+    'finite number',
+    'negative integer',
+    'non-negative integer',
+    'non-negative number',
     'odd integer',
+    'positive integer',
+    'safe integer',
     'T',
     'in range',
     'predicate returns truthy for any value',
@@ -44731,7 +44738,7 @@ const assertionTypeDescriptions = [
 ];
 const getObjectType = (value) => {
     const objectTypeName = Object.prototype.toString.call(value).slice(8, -1);
-    if (/HTML\w+Element/.test(objectTypeName) && isHtmlElement(value)) {
+    if (/HTML\w+Element/v.test(objectTypeName) && isHtmlElement(value)) {
         return 'HTMLElement';
     }
     if (isObjectTypeName(objectTypeName)) {
@@ -44743,6 +44750,7 @@ function detect(value) {
     if (value === null) {
         return 'null';
     }
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
     switch (typeof value) {
         case 'undefined': {
             return 'undefined';
@@ -44777,13 +44785,13 @@ function detect(value) {
         return 'Buffer';
     }
     const tagType = getObjectType(value);
-    if (tagType && tagType !== 'Object') {
+    if (tagType !== undefined && tagType !== 'Object') {
         return tagType;
     }
     if (hasPromiseApi(value)) {
         return 'Promise';
     }
-    if (value instanceof String || value instanceof Boolean || value instanceof Number) {
+    if (isBoxedPrimitiveObject(value)) {
         throw new TypeError('Please don\'t use object wrappers for primitive types');
     }
     return 'Object';
@@ -44791,12 +44799,29 @@ function detect(value) {
 function hasPromiseApi(value) {
     return isFunction(value?.then) && isFunction(value?.catch);
 }
+function hasBoxedPrimitiveBrand(value, valueOf) {
+    try {
+        // `Object.prototype.toString` can be spoofed via `Symbol.toStringTag`, but the
+        // boxed primitive `valueOf` methods still enforce the real internal brand.
+        Reflect.apply(valueOf, value, []);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+function isBoxedPrimitiveObject(value) {
+    return hasBoxedPrimitiveBrand(value, String.prototype.valueOf)
+        || hasBoxedPrimitiveBrand(value, Boolean.prototype.valueOf)
+        || hasBoxedPrimitiveBrand(value, Number.prototype.valueOf);
+}
 const is = Object.assign(detect, {
     all: isAll,
     any: isAny,
     array: isArray,
     arrayBuffer: isArrayBuffer,
     arrayLike: isArrayLike,
+    arrayOf: isArrayOf,
     asyncFunction: isAsyncFunction,
     asyncGenerator: isAsyncGenerator,
     asyncGeneratorFunction: isAsyncGeneratorFunction,
@@ -44823,6 +44848,7 @@ const is = Object.assign(detect, {
     error: isError,
     evenInteger: isEvenInteger,
     falsy: isFalsy,
+    finiteNumber: isFiniteNumber,
     float32Array: isFloat32Array,
     float64Array: isFloat64Array,
     formData: isFormData,
@@ -44840,6 +44866,7 @@ const is = Object.assign(detect, {
     map: isMap,
     nan: isNan,
     nativePromise: isNativePromise,
+    negativeInteger: isNegativeInteger,
     negativeNumber: isNegativeNumber,
     nodeStream: isNodeStream,
     nonEmptyArray: isNonEmptyArray,
@@ -44848,6 +44875,8 @@ const is = Object.assign(detect, {
     nonEmptySet: isNonEmptySet,
     nonEmptyString: isNonEmptyString,
     nonEmptyStringAndNotWhitespace: isNonEmptyStringAndNotWhitespace,
+    nonNegativeInteger: isNonNegativeInteger,
+    nonNegativeNumber: isNonNegativeNumber,
     null: isNull,
     nullOrUndefined: isNullOrUndefined,
     number: isNumber,
@@ -44855,7 +44884,9 @@ const is = Object.assign(detect, {
     object: isObject,
     observable: isObservable,
     oddInteger: isOddInteger,
+    oneOf: isOneOf,
     plainObject: isPlainObject,
+    positiveInteger: isPositiveInteger,
     positiveNumber: isPositiveNumber,
     primitive: isPrimitive,
     promise: isPromise,
@@ -44900,9 +44931,12 @@ function validatePredicateArray(predicateArray, allowEmpty) {
         return;
     }
     for (const predicate of predicateArray) {
-        if (!isFunction(predicate)) {
-            throw new TypeError(`Invalid predicate: ${JSON.stringify(predicate)}`);
-        }
+        validatePredicate(predicate);
+    }
+}
+function validatePredicate(predicate) {
+    if (!isFunction(predicate)) {
+        throw new TypeError(`Invalid predicate: ${JSON.stringify(predicate)}`);
     }
 }
 function isAll(predicate, ...values) {
@@ -44948,6 +44982,9 @@ function isArrayBuffer(value) {
 function isArrayLike(value) {
     return !isNullOrUndefined(value) && !isFunction(value) && isValidLength(value.length);
 }
+function isArrayOf(predicate) {
+    return (value) => isArray(value) && value.every(element => predicate(element));
+}
 function isAsyncFunction(value) {
     return getObjectType(value) === 'AsyncFunction';
 }
@@ -44975,7 +45012,7 @@ function isBlob(value) {
 function isBoolean(value) {
     return value === true || value === false;
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function isBoundFunction(value) {
     return isFunction(value) && !Object.hasOwn(value, 'prototype');
 }
@@ -44983,11 +45020,11 @@ function isBoundFunction(value) {
 Note: [Prefer using `Uint8Array` instead of `Buffer`.](https://sindresorhus.com/blog/goodbye-nodejs-buffer)
 */
 function isBuffer(value) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return value?.constructor?.isBuffer?.(value) ?? false;
 }
 function isClass(value) {
-    return isFunction(value) && /^class(\s+|{)/.test(value.toString());
+    return isFunction(value) && /^class(?:\s+|\{)/v.test(value.toString());
 }
 function isDataView(value) {
     return getObjectType(value) === 'DataView';
@@ -45008,7 +45045,7 @@ function isEmptyMap(value) {
     return isMap(value) && value.size === 0;
 }
 function isEmptyObject(value) {
-    return isObject(value) && !isMap(value) && !isSet(value) && Object.keys(value).length === 0;
+    return isObject(value) && !isFunction(value) && !isArray(value) && !isMap(value) && !isSet(value) && Object.keys(value).length === 0;
 }
 function isEmptySet(value) {
     return isSet(value) && value.size === 0;
@@ -45020,11 +45057,21 @@ function isEmptyStringOrWhitespace(value) {
     return isEmptyString(value) || isWhitespaceString(value);
 }
 function isEnumCase(value, targetEnum) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    return Object.values(targetEnum).includes(value);
+    // Numeric enums have reverse mappings (e.g. `Direction[0] = "Up"`), so their runtime object contains both `{ Up: 0 }` and `{ "0": "Up" }`. Filtering out entries that round-trip like a canonical number and point back to an own property leaves only actual enum member values.
+    const enumObject = targetEnum;
+    return Object.entries(enumObject).some(([key, enumValue]) => {
+        if (!isString(enumValue)) {
+            return enumValue === value;
+        }
+        const numericKey = Number(key);
+        if (Number.isNaN(numericKey) || String(numericKey) !== key) {
+            return enumValue === value;
+        }
+        return enumValue === value && !(Object.hasOwn(enumObject, enumValue) && enumObject[enumValue] === numericKey);
+    });
 }
 function isError(value) {
-    // TODO: Use `Error.isError` when targeting Node.js 24.`
+    // TODO: Use `Error.isError` when targeting Node.js 24.
     return getObjectType(value) === 'Error';
 }
 function isEvenInteger(value) {
@@ -45033,6 +45080,9 @@ function isEvenInteger(value) {
 // Example: `is.falsy = (value: unknown): value is (not true | 0 | '' | undefined | null) => Boolean(value);`
 function isFalsy(value) {
     return !value;
+}
+function isFiniteNumber(value) {
+    return Number.isFinite(value);
 }
 // TODO: Support detecting Float16Array when targeting Node.js 24.
 function isFloat32Array(value) {
@@ -45044,7 +45094,7 @@ function isFloat64Array(value) {
 function isFormData(value) {
     return getObjectType(value) === 'FormData';
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function isFunction(value) {
     return typeof value === 'function';
 }
@@ -45054,9 +45104,7 @@ function isGenerator(value) {
 function isGeneratorFunction(value) {
     return getObjectType(value) === 'GeneratorFunction';
 }
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const NODE_TYPE_ELEMENT = 1;
-// eslint-disable-next-line @typescript-eslint/naming-convention
+const NODE_TYPE_ELEMENT = 1; // eslint-disable-line @typescript-eslint/naming-convention
 const DOM_PROPERTIES_TO_CHECK = [
     'innerHTML',
     'ownerDocument',
@@ -45079,6 +45127,9 @@ function isInRange(value, range) {
         return value >= Math.min(0, range) && value <= Math.max(range, 0);
     }
     if (isArray(range) && range.length === 2) {
+        if (Number.isNaN(range[0]) || Number.isNaN(range[1])) {
+            throw new TypeError(`Invalid range: ${JSON.stringify(range)}`);
+        }
         return value >= Math.min(...range) && value <= Math.max(...range);
     }
     throw new TypeError(`Invalid range: ${JSON.stringify(range)}`);
@@ -45107,6 +45158,9 @@ function isNan(value) {
 function isNativePromise(value) {
     return getObjectType(value) === 'Promise';
 }
+function isNegativeInteger(value) {
+    return isInteger(value) && value < 0;
+}
 function isNegativeNumber(value) {
     return isNumber(value) && value < 0;
 }
@@ -45122,7 +45176,7 @@ function isNonEmptyMap(value) {
 // TODO: Use `not` operator here to remove `Map` and `Set` from type guard:
 // - https://github.com/Microsoft/TypeScript/pull/29317
 function isNonEmptyObject(value) {
-    return isObject(value) && !isMap(value) && !isSet(value) && Object.keys(value).length > 0;
+    return isObject(value) && !isFunction(value) && !isArray(value) && !isMap(value) && !isSet(value) && Object.keys(value).length > 0;
 }
 function isNonEmptySet(value) {
     return isSet(value) && value.size > 0;
@@ -45135,11 +45189,17 @@ function isNonEmptyString(value) {
 function isNonEmptyStringAndNotWhitespace(value) {
     return isString(value) && !isEmptyStringOrWhitespace(value);
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+function isNonNegativeInteger(value) {
+    return isInteger(value) && value >= 0;
+}
+function isNonNegativeNumber(value) {
+    return isNumber(value) && value >= 0;
+}
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isNull(value) {
     return value === null;
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isNullOrUndefined(value) {
     return isNull(value) || isUndefined(value);
 }
@@ -45147,9 +45207,9 @@ function isNumber(value) {
     return typeof value === 'number' && !Number.isNaN(value);
 }
 function isNumericString(value) {
-    return isString(value) && !isEmptyStringOrWhitespace(value) && !Number.isNaN(Number(value));
+    return isString(value) && !isEmptyStringOrWhitespace(value) && value === value.trim() && !Number.isNaN(Number(value));
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isObject(value) {
     return !isNull(value) && (typeof value === 'object' || isFunction(value));
 }
@@ -45157,11 +45217,11 @@ function isObservable(value) {
     if (!value) {
         return false;
     }
-    // eslint-disable-next-line no-use-extend-native/no-use-extend-native, @typescript-eslint/no-unsafe-call
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     if (Symbol.observable !== undefined && value === value[Symbol.observable]?.()) {
         return true;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     if (value === value['@@observable']?.()) {
         return true;
     }
@@ -45169,6 +45229,9 @@ function isObservable(value) {
 }
 function isOddInteger(value) {
     return isAbsoluteModule2(1)(value);
+}
+function isOneOf(values) {
+    return (value) => values.includes(value);
 }
 function isPlainObject(value) {
     // From: https://github.com/sindresorhus/is-plain-obj/blob/main/index.js
@@ -45179,6 +45242,9 @@ function isPlainObject(value) {
     const prototype = Object.getPrototypeOf(value);
     return (prototype === null || prototype === Object.prototype || Object.getPrototypeOf(prototype) === null) && !(Symbol.toStringTag in value) && !(Symbol.iterator in value);
 }
+function isPositiveInteger(value) {
+    return isInteger(value) && value > 0;
+}
 function isPositiveNumber(value) {
     return isNumber(value) && value > 0;
 }
@@ -45188,7 +45254,7 @@ function isPrimitive(value) {
 function isPromise(value) {
     return isNativePromise(value) || hasPromiseApi(value);
 }
-// `PropertyKey` is any value that can be used as an object key (string, number, or symbol)
+// `PropertyKey` is any value that can be used as an object key (string, number, or symbol). Note: NaN is technically `typeof 'number'` and thus fits TypeScript's `PropertyKey`, but we intentionally exclude it here because using NaN as a property key is almost always a mistake.
 function isPropertyKey(value) {
     return isAny([isString, isNumber, isSymbol], value);
 }
@@ -45264,25 +45330,23 @@ function isValidDate(value) {
 function isValidLength(value) {
     return isSafeInteger(value) && value >= 0;
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isWeakMap(value) {
     return getObjectType(value) === 'WeakMap';
 }
-// eslint-disable-next-line @typescript-eslint/ban-types, unicorn/prevent-abbreviations
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isWeakRef(value) {
     return getObjectType(value) === 'WeakRef';
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function isWeakSet(value) {
     return getObjectType(value) === 'WeakSet';
 }
 function isWhitespaceString(value) {
-    return isString(value) && /^\s+$/.test(value);
+    return isString(value) && /^\s+$/v.test(value);
 }
 function predicateOnArray(method, predicate, values) {
-    if (!isFunction(predicate)) {
-        throw new TypeError(`Invalid predicate: ${JSON.stringify(predicate)}`);
-    }
+    validatePredicate(predicate);
     if (values.length === 0) {
         throw new TypeError('Invalid number of values');
     }
@@ -45290,6 +45354,9 @@ function predicateOnArray(method, predicate, values) {
 }
 function typeErrorMessage(description, value) {
     return `Expected value which is \`${description}\`, received value of type \`${is(value)}\`.`;
+}
+function typeErrorMessageNot(description, value) {
+    return `Expected value which is not \`${description}\`, received value of type \`${is(value)}\`.`;
 }
 function unique(values) {
     // eslint-disable-next-line unicorn/prefer-spread
@@ -45302,9 +45369,41 @@ function typeErrorMessageMultipleValues(expectedType, values) {
     const uniqueValueTypes = unique(values.map(value => `\`${is(value)}\``));
     return `Expected values which are ${orFormatter.format(uniqueExpectedTypes)}. Received values of type${uniqueValueTypes.length > 1 ? 's' : ''} ${andFormatter.format(uniqueValueTypes)}.`;
 }
+// Negative assertions are limited to types where the assertion rejects every TypeScript value assignable to the forbidden type. Structural object types such as `Map`, `Set`, `Date`, and `Array` are excluded because TypeScript accepts shape-compatible mocks while the runtime checks use object brands, so `Exclude` would narrow values that can pass the negative assertion.
+function createAssertNot(predicate, description) {
+    return (value, message) => {
+        if (predicate(value)) {
+            throw new TypeError(message ?? typeErrorMessageNot(description, value));
+        }
+    };
+}
+const assertNotUndefined = createAssertNot(isUndefined, 'undefined');
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
+const assertNotNull = createAssertNot(isNull, 'null');
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
+const assertNotNullOrUndefined 
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
+= createAssertNot(isNullOrUndefined, 'null or undefined');
+const assertNotString = createAssertNot(isString, 'string');
+const assertNotBoolean = createAssertNot(isBoolean, 'boolean');
+const assertNotSymbol = createAssertNot(isSymbol, 'symbol');
+const assertNotBigint = createAssertNot(isBigint, 'bigint');
+const assertNotPrimitive = createAssertNot(isPrimitive, 'primitive'); // eslint-disable-line @typescript-eslint/no-restricted-types
+// We intentionally do not support `assert.not(is.undefined, value)`. TypeScript cannot derive safe complement types from arbitrary predicates, and many predicates here are refinements (for example, `is.number` rejects `NaN`). Explicit methods keep runtime checks and type narrowing aligned.
+const notAssertions = {
+    bigint: assertNotBigint,
+    boolean: assertNotBoolean,
+    null: assertNotNull,
+    nullOrUndefined: assertNotNullOrUndefined,
+    primitive: assertNotPrimitive,
+    string: assertNotString,
+    symbol: assertNotSymbol,
+    undefined: assertNotUndefined,
+};
 const assert = {
     all: assertAll,
     any: assertAny,
+    not: notAssertions,
     optional: assertOptional,
     array: assertArray,
     arrayBuffer: assertArrayBuffer,
@@ -45334,6 +45433,7 @@ const assert = {
     error: assertError,
     evenInteger: assertEvenInteger,
     falsy: assertFalsy,
+    finiteNumber: assertFiniteNumber,
     float32Array: assertFloat32Array,
     float64Array: assertFloat64Array,
     formData: assertFormData,
@@ -45351,6 +45451,7 @@ const assert = {
     map: assertMap,
     nan: assertNan,
     nativePromise: assertNativePromise,
+    negativeInteger: assertNegativeInteger,
     negativeNumber: assertNegativeNumber,
     nodeStream: assertNodeStream,
     nonEmptyArray: assertNonEmptyArray,
@@ -45359,6 +45460,8 @@ const assert = {
     nonEmptySet: assertNonEmptySet,
     nonEmptyString: assertNonEmptyString,
     nonEmptyStringAndNotWhitespace: assertNonEmptyStringAndNotWhitespace,
+    nonNegativeInteger: assertNonNegativeInteger,
+    nonNegativeNumber: assertNonNegativeNumber,
     null: assertNull,
     nullOrUndefined: assertNullOrUndefined,
     number: assertNumber,
@@ -45367,6 +45470,7 @@ const assert = {
     observable: assertObservable,
     oddInteger: assertOddInteger,
     plainObject: assertPlainObject,
+    positiveInteger: assertPositiveInteger,
     positiveNumber: assertPositiveNumber,
     primitive: assertPrimitive,
     promise: assertPromise,
@@ -45408,7 +45512,7 @@ const methodTypeMap = {
     isBigUint64Array: 'BigUint64Array',
     isBlob: 'Blob',
     isBoolean: 'boolean',
-    isBoundFunction: 'Function',
+    isBoundFunction: 'bound Function',
     isBuffer: 'Buffer',
     isClass: 'Class',
     isDataView: 'DataView',
@@ -45424,6 +45528,7 @@ const methodTypeMap = {
     isError: 'Error',
     isEvenInteger: 'even integer',
     isFalsy: 'falsy',
+    isFiniteNumber: 'finite number',
     isFloat32Array: 'Float32Array',
     isFloat64Array: 'Float64Array',
     isFormData: 'FormData',
@@ -45441,6 +45546,7 @@ const methodTypeMap = {
     isMap: 'Map',
     isNan: 'NaN',
     isNativePromise: 'native Promise',
+    isNegativeInteger: 'negative integer',
     isNegativeNumber: 'negative number',
     isNodeStream: 'Node.js Stream',
     isNonEmptyArray: 'non-empty array',
@@ -45449,6 +45555,8 @@ const methodTypeMap = {
     isNonEmptySet: 'non-empty set',
     isNonEmptyString: 'non-empty string',
     isNonEmptyStringAndNotWhitespace: 'non-empty string and not whitespace',
+    isNonNegativeInteger: 'non-negative integer',
+    isNonNegativeNumber: 'non-negative number',
     isNull: 'null',
     isNullOrUndefined: 'null or undefined',
     isNumber: 'number',
@@ -45457,12 +45565,13 @@ const methodTypeMap = {
     isObservable: 'Observable',
     isOddInteger: 'odd integer',
     isPlainObject: 'plain object',
+    isPositiveInteger: 'positive integer',
     isPositiveNumber: 'positive number',
     isPrimitive: 'primitive',
     isPromise: 'Promise',
     isPropertyKey: 'PropertyKey',
     isRegExp: 'RegExp',
-    isSafeInteger: 'integer',
+    isSafeInteger: 'safe integer',
     isSet: 'Set',
     isSharedArrayBuffer: 'SharedArrayBuffer',
     isString: 'string',
@@ -45535,7 +45644,7 @@ function assertArrayLike(value, message) {
         throw new TypeError(message ?? typeErrorMessage('array-like', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function assertAsyncFunction(value, message) {
     if (!isAsyncFunction(value)) {
         throw new TypeError(message ?? typeErrorMessage('AsyncFunction', value));
@@ -45581,10 +45690,10 @@ function assertBoolean(value, message) {
         throw new TypeError(message ?? typeErrorMessage('boolean', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function assertBoundFunction(value, message) {
     if (!isBoundFunction(value)) {
-        throw new TypeError(message ?? typeErrorMessage('Function', value));
+        throw new TypeError(message ?? typeErrorMessage('bound Function', value));
     }
 }
 /**
@@ -45665,6 +45774,11 @@ function assertFalsy(value, message) {
         throw new TypeError(message ?? typeErrorMessage('falsy', value));
     }
 }
+function assertFiniteNumber(value, message) {
+    if (!isFiniteNumber(value)) {
+        throw new TypeError(message ?? typeErrorMessage('finite number', value));
+    }
+}
 function assertFloat32Array(value, message) {
     if (!isFloat32Array(value)) {
         throw new TypeError(message ?? typeErrorMessage('Float32Array', value));
@@ -45680,7 +45794,7 @@ function assertFormData(value, message) {
         throw new TypeError(message ?? typeErrorMessage('FormData', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function assertFunction(value, message) {
     if (!isFunction(value)) {
         throw new TypeError(message ?? typeErrorMessage('Function', value));
@@ -45751,6 +45865,11 @@ function assertNativePromise(value, message) {
         throw new TypeError(message ?? typeErrorMessage('native Promise', value));
     }
 }
+function assertNegativeInteger(value, message) {
+    if (!isNegativeInteger(value)) {
+        throw new TypeError(message ?? typeErrorMessage('negative integer', value));
+    }
+}
 function assertNegativeNumber(value, message) {
     if (!isNegativeNumber(value)) {
         throw new TypeError(message ?? typeErrorMessage('negative number', value));
@@ -45791,13 +45910,23 @@ function assertNonEmptyStringAndNotWhitespace(value, message) {
         throw new TypeError(message ?? typeErrorMessage('non-empty string and not whitespace', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+function assertNonNegativeInteger(value, message) {
+    if (!isNonNegativeInteger(value)) {
+        throw new TypeError(message ?? typeErrorMessage('non-negative integer', value));
+    }
+}
+function assertNonNegativeNumber(value, message) {
+    if (!isNonNegativeNumber(value)) {
+        throw new TypeError(message ?? typeErrorMessage('non-negative number', value));
+    }
+}
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertNull(value, message) {
     if (!isNull(value)) {
         throw new TypeError(message ?? typeErrorMessage('null', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertNullOrUndefined(value, message) {
     if (!isNullOrUndefined(value)) {
         throw new TypeError(message ?? typeErrorMessage('null or undefined', value));
@@ -45813,7 +45942,7 @@ function assertNumericString(value, message) {
         throw new TypeError(message ?? typeErrorMessage('string with a number', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertObject(value, message) {
     if (!isObject(value)) {
         throw new TypeError(message ?? typeErrorMessage('Object', value));
@@ -45832,6 +45961,11 @@ function assertOddInteger(value, message) {
 function assertPlainObject(value, message) {
     if (!isPlainObject(value)) {
         throw new TypeError(message ?? typeErrorMessage('plain object', value));
+    }
+}
+function assertPositiveInteger(value, message) {
+    if (!isPositiveInteger(value)) {
+        throw new TypeError(message ?? typeErrorMessage('positive integer', value));
     }
 }
 function assertPositiveNumber(value, message) {
@@ -45861,7 +45995,7 @@ function assertRegExp(value, message) {
 }
 function assertSafeInteger(value, message) {
     if (!isSafeInteger(value)) {
-        throw new TypeError(message ?? typeErrorMessage('integer', value));
+        throw new TypeError(message ?? typeErrorMessage('safe integer', value));
     }
 }
 function assertSet(value, message) {
@@ -45950,19 +46084,19 @@ function assertValidLength(value, message) {
         throw new TypeError(message ?? typeErrorMessage('valid length', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertWeakMap(value, message) {
     if (!isWeakMap(value)) {
         throw new TypeError(message ?? typeErrorMessage('WeakMap', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types, unicorn/prevent-abbreviations
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertWeakRef(value, message) {
     if (!isWeakRef(value)) {
         throw new TypeError(message ?? typeErrorMessage('WeakRef', value));
     }
 }
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 function assertWeakSet(value, message) {
     if (!isWeakSet(value)) {
         throw new TypeError(message ?? typeErrorMessage('WeakSet', value));
@@ -49046,6 +49180,10 @@ const deferToConnect = (socket, fn) => {
 
 
 
+const getInitialConnectionTimings = (socket) => Reflect.get(socket, '__initial_connection_timings__');
+const setInitialConnectionTimings = (socket, timings) => {
+    Reflect.set(socket, '__initial_connection_timings__', timings);
+};
 const timer = (request) => {
     if (request.timings) {
         return request.timings;
@@ -49103,11 +49241,12 @@ const timer = (request) => {
             // original connection so they're not lost.
             timings.lookup = timings.socket;
             timings.connect = timings.socket;
-            if (socket.__initial_connection_timings__) {
+            const initialConnectionTimings = getInitialConnectionTimings(socket);
+            if (initialConnectionTimings) {
                 // Restore the phase timings from the initial connection
-                timings.phases.dns = socket.__initial_connection_timings__.dnsPhase;
-                timings.phases.tcp = socket.__initial_connection_timings__.tcpPhase;
-                timings.phases.tls = socket.__initial_connection_timings__.tlsPhase;
+                timings.phases.dns = initialConnectionTimings.dnsPhase;
+                timings.phases.tcp = initialConnectionTimings.tcpPhase;
+                timings.phases.tls = initialConnectionTimings.tlsPhase;
                 // Set secureConnect timestamp if there was TLS
                 if (timings.phases.tls !== undefined) {
                     timings.secureConnect = timings.socket;
@@ -49145,18 +49284,21 @@ const timer = (request) => {
                     timings.phases.dns = 0;
                 }
                 // Store connection phase timings on socket for potential reuse
-                socket.__initial_connection_timings__ ??= {
-                    dnsPhase: timings.phases.dns,
-                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript can't prove this is defined due to callback structure
-                    tcpPhase: timings.phases.tcp,
-                };
+                if (!getInitialConnectionTimings(socket)) {
+                    setInitialConnectionTimings(socket, {
+                        dnsPhase: timings.phases.dns,
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript can't prove this is defined due to callback structure
+                        tcpPhase: timings.phases.tcp,
+                    });
+                }
             },
             secureConnect() {
                 timings.secureConnect = Date.now();
                 timings.phases.tls = timings.secureConnect - timings.connect;
                 // Update stored timings with TLS phase timing
-                if (socket.__initial_connection_timings__) {
-                    socket.__initial_connection_timings__.tlsPhase = timings.phases.tls;
+                const initialConnectionTimings = getInitialConnectionTimings(socket);
+                if (initialConnectionTimings) {
+                    initialConnectionTimings.tlsPhase = timings.phases.tls;
                 }
             },
         });
@@ -50151,13 +50293,14 @@ function assertValidHeaderName(name) {
 Safely assign own properties from source to target, skipping `__proto__` to prevent prototype pollution from JSON.parse'd input.
 */
 function safeObjectAssign(target, source) {
-    for (const key of Object.keys(source)) {
+    for (const [key, value] of Object.entries(source)) {
         if (key === '__proto__') {
             continue;
         }
-        target[key] = source[key];
+        Reflect.set(target, key, value);
     }
 }
+const isToughCookieJar = (cookieJar) => cookieJar.setCookie.length === 4 && cookieJar.getCookieString.length === 0;
 function validateSearchParameters(searchParameters) {
     for (const key of Object.keys(searchParameters)) {
         if (key === '__proto__') {
@@ -50974,10 +51117,10 @@ class Options {
         assert.function(setCookie);
         assert.function(getCookieString);
         /* istanbul ignore next: Horrible `tough-cookie` v3 check */
-        if (setCookie.length === 4 && getCookieString.length === 0) {
+        if (isToughCookieJar(value)) {
             this.#internals.cookieJar = {
-                setCookie: (0,external_node_util_.promisify)(setCookie.bind(value)),
-                getCookieString: (0,external_node_util_.promisify)(getCookieString.bind(value)),
+                setCookie: (0,external_node_util_.promisify)(value.setCookie.bind(value)),
+                getCookieString: (0,external_node_util_.promisify)(value.getCookieString.bind(value)),
             };
         }
         else {
@@ -52381,6 +52524,11 @@ function publishRedirect(message) {
 const supportsBrotli = distribution.string(external_node_process_namespaceObject.versions.brotli);
 const core_supportsZstd = distribution.string(external_node_process_namespaceObject.versions.zstd);
 const methodsWithoutBody = new Set(['GET', 'HEAD']);
+const singleValueRequestHeaders = new Set([
+    'authorization',
+    'content-length',
+    'proxy-authorization',
+]);
 const cacheableStore = new WeakableMap();
 const redirectCodes = new Set([301, 302, 303, 307, 308]);
 
@@ -52569,24 +52717,6 @@ class Request extends external_node_stream_.Duplex {
         if (distribution.nodeStream(body)) {
             body.once('error', this._onBodyError);
         }
-        if (this.options.signal) {
-            const abort = () => {
-                // See https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static#return_value
-                if (this.options.signal?.reason?.name === 'TimeoutError') {
-                    this.destroy(new TimeoutError(this.options.signal.reason, this.timings, this));
-                }
-                else {
-                    this.destroy(new AbortError(this));
-                }
-            };
-            if (this.options.signal.aborted) {
-                abort();
-            }
-            else {
-                const abortListenerDisposer = (0,external_node_events_.addAbortListener)(this.options.signal, abort);
-                this._abortListenerDisposer = abortListenerDisposer;
-            }
-        }
     }
     async flush() {
         if (this._flushed) {
@@ -52594,6 +52724,10 @@ class Request extends external_node_stream_.Duplex {
         }
         this._flushed = true;
         try {
+            this._attachAbortListener();
+            if (this.destroyed) {
+                return;
+            }
             await this._finalizeBody();
             if (this.destroyed) {
                 return;
@@ -52807,7 +52941,13 @@ class Request extends external_node_stream_.Duplex {
                 if (progress.percent < 1) {
                     this.emit('downloadProgress', progress);
                 }
+                if (this._stopReading) {
+                    return;
+                }
                 this.push(data);
+                if (this._stopReading) {
+                    return;
+                }
             }
         }
     }
@@ -52908,6 +53048,30 @@ class Request extends external_node_stream_.Duplex {
         }
         super.unpipe(destination);
         return this;
+    }
+    _attachAbortListener() {
+        if (this._abortListenerDisposer) {
+            return;
+        }
+        const { signal } = this.options;
+        if (!signal) {
+            return;
+        }
+        const abort = () => {
+            // See https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static#return_value
+            if (signal.reason?.name === 'TimeoutError') {
+                this.destroy(new TimeoutError(signal.reason, this.timings, this));
+            }
+            else {
+                this.destroy(new AbortError(this));
+            }
+        };
+        if (signal.aborted) {
+            abort();
+        }
+        else {
+            this._abortListenerDisposer = (0,external_node_events_.addAbortListener)(signal, abort);
+        }
     }
     _shouldIncrementallyDecodeBody() {
         const { responseType, encoding } = this.options;
@@ -53054,6 +53218,9 @@ class Request extends external_node_stream_.Duplex {
             response = decompressResponse(response);
             typedResponse = prepareResponse(response);
         }
+        // `decompressResponse` wraps the response stream when it decompresses,
+        // so `response !== nativeResponse` indicates decompression happened.
+        const wasDecompressed = response !== nativeResponse;
         this._responseSize = Number(response.headers['content-length']) || undefined;
         this.response = typedResponse;
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -53067,10 +53234,26 @@ class Request extends external_node_stream_.Duplex {
             isFromCache: typedResponse.isFromCache,
         });
         response.once('error', (error) => {
+            // Node synthesizes ECONNRESET for close-delimited responses after all body
+            // bytes have been delivered. Only ignore that late synthetic error on the
+            // native response. Wrapped decompression streams surface real checksum and
+            // truncation failures after the underlying response has completed.
+            if (!wasDecompressed
+                && response.complete
+                && this._responseSize === undefined
+                && error.code === 'ECONNRESET') {
+                return;
+            }
             this._aborted = true;
             this._beforeError(new ReadError(error, this));
         });
         response.once('aborted', () => {
+            // Without Content-Length, connection close is the intended EOF signal (RFC 9110 §8.6),
+            // not a premature abort. For wrapped decompression streams, rely on the native
+            // response completion state because the wrapper strips `content-length`.
+            if (this._responseSize === undefined && nativeResponse.complete) {
+                return;
+            }
             this._aborted = true;
             // Check if there's a content-length mismatch to provide a more specific error
             if (!this._checkContentLengthMismatch()) {
@@ -53263,9 +53446,6 @@ class Request extends external_node_stream_.Duplex {
             this._beforeError(new HTTPError(typedResponse));
             return;
         }
-        // `decompressResponse` wraps the response stream when it decompresses,
-        // so `response !== nativeResponse` indicates decompression happened.
-        const wasDecompressed = response !== nativeResponse;
         // Store the expected content-length from the native response for validation.
         // This is the content-length before decompression, which is what actually gets transferred.
         // Skip storing for responses that shouldn't have bodies per RFC 9110.
@@ -53884,11 +54064,6 @@ class Request extends external_node_stream_.Duplex {
     }
     async _makeRequest() {
         const { options } = this;
-        const initialHeaders = options.getInternalHeaders();
-        const explicitAuthorizationHeader = options.isHeaderExplicitlySet('authorization') ? initialHeaders.authorization : undefined;
-        const explicitCookieHeader = options.isHeaderExplicitlySet('cookie') ? initialHeaders.cookie : undefined;
-        const authorizationWasInitiallyOmitted = options.isHeaderExplicitlySet('authorization') && distribution.undefined(initialHeaders.authorization);
-        const cookieWasInitiallyOmitted = options.isHeaderExplicitlySet('cookie') && distribution.undefined(initialHeaders.cookie);
         const shouldDeleteGeneratedHeader = (currentHeader, generatedHeader) => currentHeader === generatedHeader || distribution.undefined(currentHeader);
         const syncGeneratedHeader = (name, { currentHeader, explicitHeader, nextHeader, staleGeneratedHeader, }) => {
             if (!distribution.undefined(nextHeader)) {
@@ -53913,6 +54088,22 @@ class Request extends external_node_stream_.Duplex {
                 else if (distribution.null(currentHeaders[key])) {
                     throw new TypeError(`Use \`undefined\` instead of \`null\` to delete the \`${key}\` header`);
                 }
+                else if (Array.isArray(currentHeaders[key]) && key === 'transfer-encoding') {
+                    // Node serializes request header arrays as repeated field lines. Keep framing
+                    // unambiguous by allowing only one transfer-encoding value here.
+                    if (currentHeaders[key].length !== 1) {
+                        throw new TypeError(`The \`${key}\` header must be a single value`);
+                    }
+                    options.setInternalHeader(key, currentHeaders[key][0]);
+                }
+                else if (Array.isArray(currentHeaders[key]) && singleValueRequestHeaders.has(key)) {
+                    // Duplicate credential and content-length lines are not allowed on requests.
+                    // Normalize a single-element array to match the long-supported string path.
+                    if (currentHeaders[key].length !== 1) {
+                        throw new TypeError(`The \`${key}\` header must be a single value`);
+                    }
+                    options.setInternalHeader(key, currentHeaders[key][0]);
+                }
             }
             return currentHeaders;
         };
@@ -53924,6 +54115,12 @@ class Request extends external_node_stream_.Duplex {
             return distribution.nonEmptyString(cookieString) ? cookieString : undefined;
         };
         const headers = sanitizeHeaders();
+        const initialHeaders = options.getInternalHeaders();
+        const authorizationWasInitiallyExplicit = options.isHeaderExplicitlySet('authorization');
+        const explicitAuthorizationHeader = authorizationWasInitiallyExplicit ? initialHeaders.authorization : undefined;
+        const explicitCookieHeader = options.isHeaderExplicitlySet('cookie') ? initialHeaders.cookie : undefined;
+        const authorizationWasInitiallyOmitted = options.isHeaderExplicitlySet('authorization') && distribution.undefined(initialHeaders.authorization);
+        const cookieWasInitiallyOmitted = options.isHeaderExplicitlySet('cookie') && distribution.undefined(initialHeaders.cookie);
         if (options.decompress && distribution.undefined(headers['accept-encoding'])) {
             const encodings = ['gzip', 'deflate'];
             if (supportsBrotli) {
@@ -53936,7 +54133,11 @@ class Request extends external_node_stream_.Duplex {
         }
         const { username, password } = options;
         const cookieJar = options.cookieJar;
-        const generatedAuthorizationHeader = getAuthorizationHeader(username, password, authorizationWasInitiallyOmitted);
+        // Preserve an explicit Authorization header over URL-derived Basic auth. This keeps
+        // normalized single-element arrays aligned with the long-supported string behavior.
+        const generatedAuthorizationHeader = distribution.undefined(explicitAuthorizationHeader)
+            ? getAuthorizationHeader(username, password, authorizationWasInitiallyOmitted)
+            : undefined;
         let generatedCookieHeader;
         if (!distribution.undefined(generatedAuthorizationHeader)) {
             options.setInternalHeader('authorization', generatedAuthorizationHeader);
@@ -53966,11 +54167,21 @@ class Request extends external_node_stream_.Duplex {
             // `headers.authorization = undefined` / `headers.cookie = undefined` is an
             // explicit opt-out. Respect that instead of regenerating values from URL
             // credentials or the cookie jar later in request setup.
-            const isHeaderExplicitlyOmitted = (header) => options.isHeaderExplicitlySet(header) && distribution.undefined(currentHeaders[header]);
-            const authorizationWasExplicitlyOmitted = isHeaderExplicitlyOmitted('authorization');
-            const cookieWasExplicitlyOmitted = isHeaderExplicitlyOmitted('cookie');
+            const isHeaderExplicitlyOmitted = (header) => options.isHeaderExplicitlySet(header)
+                && Object.hasOwn(currentHeaders, header)
+                && distribution.undefined(currentHeaders[header]);
             const currentAuthorizationHeader = currentHeaders.authorization;
             const currentCookieHeader = currentHeaders.cookie;
+            // Authorization follows a small contract:
+            // - A concrete Authorization header is sent as-is.
+            // - `authorization = undefined` means omit Authorization entirely, including URL auth.
+            // - Deleting an Authorization header that started explicit also means omit it.
+            // - Otherwise, if the request did not start with explicit Authorization, Got may
+            //   generate Basic auth from the current username/password.
+            const authorizationWasExplicitlyOmitted = isHeaderExplicitlyOmitted('authorization')
+                || (authorizationWasInitiallyExplicit && distribution.undefined(currentAuthorizationHeader));
+            const cookieWasExplicitlyOmitted = distribution.undefined(currentCookieHeader)
+                && (cookieWasInitiallyOmitted || isHeaderExplicitlyOmitted('cookie'));
             sanitizeHeaders();
             if (!distribution.undefined(currentHeaders['transfer-encoding']) && !distribution.undefined(currentHeaders['content-length'])) {
                 options.deleteInternalHeader('content-length');
@@ -53982,15 +54193,22 @@ class Request extends external_node_stream_.Duplex {
                     delete options.headers.authorization;
                 }
             }
-            const authorizationHeader = getAuthorizationHeader(options.username, options.password, authorizationWasExplicitlyOmitted);
+            const authorizationHeader = !authorizationWasInitiallyExplicit
+                && !authorizationWasInitiallyOmitted
+                && !authorizationWasExplicitlyOmitted
+                ? getAuthorizationHeader(options.username, options.password, authorizationWasExplicitlyOmitted)
+                : undefined;
             const cookieJar = options.cookieJar;
-            if (changedState.has('authorization')) {
+            if (changedState.has('authorization') && !distribution.undefined(currentAuthorizationHeader)) {
                 // A beforeRequest hook intentionally set the outgoing Authorization header.
             }
             else {
+                const restorableAuthorizationHeader = changedState.has('authorization') && distribution.undefined(currentAuthorizationHeader)
+                    ? undefined
+                    : explicitAuthorizationHeader;
                 syncGeneratedHeader('authorization', {
                     currentHeader: currentAuthorizationHeader,
-                    explicitHeader: explicitAuthorizationHeader,
+                    explicitHeader: restorableAuthorizationHeader,
                     nextHeader: authorizationHeader,
                     staleGeneratedHeader: generatedAuthorizationHeader,
                 });
@@ -54005,10 +54223,13 @@ class Request extends external_node_stream_.Duplex {
                 // A beforeRequest hook intentionally set the outgoing Cookie header.
             }
             else {
+                const cookieHeader = !cookieWasInitiallyOmitted && !cookieWasExplicitlyOmitted
+                    ? await getCookieHeader(cookieJar)
+                    : undefined;
                 syncGeneratedHeader('cookie', {
                     currentHeader: currentCookieHeader,
                     explicitHeader: explicitCookieHeader,
-                    nextHeader: await getCookieHeader(cookieJar),
+                    nextHeader: cookieHeader,
                     staleGeneratedHeader: generatedCookieHeader,
                 });
             }
