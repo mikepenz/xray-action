@@ -39,7 +39,7 @@
     "@supercharge/promise-pool": "3.3.0",
     "form-data": "4.0.5",
     "got": "15.0.5",
-    "junit-report-merger": "9.0.3",
+    "junit-report-merger": "9.0.4",
     "mime-types": "3.0.2"
   },
   "devDependencies": {
