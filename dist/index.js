@@ -1814,6 +1814,18 @@ var hasOwn = __nccwpck_require__(4076);
 var populate = __nccwpck_require__(1835);
 
 /**
+ * Escape CR, LF, and `"` in a multipart `name`/`filename` parameter, so a field
+ * name or filename can not break out of its header line to inject headers or
+ * smuggle additional parts. Matches the WHATWG HTML multipart/form-data encoding.
+ *
+ * @param {string} str - the parameter value to escape
+ * @returns {string} the escaped value
+ */
+function escapeHeaderParam(str) {
+  return String(str).replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(/"/g, '%22');
+}
+
+/**
  * Create readable "multipart/form-data" streams.
  * Can be used to submit forms
  * and file uploads to other web applications.
@@ -1978,7 +1990,7 @@ FormData.prototype._multiPartHeader = function (field, value, options) {
   var contents = '';
   var headers = {
     // add custom disposition as third element or keep it two elements if not
-    'Content-Disposition': ['form-data', 'name="' + field + '"'].concat(contentDisposition || []),
+    'Content-Disposition': ['form-data', 'name="' + escapeHeaderParam(field) + '"'].concat(contentDisposition || []),
     // if no content type. allow it to be empty array
     'Content-Type': [].concat(contentType || [])
   };
@@ -2032,7 +2044,7 @@ FormData.prototype._getContentDisposition = function (value, options) { // eslin
   }
 
   if (filename) {
-    return 'filename="' + filename + '"';
+    return 'filename="' + escapeHeaderParam(filename) + '"';
   }
 };
 
@@ -6574,16 +6586,49 @@ module.exports = {
 
 /***/ }),
 
-/***/ 8478:
+/***/ 3541:
 /***/ ((module) => {
 
+/**
+ * Aggregate using sum.
+ *
+ * @example sumAggregator(3, 9) == 12
+ *
+ * @param a
+ * @param b
+ *
+ * @returns {number}
+ */
 function sumAggregator(a, b) {
   return Number(a) + Number(b)
 }
 
+/**
+ * Aggregate using Math.max.
+ *
+ * @example maxAggregator(3, 9) == 9
+ *
+ * @param a
+ * @param b
+ *
+ * @returns {number}
+ */
 function maxAggregator(a, b) {
   return Math.max(Number(a), Number(b))
 }
+
+module.exports = {
+  sumAggregator,
+  maxAggregator
+}
+
+
+/***/ }),
+
+/***/ 8478:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const { sumAggregator, maxAggregator } = __nccwpck_require__(3541)
 
 /**
  * We use https://github.com/windyroad/JUnit-Schema/blob/master/JUnit.xsd as a reference.
@@ -6739,6 +6784,7 @@ const { mergeToString } = __nccwpck_require__(8083)
  *
  * @typedef {Object} MergeFilesOptions
  * @property {MergeFilesCallback} [onFileMatched]  A callback function which will be called for the each match
+ * @property {boolean} sumTime  Aggregate testsuite time with sum instead of max
  *
  * @callback TMergeFilesCompletionCallback
  * @param {Error} [err]  Error if any
@@ -6755,7 +6801,7 @@ const { mergeToString } = __nccwpck_require__(8083)
  * @callback MergeFilesPromiseStyle Reads multiple files, merges their contents and write into the given file.
  * @param {String} destFilePath   Where the output should be stored. Denotes a path to file. If file already exists, it will be overwritten.
  * @param {String[]} srcFilePathsOrGlobPatterns   Paths to the files which should be merged or glob patterns to find them.
- * @param {MergeFilesOptions} [options]   Merge options. Currently unused.
+ * @param {MergeFilesOptions} [options]   Merge options.
  * @return {Promise<void>}
  *
  * @typedef {MergeFilesCallbackStyle & MergeFilesPromiseStyle} MergeFilesFn
@@ -6780,7 +6826,9 @@ module.exports.mergeFiles = function (destFilePath, srcFilePathsOrGlobPatterns, 
         srcStrings.push(content)
       }
 
-      const mergedContent = await mergeToString(srcStrings, {})
+      const mergedContent = await mergeToString(srcStrings, {
+        sumTime: normalizedOptions?.sumTime ?? false
+      })
       await fs.promises.writeFile(destFilePath, mergedContent, 'utf8')
 
       callback()
@@ -6800,7 +6848,8 @@ const { normalizeArgs, readableToString } = __nccwpck_require__(4478)
 const { mergeToString } = __nccwpck_require__(8083)
 
 /**
- * @typedef {{}} MergeStreamsOptions
+ * @typedef {Object} MergeStreamsOptions
+ * @property {boolean} sumTime  Aggregate testsuite time with sum instead of max
  *
  * @callback TMergeStreamsCallback
  * @param {Error} [err]  Error if any
@@ -6810,14 +6859,14 @@ const { mergeToString } = __nccwpck_require__(8083)
  * @callback MergeStreamsCallbackStyle
  * @param {import('stream').Writable} destStream   A stream which will be used to write the merge result.
  * @param {import('stream').Readable[]} srcStreams   Streams which will be used to read data from.
- * @param {MergeStreamsOptions} options   Merge options. Currently unused.
+ * @param {MergeStreamsOptions} options   Merge options.
  * @param {TMergeStreamsCallback} cb   Callback function which will be called at completion. Will receive error as first argument if any.
  * @return {void}
  *
  * @callback MergeStreamsPromiseStyle
  * @param {import('stream').Writable} destStream   A stream which will be used to write the merge result.
  * @param {import('stream').Readable[]} srcStreams   Streams which will be used to read data from.
- * @param {MergeStreamsOptions} [options]   Merge options. Currently unused.
+ * @param {MergeStreamsOptions} [options]   Merge options.
  * @return {Promise<void>}
  *
  * @typedef {MergeStreamsCallbackStyle & MergeStreamsPromiseStyle} MergeStreamsFn
@@ -6829,7 +6878,9 @@ module.exports.mergeStreams = function (destStream, srcStreams, options, cb) {
 
   Promise.all(srcStreams.map(readableToString))
     .then(async (srcStrings) => {
-      let destString = await mergeToString(srcStrings, options)
+      let destString = await mergeToString(srcStrings, {
+        sumTime: normalizedOptions?.sumTime ?? false
+      })
       destStream.on('error', callback)
       destStream.write(destString, 'utf8', callback)
     })
@@ -6845,6 +6896,7 @@ module.exports.mergeStreams = function (destStream, srcStreams, options, cb) {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { KNOWN_ATTRIBUTES } = __nccwpck_require__(8478)
+const { sumAggregator } = __nccwpck_require__(3541)
 const { isNumeric } = __nccwpck_require__(4478)
 const {
   getNodeAttribute,
@@ -6854,17 +6906,18 @@ const {
 } = __nccwpck_require__(5634)
 
 /**
- * @typedef {{}} MergeStringsOptions
+ * @typedef {Object} MergeToStringOptions
+ * @property {boolean} sumTime  Aggregate testsuite time with sum instead of max
  */
 
 /**
  * Merges contents of given XML strings and returns resulting XML string.
  * @param {String[]} srcStrings   Array of strings to merge together.
- * @param {MergeStringsOptions} [options]   Merge options. Currently unused.
+ * @param {MergeToStringOptions} [options]   Merge options.
  * @return {Promise<String>}
  */
 module.exports.mergeToString = async function (srcStrings, options) {
-  const { create } = await __nccwpck_require__.e(/* import() */ 998).then(__nccwpck_require__.bind(__nccwpck_require__, 2998))
+  const { create } = await __nccwpck_require__.e(/* import() */ 697).then(__nccwpck_require__.bind(__nccwpck_require__, 4697))
   const targetDoc = create(
     {
       encoding: 'UTF-8'
@@ -6959,7 +7012,10 @@ module.exports.mergeToString = async function (srcStrings, options) {
         for (let attrName of attributeNames) {
           const attrValue = getNodeAttribute(node, attrName)
           if (attrValue !== undefined && isNumeric(attrValue)) {
-            const { aggregator } = KNOWN_ATTRIBUTES[attrName]
+            const aggregator =
+              attrName === 'time' && options?.sumTime === true
+                ? sumAggregator
+                : KNOWN_ATTRIBUTES[attrName].aggregator
             attributes[attrName] = aggregator(attributes[attrName] || 0, attrValue)
           }
         }
