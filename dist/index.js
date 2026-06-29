@@ -62746,7 +62746,8 @@ class Options {
             updated = new URLSearchParams(value);
         }
         else if (value instanceof URLSearchParams) {
-            updated = value;
+            // Clone so the caller-owned object is not stored by reference.
+            updated = new URLSearchParams(value);
         }
         else {
             validateSearchParameters(value);
@@ -62777,10 +62778,11 @@ class Options {
             }
         }
         else if (url) {
-            url.search = searchParameters.toString();
+            // Overrides the query string in the URL.
+            url.search = updated.toString();
         }
         else {
-            this.#internals.searchParams = searchParameters;
+            this.#internals.searchParams = updated;
         }
     }
     get searchParameters() {
