@@ -21506,13 +21506,13 @@ function utf8Decode(bytes) {
 
 /***/ }),
 
-/***/ 4281:
+/***/ 8771:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const loader = __webpack_require__(1950)
-const dumper = __webpack_require__(9980)
+const loader = __webpack_require__(7600)
+const dumper = __webpack_require__(5642)
 
 function renamed (from, to) {
   return function () {
@@ -21521,32 +21521,32 @@ function renamed (from, to) {
   }
 }
 
-module.exports.Type = __webpack_require__(9557)
-module.exports.Schema = __webpack_require__(2046)
-module.exports.FAILSAFE_SCHEMA = __webpack_require__(9832)
-module.exports.JSON_SCHEMA = __webpack_require__(8927)
-module.exports.CORE_SCHEMA = __webpack_require__(5746)
-module.exports.DEFAULT_SCHEMA = __webpack_require__(7336)
+module.exports.Type = __webpack_require__(1015)
+module.exports.Schema = __webpack_require__(8000)
+module.exports.FAILSAFE_SCHEMA = __webpack_require__(8334)
+module.exports.JSON_SCHEMA = __webpack_require__(9625)
+module.exports.CORE_SCHEMA = __webpack_require__(9568)
+module.exports.DEFAULT_SCHEMA = __webpack_require__(914)
 module.exports.load = loader.load
 module.exports.loadAll = loader.loadAll
 module.exports.dump = dumper.dump
-module.exports.YAMLException = __webpack_require__(1248)
+module.exports.YAMLException = __webpack_require__(3194)
 
 // Re-export all types in case user wants to create custom schema
 module.exports.types = {
-  binary: __webpack_require__(8149),
-  float: __webpack_require__(7584),
-  map: __webpack_require__(7316),
-  null: __webpack_require__(4333),
-  pairs: __webpack_require__(6267),
-  set: __webpack_require__(8758),
-  timestamp: __webpack_require__(8966),
-  bool: __webpack_require__(7296),
-  int: __webpack_require__(2271),
-  merge: __webpack_require__(4473),
-  omap: __webpack_require__(8649),
-  seq: __webpack_require__(7161),
-  str: __webpack_require__(3929)
+  binary: __webpack_require__(1531),
+  float: __webpack_require__(4334),
+  map: __webpack_require__(9098),
+  null: __webpack_require__(4427),
+  pairs: __webpack_require__(5129),
+  set: __webpack_require__(7344),
+  timestamp: __webpack_require__(6856),
+  bool: __webpack_require__(8246),
+  int: __webpack_require__(2961),
+  merge: __webpack_require__(4844),
+  omap: __webpack_require__(5639),
+  seq: __webpack_require__(4707),
+  str: __webpack_require__(7055)
 }
 
 // Removed functions from JS-YAML 3.0.x
@@ -21557,7 +21557,7 @@ module.exports.safeDump = renamed('safeDump', 'dump')
 
 /***/ }),
 
-/***/ 9816:
+/***/ 1450:
 /***/ ((module) => {
 
 
@@ -21614,14 +21614,14 @@ module.exports.extend = extend
 
 /***/ }),
 
-/***/ 9980:
+/***/ 5642:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const common = __webpack_require__(9816)
-const YAMLException = __webpack_require__(1248)
-const DEFAULT_SCHEMA = __webpack_require__(7336)
+const common = __webpack_require__(1450)
+const YAMLException = __webpack_require__(3194)
+const DEFAULT_SCHEMA = __webpack_require__(914)
 
 const _toString = Object.prototype.toString
 const _hasOwnProperty = Object.prototype.hasOwnProperty
@@ -22558,7 +22558,7 @@ module.exports.dump = dump
 
 /***/ }),
 
-/***/ 1248:
+/***/ 3194:
 /***/ ((module) => {
 
 // YAML error class. http://stackoverflow.com/questions/8458984
@@ -22616,15 +22616,15 @@ module.exports = YAMLException
 
 /***/ }),
 
-/***/ 1950:
+/***/ 7600:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const common = __webpack_require__(9816)
-const YAMLException = __webpack_require__(1248)
-const makeSnippet = __webpack_require__(9440)
-const DEFAULT_SCHEMA = __webpack_require__(7336)
+const common = __webpack_require__(1450)
+const YAMLException = __webpack_require__(3194)
+const makeSnippet = __webpack_require__(342)
+const DEFAULT_SCHEMA = __webpack_require__(914)
 
 const _hasOwnProperty = Object.prototype.hasOwnProperty
 
@@ -22773,7 +22773,7 @@ function State (input, options) {
   this.json = options['json'] || false
   this.listener = options['listener'] || null
   this.maxDepth = typeof options['maxDepth'] === 'number' ? options['maxDepth'] : 100
-  this.maxMergeSeqLength = typeof options['maxMergeSeqLength'] === 'number' ? options['maxMergeSeqLength'] : 20
+  this.maxTotalMergeKeys = typeof options['maxTotalMergeKeys'] === 'number' ? options['maxTotalMergeKeys'] : 10000
 
   this.implicitTypes = this.schema.compiledImplicit
   this.typeMap = this.schema.compiledTypeMap
@@ -22784,6 +22784,7 @@ function State (input, options) {
   this.lineStart = 0
   this.lineIndent = 0
   this.depth = 0
+  this.totalMergeKeys = 0
 
   // position of first leading tab in the current line,
   // used to make sure there are no tabs in the indentation
@@ -23001,6 +23002,10 @@ function mergeMappings (state, destination, source, overridableKeys) {
   for (let index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
     const key = sourceKeys[index]
 
+    if (state.maxTotalMergeKeys !== -1 && ++state.totalMergeKeys > state.maxTotalMergeKeys) {
+      throwError(state, 'merge keys exceeded maxTotalMergeKeys (' + state.maxTotalMergeKeys + ')')
+    }
+
     if (!_hasOwnProperty.call(destination, key)) {
       setProperty(destination, key, source[key])
       overridableKeys[key] = true
@@ -23042,17 +23047,8 @@ function storeMappingPair (state, _result, overridableKeys, keyTag, keyNode, val
 
   if (keyTag === 'tag:yaml.org,2002:merge') {
     if (Array.isArray(valueNode)) {
-      if (valueNode.length > state.maxMergeSeqLength) {
-        throwError(state, 'merge sequence length exceeded maxMergeSeqLength (' + state.maxMergeSeqLength + ')')
-      }
-      const seen = new Set()
       for (let index = 0, quantity = valueNode.length; index < quantity; index += 1) {
-        const src = valueNode[index]
-        // Existing keys are not overridden on merge, so dedupe sources to
-        // avoid redundant work on repeated aliases.
-        if (seen.has(src)) continue
-        seen.add(src)
-        mergeMappings(state, _result, src, overridableKeys)
+        mergeMappings(state, _result, valueNode[index], overridableKeys)
       }
     } else {
       mergeMappings(state, _result, valueNode, overridableKeys)
@@ -24417,13 +24413,13 @@ module.exports.load = load
 
 /***/ }),
 
-/***/ 2046:
+/***/ 8000:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const YAMLException = __webpack_require__(1248)
-const Type = __webpack_require__(9557)
+const YAMLException = __webpack_require__(3194)
+const Type = __webpack_require__(1015)
 
 function compileList (schema, name) {
   const result = []
@@ -24533,7 +24529,7 @@ module.exports = Schema
 
 /***/ }),
 
-/***/ 5746:
+/***/ 9568:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Standard YAML's Core schema.
@@ -24544,12 +24540,12 @@ module.exports = Schema
 
 
 
-module.exports = __webpack_require__(8927)
+module.exports = __webpack_require__(9625)
 
 
 /***/ }),
 
-/***/ 7336:
+/***/ 914:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // JS-YAML's default schema for `safeLoad` function.
@@ -24560,23 +24556,23 @@ module.exports = __webpack_require__(8927)
 
 
 
-module.exports = (__webpack_require__(5746).extend)({
+module.exports = (__webpack_require__(9568).extend)({
   implicit: [
-    __webpack_require__(8966),
-    __webpack_require__(4473)
+    __webpack_require__(6856),
+    __webpack_require__(4844)
   ],
   explicit: [
-    __webpack_require__(8149),
-    __webpack_require__(8649),
-    __webpack_require__(6267),
-    __webpack_require__(8758)
+    __webpack_require__(1531),
+    __webpack_require__(5639),
+    __webpack_require__(5129),
+    __webpack_require__(7344)
   ]
 })
 
 
 /***/ }),
 
-/***/ 9832:
+/***/ 8334:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Standard YAML's Failsafe schema.
@@ -24584,20 +24580,20 @@ module.exports = (__webpack_require__(5746).extend)({
 
 
 
-const Schema = __webpack_require__(2046)
+const Schema = __webpack_require__(8000)
 
 module.exports = new Schema({
   explicit: [
-    __webpack_require__(3929),
-    __webpack_require__(7161),
-    __webpack_require__(7316)
+    __webpack_require__(7055),
+    __webpack_require__(4707),
+    __webpack_require__(9098)
   ]
 })
 
 
 /***/ }),
 
-/***/ 8927:
+/***/ 9625:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Standard YAML's JSON schema.
@@ -24609,24 +24605,24 @@ module.exports = new Schema({
 
 
 
-module.exports = (__webpack_require__(9832).extend)({
+module.exports = (__webpack_require__(8334).extend)({
   implicit: [
-    __webpack_require__(4333),
-    __webpack_require__(7296),
-    __webpack_require__(2271),
-    __webpack_require__(7584)
+    __webpack_require__(4427),
+    __webpack_require__(8246),
+    __webpack_require__(2961),
+    __webpack_require__(4334)
   ]
 })
 
 
 /***/ }),
 
-/***/ 9440:
+/***/ 342:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const common = __webpack_require__(9816)
+const common = __webpack_require__(1450)
 
 // get snippet for a single line, respecting maxLength
 function getLine (buffer, lineStart, lineEnd, position, maxLineLength) {
@@ -24724,12 +24720,12 @@ module.exports = makeSnippet
 
 /***/ }),
 
-/***/ 9557:
+/***/ 1015:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const YAMLException = __webpack_require__(1248)
+const YAMLException = __webpack_require__(3194)
 
 const TYPE_CONSTRUCTOR_OPTIONS = [
   'kind',
@@ -24797,12 +24793,12 @@ module.exports = Type
 
 /***/ }),
 
-/***/ 8149:
+/***/ 1531:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 // [ 64, 65, 66 ] -> [ padding, CR, LF ]
 const BASE64_MAP = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r'
@@ -24926,12 +24922,12 @@ module.exports = new Type('tag:yaml.org,2002:binary', {
 
 /***/ }),
 
-/***/ 7296:
+/***/ 8246:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 function resolveYamlBoolean (data) {
   if (data === null) return false
@@ -24968,13 +24964,13 @@ module.exports = new Type('tag:yaml.org,2002:bool', {
 
 /***/ }),
 
-/***/ 7584:
+/***/ 4334:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const common = __webpack_require__(9816)
-const Type = __webpack_require__(9557)
+const common = __webpack_require__(1450)
+const Type = __webpack_require__(1015)
 
 const YAML_FLOAT_PATTERN = new RegExp(
   // 2.5e4, 2.5 and integers
@@ -25001,7 +24997,7 @@ function resolveYamlFloat (data) {
     return false
   }
 
-  if (Number.isFinite(parseFloat(data, 10))) {
+  if (isFinite(parseFloat(data, 10))) {
     return true
   }
 
@@ -25074,13 +25070,13 @@ module.exports = new Type('tag:yaml.org,2002:float', {
 
 /***/ }),
 
-/***/ 2271:
+/***/ 2961:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const common = __webpack_require__(9816)
-const Type = __webpack_require__(9557)
+const common = __webpack_require__(1450)
+const Type = __webpack_require__(1015)
 
 function isHexCode (c) {
   return ((c >= 0x30/* 0 */) && (c <= 0x39/* 9 */)) ||
@@ -25128,7 +25124,7 @@ function resolveYamlInteger (data) {
         if (ch !== '0' && ch !== '1') return false
         hasDigits = true
       }
-      return hasDigits && Number.isFinite(parseYamlInteger(data))
+      return hasDigits && isFinite(parseYamlInteger(data))
     }
 
     if (ch === 'x') {
@@ -25139,7 +25135,7 @@ function resolveYamlInteger (data) {
         if (!isHexCode(data.charCodeAt(index))) return false
         hasDigits = true
       }
-      return hasDigits && Number.isFinite(parseYamlInteger(data))
+      return hasDigits && isFinite(parseYamlInteger(data))
     }
 
     if (ch === 'o') {
@@ -25150,7 +25146,7 @@ function resolveYamlInteger (data) {
         if (!isOctCode(data.charCodeAt(index))) return false
         hasDigits = true
       }
-      return hasDigits && Number.isFinite(parseYamlInteger(data))
+      return hasDigits && isFinite(parseYamlInteger(data))
     }
   }
 
@@ -25165,7 +25161,7 @@ function resolveYamlInteger (data) {
 
   if (!hasDigits) return false
 
-  return Number.isFinite(parseYamlInteger(data))
+  return isFinite(parseYamlInteger(data))
 }
 
 function parseYamlInteger (data) {
@@ -25223,12 +25219,12 @@ module.exports = new Type('tag:yaml.org,2002:int', {
 
 /***/ }),
 
-/***/ 7316:
+/***/ 9098:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 module.exports = new Type('tag:yaml.org,2002:map', {
   kind: 'mapping',
@@ -25238,12 +25234,12 @@ module.exports = new Type('tag:yaml.org,2002:map', {
 
 /***/ }),
 
-/***/ 4473:
+/***/ 4844:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 function resolveYamlMerge (data) {
   return data === '<<' || data === null
@@ -25257,12 +25253,12 @@ module.exports = new Type('tag:yaml.org,2002:merge', {
 
 /***/ }),
 
-/***/ 4333:
+/***/ 4427:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 function resolveYamlNull (data) {
   if (data === null) return true
@@ -25299,12 +25295,12 @@ module.exports = new Type('tag:yaml.org,2002:null', {
 
 /***/ }),
 
-/***/ 8649:
+/***/ 5639:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 const _hasOwnProperty = Object.prototype.hasOwnProperty
 const _toString = Object.prototype.toString
@@ -25351,12 +25347,12 @@ module.exports = new Type('tag:yaml.org,2002:omap', {
 
 /***/ }),
 
-/***/ 6267:
+/***/ 5129:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 const _toString = Object.prototype.toString
 
@@ -25408,12 +25404,12 @@ module.exports = new Type('tag:yaml.org,2002:pairs', {
 
 /***/ }),
 
-/***/ 7161:
+/***/ 4707:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 module.exports = new Type('tag:yaml.org,2002:seq', {
   kind: 'sequence',
@@ -25423,12 +25419,12 @@ module.exports = new Type('tag:yaml.org,2002:seq', {
 
 /***/ }),
 
-/***/ 8758:
+/***/ 7344:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 const _hasOwnProperty = Object.prototype.hasOwnProperty
 
@@ -25459,12 +25455,12 @@ module.exports = new Type('tag:yaml.org,2002:set', {
 
 /***/ }),
 
-/***/ 3929:
+/***/ 7055:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 module.exports = new Type('tag:yaml.org,2002:str', {
   kind: 'scalar',
@@ -25474,12 +25470,12 @@ module.exports = new Type('tag:yaml.org,2002:str', {
 
 /***/ }),
 
-/***/ 8966:
+/***/ 6856:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
 
-const Type = __webpack_require__(9557)
+const Type = __webpack_require__(1015)
 
 const YAML_DATE_REGEXP = new RegExp(
   '^([0-9][0-9][0-9][0-9])' + // [1] year
@@ -27866,7 +27862,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.YAMLReader = void 0;
 const ObjectReader_1 = __webpack_require__(908);
 const BaseReader_1 = __webpack_require__(8646);
-const js_yaml_1 = __webpack_require__(4281);
+const js_yaml_1 = __webpack_require__(8771);
 /**
  * Parses XML nodes from a YAML string.
  */
