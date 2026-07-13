@@ -52854,19 +52854,23 @@ function gte(i, y) {
 function expand_(str, max, isTop) {
     /** @type {string[]} */
     const expansions = [];
-    const m = balanced('{', '}', str);
-    if (!m)
-        return [str];
-    // no need to expand pre, since it is guaranteed to be free of brace-sets
-    const pre = m.pre;
-    const post = m.post.length ? expand_(m.post, max, false) : [''];
-    if (/\$$/.test(m.pre)) {
-        for (let k = 0; k < post.length && k < max; k++) {
-            const expansion = pre + '{' + m.body + '}' + post[k];
-            expansions.push(expansion);
+    // The `{a},b}` rewrite below restarts expansion on a rewritten string with
+    // the same `max` and `isTop = true`. Loop instead of recursing so a long run
+    // of non-expanding `{}` groups can't exhaust the call stack.
+    for (;;) {
+        const m = balanced('{', '}', str);
+        if (!m)
+            return [str];
+        // no need to expand pre, since it is guaranteed to be free of brace-sets
+        const pre = m.pre;
+        if (/\$$/.test(m.pre)) {
+            const post = m.post.length ? expand_(m.post, max, false) : [''];
+            for (let k = 0; k < post.length && k < max; k++) {
+                const expansion = pre + '{' + m.body + '}' + post[k];
+                expansions.push(expansion);
+            }
+            return expansions;
         }
-    }
-    else {
         const isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
         const isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
         const isSequence = isNumericSequence || isAlphaSequence;
@@ -52875,10 +52879,16 @@ function expand_(str, max, isTop) {
             // {a},b}
             if (m.post.match(/,(?!,).*\}/)) {
                 str = m.pre + '{' + m.body + escClose + m.post;
-                return expand_(str, max, true);
+                isTop = true;
+                continue;
             }
             return [str];
         }
+        // Only expand post once we know this brace set actually expands. Computing
+        // it before the early returns above expanded post a second time on every
+        // non-expanding `{}`, which is what made inputs like `a{},{},{}...` blow up
+        // exponentially.
+        const post = m.post.length ? expand_(m.post, max, false) : [''];
         let n;
         if (isSequence) {
             n = m.body.split(/\.\./);
@@ -52954,8 +52964,8 @@ function expand_(str, max, isTop) {
                 }
             }
         }
+        return expansions;
     }
-    return expansions;
 }
 //# sourceMappingURL=index.js.map
 ;// CONCATENATED MODULE: ./node_modules/minimatch/dist/esm/assert-valid-pattern.js
