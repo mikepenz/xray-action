@@ -61810,12 +61810,84 @@ const hasExplicitCredentialInUrlChange = (changedState, url, credential) => (cha
     || (changedState.has('url') && url?.[credential] !== ''));
 const hasProtocolSlashes = (value) => /^[a-z][\d+\-.a-z]*:\/\//iv.test(value);
 const hasHttpProtocolWithoutSlashes = (value) => /^https?:(?!\/\/)/iv.test(value);
-function applyUrlOverride(options, url, { username, password } = {}) {
-    if (distribution.string(url) && options.url) {
-        url = new URL(url, options.url).toString();
+const hasUnixProtocolWithoutSlashes = (value) => /^unix:/iv.test(value);
+const isAbsoluteUrl = (url) => distribution.urlInstance(url) || (distribution.string(url) && (hasProtocolSlashes(url) || url.startsWith('//')));
+const isSlashOrBackslash = (character) => character === '/' || character === '\\';
+const startsWithSchemeRelativeSeparators = (value) => value.length > 1 && isSlashOrBackslash(value[0]) && isSlashOrBackslash(value[1]);
+const stripLeadingC0ControlOrSpace = (value) => {
+    let index = 0;
+    while (index < value.length && value.codePointAt(index) <= 0x20) {
+        index++;
     }
-    options.prefixUrl = '';
-    options.url = url;
+    return value.slice(index);
+};
+const removeAsciiTabOrNewline = (value) => {
+    let result = '';
+    for (const character of value) {
+        const codePoint = character.codePointAt(0);
+        if (codePoint !== 0x09 && codePoint !== 0x0A && codePoint !== 0x0D) {
+            result += character;
+        }
+    }
+    return result;
+};
+const assertRelativeUrlIfNeeded = (options, url) => {
+    if (!options.prefixUrl || options.allowAbsoluteUrls) {
+        return;
+    }
+    const normalizedUrl = distribution.string(url) ? stripLeadingC0ControlOrSpace(removeAsciiTabOrNewline(url)) : url;
+    const isDisallowed = isAbsoluteUrl(normalizedUrl)
+        || (distribution.string(normalizedUrl) && (hasHttpProtocolWithoutSlashes(normalizedUrl)
+            || startsWithSchemeRelativeSeparators(normalizedUrl)
+            || (options.enableUnixSockets && hasUnixProtocolWithoutSlashes(normalizedUrl))));
+    if (isDisallowed) {
+        throw new Error('The `url` option must be relative when `allowAbsoluteUrls` is false and `prefixUrl` is set');
+    }
+};
+const assertUrlHasSameOriginAsPrefixUrlIfNeeded = (options, url) => {
+    if (!options.prefixUrl || options.allowAbsoluteUrls) {
+        return;
+    }
+    let prefixUrl;
+    try {
+        prefixUrl = new URL(options.prefixUrl);
+    }
+    catch {
+        return;
+    }
+    if (isSameOrigin(prefixUrl, url)) {
+        return;
+    }
+    throw new Error('The `url` option must stay on the same origin as `prefixUrl` when `allowAbsoluteUrls` is false');
+};
+const getUrlPrefixBoundary = (options) => ({
+    url: options.url instanceof URL ? new URL(options.url) : undefined,
+    prefixUrl: options.prefixUrl.toString(),
+    allowAbsoluteUrls: options.allowAbsoluteUrls,
+});
+const hasUrlOrPrefixUrlBoundaryChanged = (options, currentUrl, previous) => (currentUrl.href !== previous.url?.href
+    || options.prefixUrl.toString() !== previous.prefixUrl
+    || options.allowAbsoluteUrls !== previous.allowAbsoluteUrls);
+function applyUrlOverride(options, url, { username, password, baseUrl } = {}) {
+    assertRelativeUrlIfNeeded(options, url);
+    if (distribution.string(url) && options.url) {
+        const resolvedUrl = new URL(url, baseUrl ?? options.url);
+        url = resolvedUrl.toString();
+    }
+    if (options.allowAbsoluteUrls) {
+        options.prefixUrl = '';
+        options.url = url;
+    }
+    else {
+        const { allowAbsoluteUrls } = options;
+        try {
+            options.allowAbsoluteUrls = true;
+            options.url = url;
+        }
+        finally {
+            options.allowAbsoluteUrls = allowAbsoluteUrls;
+        }
+    }
     if (username !== undefined) {
         options.username = username;
     }
@@ -61938,6 +62010,7 @@ const defaultInternals = {
     password: '',
     http2: false,
     allowGetBody: false,
+    allowAbsoluteUrls: true,
     copyPipedHeaders: false,
     headers: {
         'user-agent': 'got (https://github.com/sindresorhus/got)',
@@ -62034,9 +62107,8 @@ const defaultInternals = {
             const parsed = parseLinkHeader(rawLinkHeader);
             const next = parsed.find(entry => entry.parameters.rel === 'next' || entry.parameters.rel === '"next"');
             if (next) {
-                const baseUrl = response.request.options.url ?? response.url;
                 return {
-                    url: new URL(next.reference, baseUrl),
+                    url: next.reference,
                 };
             }
             return false;
@@ -62426,11 +62498,13 @@ class Options {
         }
     }
     /**
-    When specified, `prefixUrl` will be prepended to `url`.
+    When specified, `prefixUrl` will be prepended to relative string `url` input.
     The prefix can be any valid URL, either relative or absolute.
     A trailing slash `/` is optional - one will be added automatically.
 
-    __Note__: `prefixUrl` will be ignored if the `url` argument is a URL instance.
+    __Note__: Absolute string URLs and URL instances bypass `prefixUrl` by default. Other instance defaults, including headers, still apply. For untrusted URLs, set `allowAbsoluteUrls` to `false`.
+
+    __Note__: Got cannot know which custom headers are sensitive. If you use headers like `x-api-key`, only pass trusted URLs or use `allowAbsoluteUrls: false`.
 
     __Note__: Leading slashes in `input` are disallowed when using this option to enforce consistency and avoid confusion.
     For example, when the prefix URL is `https://example.com/foo` and the input is `/bar`, there's ambiguity whether the resulting URL would become `https://example.com/foo/bar` or `https://example.com/bar`.
@@ -62608,8 +62682,9 @@ class Options {
             && hasHttpProtocolWithoutSlashes(valueString)) {
             throw new Error('`url` protocol must be followed by `//`');
         }
-        // Detect if URL is already absolute (has a protocol/scheme)
-        const isAbsolute = distribution.urlInstance(value) || hasProtocolSlashes(valueString);
+        // Detect if URL is already absolute.
+        const isAbsolute = isAbsoluteUrl(value);
+        assertRelativeUrlIfNeeded(this, value);
         // Only concatenate prefixUrl if the URL is relative
         const urlString = isAbsolute ? valueString : `${this.prefixUrl}${valueString}`;
         const url = new URL(urlString);
@@ -63053,6 +63128,24 @@ class Options {
     set allowGetBody(value) {
         assert.boolean(value);
         this.#internals.allowGetBody = value;
+    }
+    /**
+    Allow absolute URLs to bypass `prefixUrl`.
+
+    When set to `false` with `prefixUrl`, passing an absolute `url` will throw. This also rejects scheme-relative URL strings like `//example.com/path` in retry and pagination URL overrides. Use this when untrusted URL input must stay on the same origin as the configured `prefixUrl`. This is not a path sandbox: relative paths like `../other` still follow standard URL resolution on the same origin. Set `prefixUrl` to an empty string for a request that intentionally needs an absolute URL.
+
+    __Note__: This guards the `url` you pass. It does not block cross-origin redirects issued by the server, though inherited sensitive headers are still stripped when a redirect changes origin.
+
+    __Note__: The check is defeated if the same hook or `pagination.paginate(…)` return also sets `prefixUrl` or `allowAbsoluteUrls`. Do not populate those options from untrusted data.
+
+    @default true
+    */
+    get allowAbsoluteUrls() {
+        return this.#internals.allowAbsoluteUrls;
+    }
+    set allowAbsoluteUrls(value) {
+        assert.boolean(value);
+        this.#internals.allowAbsoluteUrls = value;
     }
     /**
     Automatically copy headers from piped streams.
@@ -64461,7 +64554,7 @@ class Request extends external_node_stream_.Duplex {
                         delay: backoff,
                     });
                     this.emit('retry', this.retryCount + 1, error, (updatedOptions) => {
-                        const request = new Request(options.url, updatedOptions, options);
+                        const request = new Request(undefined, updatedOptions, options);
                         request.retryCount = this.retryCount + 1;
                         external_node_process_namespaceObject.nextTick(() => {
                             void request.flush();
@@ -64957,8 +65050,17 @@ class Request extends external_node_stream_.Duplex {
                     redirectUrl.username = updatedOptions.username;
                     redirectUrl.password = updatedOptions.password;
                 }
-                updatedOptions.url = redirectUrl;
+                // Redirect URLs are resolved internally. Restore the user option before hooks run so hook mutations still honor it.
+                const { allowAbsoluteUrls } = updatedOptions;
+                try {
+                    updatedOptions.allowAbsoluteUrls = true;
+                    updatedOptions.url = redirectUrl;
+                }
+                finally {
+                    updatedOptions.allowAbsoluteUrls = allowAbsoluteUrls;
+                }
                 this.redirectUrls.push(redirectUrl);
+                const boundaryBeforeRedirectHooks = getUrlPrefixBoundary(updatedOptions);
                 const bodyBeforeRedirectHooks = updatedOptions.body;
                 const preHookState = isDifferentOrigin
                     ? undefined
@@ -64973,6 +65075,9 @@ class Request extends external_node_stream_.Duplex {
                     }
                     return changedState;
                 });
+                if (hasUrlOrPrefixUrlBoundaryChanged(updatedOptions, updatedOptions.url, boundaryBeforeRedirectHooks)) {
+                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(updatedOptions, updatedOptions.url);
+                }
                 updatedOptions.clearUnchangedCookieHeader(preHookState, changedState);
                 const nativeFormDataBody = this._nativeFormDataBody;
                 if (statusCode === 307 || statusCode === 308) {
@@ -65775,6 +65880,8 @@ class Request extends external_node_stream_.Duplex {
         }
         let request;
         let shouldOmitRequestUrlCredentials = false;
+        const urlBeforeRequestHooks = options.url instanceof URL ? new URL(options.url) : undefined;
+        const boundaryBeforeRequestHooks = getUrlPrefixBoundary(options);
         const changedState = await options.trackStateMutations(async (changedState) => {
             for (const hook of options.hooks.beforeRequest) {
                 // eslint-disable-next-line no-await-in-loop
@@ -65787,6 +65894,11 @@ class Request extends external_node_stream_.Duplex {
             }
             return changedState;
         });
+        if (urlBeforeRequestHooks
+            && options.url instanceof URL
+            && hasUrlOrPrefixUrlBoundaryChanged(options, options.url, boundaryBeforeRequestHooks)) {
+            assertUrlHasSameOriginAsPrefixUrlIfNeeded(options, options.url);
+        }
         if (request === undefined) {
             const currentHeaders = options.getInternalHeaders();
             // `headers.authorization = undefined` / `headers.cookie = undefined` is an
@@ -66111,6 +66223,7 @@ function asPromise(firstRequest) {
                         const hooks = options.hooks.afterResponse;
                         for (const [index, hook] of hooks.entries()) {
                             const previousUrl = options.url ? new URL(options.url) : undefined;
+                            const previousBoundary = getUrlPrefixBoundary(options);
                             const previousState = previousUrl ? snapshotCrossOriginState(options) : undefined;
                             const requestOptions = response.request.options;
                             const responseSnapshot = response;
@@ -66132,11 +66245,18 @@ function asPromise(firstRequest) {
                                     options.cookieJar = undefined;
                                 }
                                 if (!reusesRequestOptions) {
-                                    options.merge(updatedOptions);
-                                    options.syncCookieHeaderAfterMerge(previousState, updatedOptions.headers);
+                                    const { url, ...updatedOptionsWithoutUrl } = updatedOptions;
+                                    options.merge(updatedOptionsWithoutUrl);
+                                    options.syncCookieHeaderAfterMerge(previousState, updatedOptionsWithoutUrl.headers);
                                 }
                                 options.clearUnchangedCookieHeader(previousState, reusesRequestOptions ? changedState : undefined);
-                                if (updatedOptions.url) {
+                                const currentUrl = options.url;
+                                if (previousUrl
+                                    && currentUrl instanceof URL
+                                    && hasUrlOrPrefixUrlBoundaryChanged(options, currentUrl, previousBoundary)) {
+                                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(options, currentUrl);
+                                }
+                                if (updatedOptions.url !== undefined) {
                                     const nextUrl = reusesRequestOptions
                                         ? options.url
                                         : applyUrlOverride(options, updatedOptions.url, updatedOptions);
@@ -66342,7 +66462,15 @@ const create_create = (defaults) => {
             request.options.isStream = true;
         }
         let promise;
+        const urlBeforeHandlers = request.options?.url instanceof URL ? new URL(request.options.url) : undefined;
+        const boundaryBeforeHandlers = request.options ? getUrlPrefixBoundary(request.options) : undefined;
         const lastHandler = (normalized) => {
+            if (urlBeforeHandlers
+                && boundaryBeforeHandlers
+                && normalized?.url instanceof URL
+                && hasUrlOrPrefixUrlBoundaryChanged(normalized, normalized.url, boundaryBeforeHandlers)) {
+                assertUrlHasSameOriginAsPrefixUrlIfNeeded(normalized, normalized.url);
+            }
             // Note: `options` is `undefined` when `new Options(...)` fails
             request.options = normalized;
             const shouldReturnStream = normalized?.isStream ?? isStream;
@@ -66452,6 +66580,7 @@ const create_create = (defaults) => {
             }
             const requestOptions = response.request.options;
             const previousUrl = requestOptions.url ? new URL(requestOptions.url) : undefined;
+            const previousBoundary = getUrlPrefixBoundary(requestOptions);
             const previousState = previousUrl ? snapshotCrossOriginState(requestOptions) : undefined;
             // eslint-disable-next-line no-await-in-loop
             const [optionsToMerge, changedState] = await requestOptions.trackStateMutations(async (changedState) => [
@@ -66470,6 +66599,10 @@ const create_create = (defaults) => {
                 normalizedOptions.clearUnchangedCookieHeader(previousState, changedState);
                 if (previousUrl) {
                     const nextUrl = normalizedOptions.url;
+                    if (nextUrl
+                        && hasUrlOrPrefixUrlBoundaryChanged(normalizedOptions, nextUrl, previousBoundary)) {
+                        assertUrlHasSameOriginAsPrefixUrlIfNeeded(normalizedOptions, nextUrl);
+                    }
                     if (nextUrl && !isSameOrigin(previousUrl, nextUrl)) {
                         normalizedOptions.prefixUrl = '';
                         normalizedOptions.stripUnchangedCrossOriginState(previousState, changedState);
@@ -66477,18 +66610,34 @@ const create_create = (defaults) => {
                 }
             }
             else {
+                const paginationOptions = normalizedOptions;
+                const paginationUrl = paginationOptions.url instanceof URL ? new URL(paginationOptions.url) : undefined;
+                const paginationBoundary = getUrlPrefixBoundary(paginationOptions);
                 const hasExplicitBody = (Object.hasOwn(optionsToMerge, 'body') && optionsToMerge.body !== undefined)
                     || (Object.hasOwn(optionsToMerge, 'json') && optionsToMerge.json !== undefined)
                     || (Object.hasOwn(optionsToMerge, 'form') && optionsToMerge.form !== undefined);
                 const clearsCookieJar = Object.hasOwn(optionsToMerge, 'cookieJar') && optionsToMerge.cookieJar === undefined;
                 if (hasExplicitBody) {
-                    normalizedOptions.clearBody();
+                    paginationOptions.clearBody();
                 }
                 if (clearsCookieJar) {
-                    normalizedOptions.cookieJar = undefined;
+                    paginationOptions.cookieJar = undefined;
                 }
-                normalizedOptions.merge(optionsToMerge);
-                normalizedOptions.syncCookieHeaderAfterMerge(previousState, optionsToMerge.headers);
+                const { url, ...optionsToMergeWithoutUrl } = optionsToMerge;
+                paginationOptions.merge(optionsToMergeWithoutUrl);
+                paginationOptions.syncCookieHeaderAfterMerge(previousState, optionsToMergeWithoutUrl.headers);
+                if (paginationOptions.url instanceof URL
+                    && hasUrlOrPrefixUrlBoundaryChanged(paginationOptions, paginationOptions.url, paginationBoundary)) {
+                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(paginationOptions, paginationOptions.url);
+                }
+                if (previousUrl
+                    && paginationUrl
+                    && !isSameOrigin(paginationUrl, previousUrl)) {
+                    paginationOptions.stripSensitiveHeaders(paginationUrl, previousUrl, optionsToMerge);
+                    if (!hasExplicitBody) {
+                        paginationOptions.clearBody();
+                    }
+                }
                 try {
                     assert.any([distribution.string, distribution.urlInstance, distribution.undefined], optionsToMerge.url);
                 }
@@ -66498,15 +66647,23 @@ const create_create = (defaults) => {
                     }
                     throw error;
                 }
-                if (optionsToMerge.url !== undefined) {
-                    const nextUrl = applyUrlOverride(normalizedOptions, optionsToMerge.url, optionsToMerge);
+                if (url !== undefined) {
+                    const nextUrl = applyUrlOverride(paginationOptions, url, {
+                        ...optionsToMerge,
+                        baseUrl: previousUrl,
+                    });
+                    if (paginationOptions.prefixUrl.toString() !== paginationBoundary.prefixUrl
+                        || paginationOptions.allowAbsoluteUrls !== paginationBoundary.allowAbsoluteUrls) {
+                        assertUrlHasSameOriginAsPrefixUrlIfNeeded(paginationOptions, nextUrl);
+                    }
                     if (previousUrl) {
-                        normalizedOptions.stripSensitiveHeaders(previousUrl, nextUrl, optionsToMerge);
+                        paginationOptions.stripSensitiveHeaders(previousUrl, nextUrl, optionsToMerge);
                         if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
-                            normalizedOptions.clearBody();
+                            paginationOptions.clearBody();
                         }
                     }
                 }
+                normalizedOptions = paginationOptions;
             }
             numberOfRequests++;
         }
