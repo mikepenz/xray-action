@@ -13701,7 +13701,7 @@ const XMLStringLexer_1 = __webpack_require__(3529);
 const interfaces_1 = __webpack_require__(4727);
 const infra_1 = __webpack_require__(4737);
 const algorithm_1 = __webpack_require__(6573);
-const LocalNameSet_1 = __webpack_require__(7830);
+const LocalNameSet_1 = __webpack_require__(5449);
 /**
  * Represents a parser for XML content.
  *
@@ -14427,7 +14427,7 @@ var TokenType;
 
 /***/ }),
 
-/***/ 7830:
+/***/ 5449:
 /***/ ((__unused_webpack_module, exports) => {
 
 
@@ -14649,7 +14649,7 @@ exports.NamespacePrefixMap = NamespacePrefixMap;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.XMLSerializerImpl = void 0;
 const interfaces_1 = __webpack_require__(9454);
-const LocalNameSet_1 = __webpack_require__(7830);
+const LocalNameSet_1 = __webpack_require__(5449);
 const NamespacePrefixMap_1 = __webpack_require__(8377);
 const DOMException_1 = __webpack_require__(7175);
 const infra_1 = __webpack_require__(4737);
@@ -25722,7 +25722,7 @@ const BuilderFunctions_1 = __webpack_require__(9373);
 const algorithm_1 = __webpack_require__(6573);
 const infra_1 = __webpack_require__(4737);
 const NamespacePrefixMap_1 = __webpack_require__(8377);
-const LocalNameSet_1 = __webpack_require__(7830);
+const LocalNameSet_1 = __webpack_require__(5449);
 const util_2 = __webpack_require__(8247);
 const XMLCBWriter_1 = __webpack_require__(9341);
 const JSONCBWriter_1 = __webpack_require__(6108);
@@ -27947,7 +27947,7 @@ exports.BaseCBWriter = BaseCBWriter;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BaseWriter = void 0;
 const interfaces_1 = __webpack_require__(9454);
-const LocalNameSet_1 = __webpack_require__(7830);
+const LocalNameSet_1 = __webpack_require__(5449);
 const NamespacePrefixMap_1 = __webpack_require__(8377);
 const infra_1 = __webpack_require__(4737);
 const algorithm_1 = __webpack_require__(6573);
