@@ -1,33 +1,76 @@
-<div align="center">
-  :octocat:
-</div>
-<h1 align="center">
-  xray-action
-</h1>
+<h1 align="center">xray-action</h1>
 
 <p align="center">
-    ... a GitHub action to import test results into "Xray" - A complete Test Management tool for Jira.
+    ... a GitHub action to import test results into <a href="https://docs.getxray.app/site/xray">Xray</a> — the test management app for Jira.
 </p>
 
-<div align="center">
-  <a href="https://github.com/mikepenz/xray-action/actions">
-		<img src="https://github.com/mikepenz/xray-action/workflows/CI/badge.svg"/>
-	</a>
-	<a href="https://scorecard.dev/viewer/?uri=github.com/mikepenz/xray-action">
-		<img src="https://api.scorecard.dev/projects/github.com/mikepenz/xray-action/badge"/>
-	</a>
-</div>
-<br />
-
--------
+<p align="center">
+	<a href="https://github.com/mikepenz/xray-action/actions"><img src="https://github.com/mikepenz/xray-action/workflows/CI/badge.svg" alt="CI"></a>
+	<a href="https://github.com/marketplace/actions/xray-action"><img src="https://img.shields.io/github/v/release/mikepenz/xray-action?label=marketplace&color=0969DA" alt="Marketplace"></a>
+	<a href="https://scorecard.dev/viewer/?uri=github.com/mikepenz/xray-action"><img src="https://api.scorecard.dev/projects/github.com/mikepenz/xray-action/badge" alt="OpenSSF Scorecard"></a>
+	<a href="#license"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License"></a>
+</p>
 
 <p align="center">
-    <a href="#setup">Setup 🛠️</a> &bull;
-    <a href="#contribute-">Contribute 🧬</a> &bull;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mikepenz/xray-action/main/.github/images/hero-dark.svg">
+    <img src="https://raw.githubusercontent.com/mikepenz/xray-action/main/.github/images/hero-light.svg" width="100%" alt="xray-action: junit, cucumber, testng, xunit and robot reports funnel into a single Xray test execution issue">
+  </picture>
+</p>
+
+<p align="center">
+    <a href="#quickstart-">Quickstart 🛠️</a> &bull;
+    <a href="#configure-the-workflow">Inputs</a> &bull;
+    <a href="#action-outputs">Outputs</a> &bull;
+    <a href="#reference">Reference 📖</a> &bull;
     <a href="#license">License 📓</a>
 </p>
 
+| | |
+|---|---|
+| 🧾 **9 report formats** | `junit`, `xunit`, `nunit`, `testng`, `robot`, `cucumber`, `behave`, `xray`, `bundle` |
+| ☁️ **Cloud and Server/DC** | API key pairs for Xray Cloud, Jira credentials or a `xrayToken` PAT for Server/DC |
+| 🎯 **Targets a test execution** | Reuse one via `testExecKey`, or let the action create it from `projectKey` |
+| 🔀 **Merges split reports** | `testMerge` folds many `junit` / `cucumber` files into a single import |
+| 🛠️ **Real Jira fields** | `testExecutionJson` / `testJson` set summary, issue type, components, custom fields |
+| ♻️ **Survives flaky endpoints** | `importRetryLimit`, `responseTimeout` and `importParallelism` are all yours to tune |
+
+## Quickstart 🛠️
+
+**1.** Create a [Xray API key](https://docs.getxray.app/display/XRAYCLOUD/Global+Settings%3A+API+Keys) — a pair of client id and client secret.
+
+**2.** Store both as repository secrets, `XRAY_CLIENT_ID` and `XRAY_CLIENT_SECRET`.
+
+**3.** Add the import step after your tests have run:
+
+```yml
+- name: "Import results to Xray"
+  uses: mikepenz/xray-action@v4
+  with:
+    username: ${{ secrets.XRAY_CLIENT_ID }}
+    password: ${{ secrets.XRAY_CLIENT_SECRET }}
+    testFormat: "junit"
+    testPaths: "**/test/*.xml"
+    testExecKey: "TEST-1"
+    projectKey: "TEST"
+```
+
+The results show up on `TEST-1`, and the action reports back how many files it imported via the [`count` output](#action-outputs).
+
+> [!TIP]
+> On Xray Server/DC set `xrayCloud: "false"` and point `xrayBaseUrl` at your Jira instance — see [Configure the workflow](#configure-the-workflow).
+
 -------
+
+# Reference
+
+| Topic | |
+|---|---|
+| [Configure the workflow](#configure-the-workflow) | Every input, for Xray Cloud and Server/DC |
+| [Test execution json](#test-execution-json) | Set Jira fields on the created test execution |
+| [Action outputs](#action-outputs) | `count`, `completed`, `failed`, `testExecKey`, … |
+| [Contribute](#contribute-) | Build and test the action locally |
+| [Xray](#xray) | Which parts of the Xray REST API are covered |
 
 ## Setup
 
