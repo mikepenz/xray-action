@@ -3558,12 +3558,13 @@ module.exports = class CachePolicy {
 
     /**
      * @param {{headers: Record<string, string>, synchronous: boolean}|undefined} revalidation - Revalidation information, if any.
-     * @returns {{response: {headers: Record<string, string>}, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object with a cached response headers and revalidation info.
+     * @returns {{response: HttpResponse, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object with a cached response headers and revalidation info.
      */
     _evaluateRequestHitResult(revalidation) {
         return {
             response: {
                 headers: this.responseHeaders(),
+                status: this._status,
             },
             revalidation,
         };
@@ -3611,9 +3612,9 @@ module.exports = class CachePolicy {
      * }
      * ```
      * @param {HttpRequest} req - new incoming HTTP request
-     * @returns {{response: {headers: Record<string, string>}|undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object containing keys:
+     * @returns {{response: HttpResponse|undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object containing keys:
      *   - revalidation: { headers: Record<string, string>, synchronous: boolean } Set if you should send this to the origin server
-     *   - response: { headers: Record<string, string> } Set if you can respond to the client with these cached headers
+     *   - response: HttpResponse Set if you can respond to the client with these cached headers
      */
     evaluateRequest(req) {
         this._assertRequestHasHeaders(req);
@@ -3708,18 +3709,32 @@ module.exports = class CachePolicy {
             return true;
         }
 
-        // A Vary header field-value of "*" always fails to match
-        if (this._resHeaders.vary === '*') {
-            return false;
-        }
-
         const fields = this._resHeaders.vary
             .trim()
             .toLowerCase()
             .split(/\s*,\s*/);
+
         for (const name of fields) {
-            if (req.headers[name] !== this._reqHeaders[name]) return false;
+            // A Vary header field-value of "*" always fails to match
+            if (name === '*') {
+                return false;
+            }
+
+            const newReq = Object.prototype.hasOwnProperty.call(
+                req.headers,
+                name
+            ) && req.headers[name];
+
+            const cachedReq = Object.prototype.hasOwnProperty.call(
+                this._reqHeaders,
+                name
+            ) && this._reqHeaders[name];
+
+            if (newReq !== cachedReq) {
+                return false;
+            }
         }
+
         return true;
     }
 
@@ -3778,6 +3793,14 @@ module.exports = class CachePolicy {
         headers.age = `${Math.round(age)}`;
         headers.date = new Date(this.now()).toUTCString();
         return headers;
+    }
+
+    /**
+     * Returns the status code of the cached response.
+     * @returns {number} The response status code.
+     */
+    status() {
+      return this._status;
     }
 
     /**
@@ -12467,7 +12490,7 @@ class MemoryCacheStore extends EventEmitter {
   }
 
   /**
-   * @param {import('../../types/cache-interceptor.d.ts').default.CacheKey} req
+   * @param {import('../../types/cache-interceptor.d.ts').default.CacheKey} key
    * @returns {import('../../types/cache-interceptor.d.ts').default.GetResult | undefined}
    */
   get (key) {
@@ -12559,7 +12582,7 @@ class MemoryCacheStore extends EventEmitter {
 
           // Perform eviction
           for (const [key, entries] of store.#entries) {
-            for (const entry of entries.splice(0, entries.length / 2)) {
+            for (const entry of entries.splice(0, Math.ceil(entries.length / 2))) {
               store.#size -= entry.size
               store.#count -= 1
             }
@@ -15412,6 +15435,8 @@ module.exports = {
   kDestroy: Symbol('destroy'),
   kDispatch: Symbol('dispatch'),
   kUrl: Symbol('url'),
+  kRequestOrigin: Symbol('request origin'),
+  kOriginless: Symbol('originless'),
   kWriting: Symbol('writing'),
   kResuming: Symbol('resuming'),
   kQueue: Symbol('queue'),
@@ -16715,7 +16740,7 @@ module.exports = {
 
 
 const { InvalidArgumentError, MaxOriginsReachedError } = __nccwpck_require__(8707)
-const { kBusy, kClients, kConnected, kRunning, kClose, kDestroy, kDispatch, kUrl } = __nccwpck_require__(6443)
+const { kBusy, kClients, kConnected, kRunning, kPending, kClose, kDestroy, kDispatch, kUrl } = __nccwpck_require__(6443)
 const DispatcherBase = __nccwpck_require__(1841)
 const Pool = __nccwpck_require__(628)
 const Client = __nccwpck_require__(3701)
@@ -16811,7 +16836,12 @@ class Agent extends DispatcherBase {
           return
         }
 
-        if (dispatcher[kConnected] > 0 || dispatcher[kBusy]) {
+        // A GOAWAY detaches the HTTP/2 session before requeued requests are
+        // dispatched on a replacement connection. At that point the pool has
+        // no connected clients and is not busy, but it still has pending work.
+        // Closing it here lets the replacement Client finish those requests
+        // and then destroys that new connection with ClientDestroyedError.
+        if (dispatcher[kConnected] > 0 || dispatcher[kBusy] || dispatcher[kPending] > 0) {
           return
         }
 
@@ -16906,7 +16936,7 @@ const {
   kGetDispatcher
 } = __nccwpck_require__(2128)
 const Pool = __nccwpck_require__(628)
-const { kUrl } = __nccwpck_require__(6443)
+const { kOriginless, kUrl } = __nccwpck_require__(6443)
 const util = __nccwpck_require__(3440)
 const kFactory = Symbol('factory')
 
@@ -16942,14 +16972,17 @@ function defaultFactory (origin, opts) {
 }
 
 class BalancedPool extends PoolBase {
-  constructor (upstreams = [], { factory = defaultFactory, ...opts } = {}) {
+  constructor (upstreams = [], { factory = defaultFactory, connect, tls, ...opts } = {}) {
     if (typeof factory !== 'function') {
       throw new InvalidArgumentError('factory must be a function.')
     }
 
-    super()
+    super(opts)
 
-    this[kOptions] = { ...util.deepClone(opts) }
+    this[kOriginless] = true
+    if (connect && typeof connect !== 'function') connect = { ...connect }
+    if (tls && typeof tls !== 'function') tls = { ...tls }
+    this[kOptions] = { ...util.deepClone(opts), connect, tls }
     this[kIndex] = -1
     this[kCurrentWeight] = 0
 
@@ -18166,7 +18199,7 @@ function onSocketClose () {
 
 function clearIdleSocketValidation (socket) {
   if (socket[kIdleSocketValidationTimeout]) {
-    clearTimeout(socket[kIdleSocketValidationTimeout])
+    clearImmediate(socket[kIdleSocketValidationTimeout])
     socket[kIdleSocketValidationTimeout] = null
   }
 
@@ -18175,15 +18208,23 @@ function clearIdleSocketValidation (socket) {
 
 function scheduleIdleSocketValidation (client, socket) {
   socket[kIdleSocketValidation] = 1
-  socket[kIdleSocketValidationTimeout] = setTimeout(() => {
+  // Yield to the check phase (after poll) so unsolicited bytes / FIN / RST
+  // already pending on this idle keep-alive socket are processed before the
+  // next request is written (GHSA-35p6-xmwp-9g52).
+  //
+  // setTimeout(0) pays Node's ~1ms timer floor on every sequential reuse
+  // (#5493). setImmediate avoids that, but an *unref'd* Immediate lets poll
+  // block for ~500ms when the event loop is otherwise idle (#5600 / #5606).
+  // A ref'd Immediate both keeps the pending request alive and makes poll
+  // return immediately — the hybrid those issues asked for.
+  socket[kIdleSocketValidationTimeout] = setImmediate(() => {
     socket[kIdleSocketValidationTimeout] = null
     socket[kIdleSocketValidation] = 2
 
     if (client[kSocket] === socket && !socket.destroyed) {
       client[kResume]()
     }
-  }, 0)
-  socket[kIdleSocketValidationTimeout].unref?.()
+  })
 }
 
 /**
@@ -18924,7 +18965,8 @@ const {
   InformationalError,
   InvalidArgumentError,
   HeadersTimeoutError,
-  BodyTimeoutError
+  BodyTimeoutError,
+  ResponseExceededMaxSizeError
 } = __nccwpck_require__(8707)
 const {
   kUrl,
@@ -18953,7 +18995,8 @@ const {
   kRemoteSettings,
   kHTTP2Stream,
   kHTTP2SessionState,
-  kHTTP2Options
+  kHTTP2Options,
+  kMaxResponseSize
 } = __nccwpck_require__(6443)
 const { channels } = __nccwpck_require__(2414)
 
@@ -19936,9 +19979,11 @@ function writeH2 (client, request) {
   const state = {
     abort: null,
     body: request.body,
+    bytesRead: 0,
     client,
     contentLength: null,
     expectsPayload: false,
+    maxResponseSize: client[kMaxResponseSize],
     request,
     headersTimeout,
     bodyTimeout,
@@ -20174,6 +20219,7 @@ function writeH2 (client, request) {
   // become unreachable once the stream closes, so plain `on` avoids the
   // per-listener `once` wrapper allocation.
   stream.on('response', onResponse)
+  stream.on('headers', onInterimResponse)
   stream.on('end', onEnd)
   stream.on('error', onError)
   stream.on('frameError', onFrameError)
@@ -20194,6 +20240,7 @@ function removeRequestStreamListeners (stream) {
   stream.off('error', noop)
   stream.off('continue', writeBodyH2)
   stream.off('response', onResponse)
+  stream.off('headers', onInterimResponse)
   stream.off('end', onEnd)
   stream.off('error', onError)
   stream.off('frameError', onFrameError)
@@ -20236,15 +20283,49 @@ function onData (chunk) {
     return
   }
 
+  const { request, maxResponseSize } = state
+
+  if (request.aborted || request.completed) {
+    return
+  }
+
+  if (maxResponseSize > -1 && state.bytesRead + chunk.length > maxResponseSize) {
+    // Unlike HTTP/1.1, which destroys the socket because it cannot abandon one
+    // response without losing framing, resetting the offending stream leaves
+    // the session usable for its siblings.
+    state.abort(new ResponseExceededMaxSizeError())
+    return
+  }
+
+  state.bytesRead += chunk.length
+
+  if (request.onResponseData(chunk) === false) {
+    stream.pause()
+  }
+}
+
+function onInterimResponse (headers) {
+  const stream = this
+  const state = stream[kRequestStreamState]
+
+  if (state == null) {
+    return
+  }
+
   const { request } = state
 
   if (request.aborted || request.completed) {
     return
   }
 
-  if (request.onResponseData(chunk) === false) {
-    stream.pause()
-  }
+  // node http2 emits 'headers' for interim (1xx) informational responses,
+  // while the final response arrives via 'response'. Forward these to the
+  // handler so that onInfo is invoked, matching the HTTP/1 behaviour and the
+  // documented onInfo contract.
+  const statusCode = headers[HTTP2_HEADER_STATUS]
+  delete headers[HTTP2_HEADER_STATUS]
+
+  request.onResponseStart(Number(statusCode), headers, noop, '')
 }
 
 function onResponse (headers) {
@@ -20799,7 +20880,8 @@ class Client extends DispatcherBase {
     connectionWindowSize,
     pingInterval,
     webSocket,
-    h2Options
+    h2Options,
+    eventSource
   } = {}) {
     if (keepAlive !== undefined) {
       throw new InvalidArgumentError('unsupported keepAlive, use pipelining=0 instead')
@@ -20938,7 +21020,7 @@ class Client extends DispatcherBase {
       }
     }
 
-    super({ webSocket })
+    super({ webSocket, eventSource })
 
     if (typeof connect !== 'function') {
       connect = buildConnector({
@@ -21409,6 +21491,7 @@ module.exports = Client
 
 
 
+const buffer = __nccwpck_require__(4573)
 const Dispatcher = __nccwpck_require__(883)
 const {
   ClientDestroyedError,
@@ -21420,6 +21503,7 @@ const { kDestroy, kClose, kClosed, kDestroyed, kDispatch } = __nccwpck_require__
 const kOnDestroyed = Symbol('onDestroyed')
 const kOnClosed = Symbol('onClosed')
 const kWebSocketOptions = Symbol('webSocketOptions')
+const kEventSourceOptions = Symbol('eventSourceOptions')
 
 class DispatcherBase extends Dispatcher {
   /** @type {boolean} */
@@ -21440,15 +21524,25 @@ class DispatcherBase extends Dispatcher {
   constructor (opts) {
     super()
     this[kWebSocketOptions] = opts?.webSocket ?? {}
+    this[kEventSourceOptions] = opts?.eventSource ?? {}
   }
 
   /**
-   * @returns {import('../../types/dispatcher').WebSocketOptions}
+   * @returns {import('../../types/client').Client.WebSocketOptions}
    */
   get webSocketOptions () {
     return {
       maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
       maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 128 * 1024 * 1024 // 128 MB default
+    }
+  }
+
+  /**
+   * @returns {import('../../types/client').Client.EventSourceOptions}
+   */
+  get eventSourceOptions () {
+    return {
+      maxEventSize: this[kEventSourceOptions].maxEventSize ?? buffer.kStringMaxLength
     }
   }
 
@@ -21601,6 +21695,7 @@ module.exports = DispatcherBase
 
 
 const EventEmitter = __nccwpck_require__(8474)
+const { kOriginless, kUrl } = __nccwpck_require__(6443)
 
 class Dispatcher extends EventEmitter {
   dispatch () {
@@ -21618,6 +21713,10 @@ class Dispatcher extends EventEmitter {
   compose (...args) {
     // So we handle [interceptor1, interceptor2] or interceptor1, interceptor2, ...
     const interceptors = Array.isArray(args[0]) ? args[0] : args
+    // null disables origin-dependent interceptors; undefined uses opts.origin.
+    const interceptorOrigin = this[kOriginless] === true
+      ? null
+      : this[kUrl]?.origin
     let dispatch = this.dispatch.bind(this)
 
     for (const interceptor of interceptors) {
@@ -21629,11 +21728,20 @@ class Dispatcher extends EventEmitter {
         throw new TypeError(`invalid interceptor, expected function received ${typeof interceptor}`)
       }
 
-      dispatch = interceptor(dispatch)
+      dispatch = interceptor(dispatch, interceptorOrigin)
 
       if (dispatch == null || typeof dispatch !== 'function' || dispatch.length !== 2) {
         throw new TypeError('invalid interceptor')
       }
+    }
+
+    const originalDispatch = dispatch
+    const self = this
+    dispatch = function (opts, handler) {
+      if (opts && typeof opts === 'object' && !opts.origin && self[kUrl]) {
+        opts = Object.assign({}, opts, { origin: self[kUrl].origin })
+      }
+      return originalDispatch(opts, handler)
     }
 
     return new Proxy(this, {
@@ -21655,6 +21763,7 @@ module.exports = Dispatcher
 const Dispatcher = __nccwpck_require__(883)
 const { InvalidArgumentError } = __nccwpck_require__(8707)
 const { toRawHeaders } = __nccwpck_require__(3440)
+const { kOriginless, kUrl } = __nccwpck_require__(6443)
 
 class LegacyHandlerWrapper {
   #handler
@@ -21723,6 +21832,8 @@ class Dispatcher1Wrapper extends Dispatcher {
     }
 
     this.#dispatcher = dispatcher
+    this[kUrl] = dispatcher[kUrl]
+    this[kOriginless] = dispatcher[kOriginless]
   }
 
   static wrapHandler (handler) {
@@ -21782,7 +21893,7 @@ class EnvHttpProxyAgent extends DispatcherBase {
   #opts = null
 
   constructor (opts = {}) {
-    super()
+    super(opts)
     this.#opts = opts
 
     const { httpProxy, httpsProxy, noProxy, ...agentOpts } = opts
@@ -21835,6 +21946,13 @@ class EnvHttpProxyAgent extends DispatcherBase {
     // brackets from IPv6 literals (e.g. "[::1]" -> "::1") so that the
     // result matches the unbracketed form stored by #parseNoProxy.
     hostname = hostname.replace(/:\d*$/, '').replace(/^\[(.+)\]$/, '$1').toLowerCase()
+    // Drop a trailing dot: it only marks the fully qualified form of a domain
+    // name ("example.com." and "example.com" are the same name, RFC 1034 root
+    // label). This runs on every dispatch, so it is a charCode check rather
+    // than a third regex. `length > 1` leaves the degenerate host "." alone.
+    if (hostname.length > 1 && hostname.charCodeAt(hostname.length - 1) === 46) {
+      hostname = hostname.slice(0, -1)
+    }
     port = Number.parseInt(port, 10) || DEFAULT_PORTS[protocol] || 0
     if (!this.#shouldProxy(hostname, port)) {
       return this[kNoProxyAgent]
@@ -21909,8 +22027,8 @@ class EnvHttpProxyAgent extends DispatcherBase {
       }
 
       noProxyEntries.push({
-        // strip leading dot or asterisk with dot
-        hostname: hostname.replace(/^\*?\./, '').toLowerCase(),
+        // strip leading dot or asterisk with dot, and any trailing dot
+        hostname: hostname.replace(/^\*?\./, '').replace(/^(.+)\.$/, '$1').toLowerCase(),
         port
       })
     }
@@ -22539,6 +22657,7 @@ const buildConnector = __nccwpck_require__(9136)
 const Client = __nccwpck_require__(3701)
 const { channels } = __nccwpck_require__(2414)
 const Socks5ProxyAgent = __nccwpck_require__(7223)
+const { hasSafeIterator } = __nccwpck_require__(3440)
 
 const kAgent = Symbol('proxy agent')
 const kClient = Symbol('proxy client')
@@ -22650,7 +22769,7 @@ class ProxyAgent extends DispatcherBase {
 
     const { proxyTunnel, connectTimeout } = opts
 
-    super()
+    super(opts)
 
     const url = this.#getUrl(opts)
     const { href, origin, port, protocol, username, password, hostname: proxyHostname } = url
@@ -22691,6 +22810,7 @@ class ProxyAgent extends DispatcherBase {
           factory: agentFactory,
           username: opts.username || username,
           password: opts.password || password,
+          connectTimeout,
           proxyTls: opts.proxyTls,
           requestTls: opts.requestTls
         })
@@ -22874,6 +22994,21 @@ function buildHeaders (headers) {
     return headersPair
   }
 
+  // Materialize iterable header containers (e.g. Map, Headers) into a record so
+  // that throwIfProxyAuthIsSent() can inspect their entries. Object.keys and
+  // for...in see nothing on a Map/Headers instance, so without this the
+  // Proxy-Authorization guard is bypassed and proxy credentials can reach the
+  // origin server (GHSA-6cv7-626c-qhqw).
+  if (headers && typeof headers === 'object' && hasSafeIterator(headers)) {
+    const headersPair = {}
+
+    for (const [key, value] of headers) {
+      headersPair[key] = value
+    }
+
+    return headersPair
+  }
+
   return headers
 }
 
@@ -22917,6 +23052,7 @@ module.exports = ProxyAgent
 
 const Dispatcher = __nccwpck_require__(883)
 const RetryHandler = __nccwpck_require__(7816)
+const { kOriginless, kUrl } = __nccwpck_require__(6443)
 
 class RetryAgent extends Dispatcher {
   #agent = null
@@ -22925,6 +23061,8 @@ class RetryAgent extends Dispatcher {
     super(options)
     this.#agent = agent
     this.#options = options
+    this[kUrl] = agent[kUrl]
+    this[kOriginless] = agent[kOriginless]
   }
 
   dispatch (opts, handler) {
@@ -23022,7 +23160,7 @@ class RoundRobinPool extends PoolBase {
       })
     }
 
-    super()
+    super(options)
 
     this[kConnections] = connections || null
     this[kUrl] = util.parseOrigin(origin)
@@ -23127,14 +23265,17 @@ const { URL } = __nccwpck_require__(3136)
 
 let tls // include tls conditionally since it is not always available
 const DispatcherBase = __nccwpck_require__(1841)
-const { InvalidArgumentError } = __nccwpck_require__(8707)
+const { ConnectTimeoutError, InvalidArgumentError } = __nccwpck_require__(8707)
 const { Socks5Client, STATES } = __nccwpck_require__(8082)
 const { kBusy, kConnected, kDispatch, kClose, kDestroy } = __nccwpck_require__(6443)
 const Pool = __nccwpck_require__(628)
 const buildConnector = __nccwpck_require__(9136)
+const { setupConnectTimeout } = __nccwpck_require__(3440)
 const { debuglog } = __nccwpck_require__(7975)
 
 const debug = debuglog('undici:socks5-proxy')
+
+const DEFAULT_SOCKS5_CONNECT_TIMEOUT = 5000
 
 const kProxyUrl = Symbol('proxy url')
 const kProxyHeaders = Symbol('proxy headers')
@@ -23142,7 +23283,15 @@ const kProxyAuth = Symbol('proxy auth')
 const kProxyProtocol = Symbol('proxy protocol')
 const kPools = Symbol('pools')
 const kConnector = Symbol('connector')
+const kConnectTimeout = Symbol('connect timeout')
 const kRequestTls = Symbol('request tls settings')
+const kRequestTlsTimeout = Symbol('request tls timeout')
+
+function createConnectTimeoutError (hostname, port, timeout) {
+  return new ConnectTimeoutError(
+    `Connect Timeout Error (attempted address: ${hostname}:${port}, timeout: ${timeout}ms)`
+  )
+}
 
 // Static flag to ensure warning is only emitted once per process
 let experimentalWarningEmitted = false
@@ -23152,7 +23301,7 @@ let experimentalWarningEmitted = false
  */
 class Socks5ProxyAgent extends DispatcherBase {
   constructor (proxyUrl, options = {}) {
-    super()
+    super(options)
 
     // Emit experimental warning only once
     if (!experimentalWarningEmitted) {
@@ -23177,7 +23326,20 @@ class Socks5ProxyAgent extends DispatcherBase {
     this[kProxyUrl] = url
     this[kProxyHeaders] = options.headers || {}
     this[kProxyProtocol] = options.proxyTls ? 'https:' : 'http:'
-    this[kRequestTls] = options.requestTls
+
+    const connectTimeout = options.connectTimeout ?? DEFAULT_SOCKS5_CONNECT_TIMEOUT
+    if (!Number.isFinite(connectTimeout) || connectTimeout < 0) {
+      throw new InvalidArgumentError('invalid connectTimeout')
+    }
+    this[kConnectTimeout] = connectTimeout
+
+    const { timeout, ...requestTls } = options.requestTls || {}
+    const requestTlsTimeout = timeout ?? connectTimeout
+    if (!Number.isFinite(requestTlsTimeout) || requestTlsTimeout < 0) {
+      throw new InvalidArgumentError('invalid requestTls.timeout')
+    }
+    this[kRequestTls] = requestTls
+    this[kRequestTlsTimeout] = requestTlsTimeout
 
     // Extract auth from URL or options
     this[kProxyAuth] = {
@@ -23186,8 +23348,13 @@ class Socks5ProxyAgent extends DispatcherBase {
     }
 
     // Create connector for proxy connection
+    const proxyTlsTimeout = options.proxyTls?.timeout ?? connectTimeout
+    if (!Number.isFinite(proxyTlsTimeout) || proxyTlsTimeout < 0) {
+      throw new InvalidArgumentError('invalid proxyTls.timeout')
+    }
     this[kConnector] = options.connect || buildConnector({
       ...options.proxyTls,
+      timeout: proxyTlsTimeout,
       servername: options.proxyTls?.servername || url.hostname
     })
 
@@ -23236,20 +23403,29 @@ class Socks5ProxyAgent extends DispatcherBase {
 
     // Wait for authentication (if required)
     const authenticationReady = Promise.withResolvers()
+    const authenticationTimeout = this[kConnectTimeout] === 0
+      ? null
+      : setTimeout(() => {
+        cleanupAuthenticationListeners()
+        socks5Client.destroy()
+        authenticationReady.reject(
+          createConnectTimeoutError(proxyHost, proxyPort, this[kConnectTimeout])
+        )
+      }, this[kConnectTimeout])
 
-    const authenticationTimeout = setTimeout(() => {
-      authenticationReady.reject(new Error('SOCKS5 authentication timeout'))
-    }, 5000)
+    const cleanupAuthenticationListeners = () => {
+      clearTimeout(authenticationTimeout)
+      socks5Client.removeListener('authenticated', onAuthenticated)
+      socks5Client.removeListener('error', onAuthenticationError)
+    }
 
     const onAuthenticated = () => {
-      clearTimeout(authenticationTimeout)
-      socks5Client.removeListener('error', onAuthenticationError)
+      cleanupAuthenticationListeners()
       authenticationReady.resolve()
     }
 
     const onAuthenticationError = (err) => {
-      clearTimeout(authenticationTimeout)
-      socks5Client.removeListener('authenticated', onAuthenticated)
+      cleanupAuthenticationListeners()
       authenticationReady.reject(err)
     }
 
@@ -23269,21 +23445,30 @@ class Socks5ProxyAgent extends DispatcherBase {
 
     // Wait for connection
     const connectionReady = Promise.withResolvers()
+    const connectionTimeout = this[kConnectTimeout] === 0
+      ? null
+      : setTimeout(() => {
+        cleanupConnectionListeners()
+        socks5Client.destroy()
+        connectionReady.reject(
+          createConnectTimeoutError(targetHost, targetPort, this[kConnectTimeout])
+        )
+      }, this[kConnectTimeout])
 
-    const connectionTimeout = setTimeout(() => {
-      connectionReady.reject(new Error('SOCKS5 connection timeout'))
-    }, 5000)
+    const cleanupConnectionListeners = () => {
+      clearTimeout(connectionTimeout)
+      socks5Client.removeListener('connected', onConnected)
+      socks5Client.removeListener('error', onConnectionError)
+    }
 
     const onConnected = (info) => {
       debug('SOCKS5 tunnel established to', targetHost, targetPort, 'via', info)
-      clearTimeout(connectionTimeout)
-      socks5Client.removeListener('error', onConnectionError)
+      cleanupConnectionListeners()
       connectionReady.resolve()
     }
 
     const onConnectionError = (err) => {
-      clearTimeout(connectionTimeout)
-      socks5Client.removeListener('connected', onConnected)
+      cleanupConnectionListeners()
       connectionReady.reject(err)
     }
 
@@ -23336,8 +23521,31 @@ class Socks5ProxyAgent extends DispatcherBase {
                 })
 
                 const tlsReady = Promise.withResolvers()
-                finalSocket.once('secureConnect', tlsReady.resolve)
-                finalSocket.once('error', tlsReady.reject)
+
+                const cleanupTlsListeners = () => {
+                  queueMicrotask(clearTlsTimeout)
+                  finalSocket.removeListener('secureConnect', onSecureConnect)
+                  finalSocket.removeListener('error', onTlsError)
+                }
+
+                const onSecureConnect = () => {
+                  cleanupTlsListeners()
+                  tlsReady.resolve()
+                }
+
+                const onTlsError = (err) => {
+                  cleanupTlsListeners()
+                  tlsReady.reject(err)
+                }
+
+                const clearTlsTimeout = setupConnectTimeout(new WeakRef(finalSocket), {
+                  timeout: this[kRequestTlsTimeout],
+                  hostname: targetHost,
+                  port: targetPort
+                })
+
+                finalSocket.once('secureConnect', onSecureConnect)
+                finalSocket.once('error', onTlsError)
                 await tlsReady.promise
               }
 
@@ -23712,6 +23920,14 @@ class CacheHandler {
     this.#handler.onRequestStart?.(controller, context)
   }
 
+  onBodySent (chunk) {
+    this.#handler.onBodySent?.(chunk)
+  }
+
+  onRequestSent () {
+    this.#handler.onRequestSent?.()
+  }
+
   onRequestUpgrade (controller, statusCode, headers, socket) {
     this.#handler.onRequestUpgrade?.(controller, statusCode, headers, socket)
   }
@@ -23749,6 +23965,13 @@ class CacheHandler {
     }
 
     const cacheControlHeader = resHeaders['cache-control']
+    const cacheControlDirectives = cacheControlHeader ? parseCacheControlHeader(cacheControlHeader) : {}
+
+    if (revalidationResponseDisallowsCachedReuse(this.#cacheType, resHeaders, cacheControlDirectives)) {
+      deleteCachedValue(this.#store, this.#cacheKey)
+      return downstreamOnHeaders()
+    }
+
     const heuristicallyCacheable = resHeaders['last-modified'] && arrayIncludes(HEURISTICALLY_CACHEABLE_STATUS_CODES, statusCode)
     if (
       !cacheControlHeader &&
@@ -23765,8 +23988,7 @@ class CacheHandler {
       return downstreamOnHeaders()
     }
 
-    const cacheControlDirectives = cacheControlHeader ? parseCacheControlHeader(cacheControlHeader) : {}
-    if (!canCacheResponse(this.#cacheType, statusCode, resHeaders, cacheControlDirectives, this.#cacheKey.headers)) {
+    if (!canCacheResponse(this.#cacheType, this.#cacheKey.method, statusCode, resHeaders, cacheControlDirectives, this.#cacheKey.headers)) {
       if (statusCode === 304 && (cacheControlHeader || revalidationResponseDisallowsCachedReuse(this.#cacheType, resHeaders, cacheControlDirectives))) {
         deleteCachedValue(this.#store, this.#cacheKey)
       }
@@ -24015,7 +24237,10 @@ function deleteCachedValueIfNotModified (statusCode, store, cacheKey) {
  */
 function revalidationResponseDisallowsCachedReuse (cacheType, resHeaders, cacheControlDirectives) {
   return cacheControlDirectives['no-store'] === true ||
-    (cacheType === 'shared' && cacheControlDirectives.private === true) ||
+    (cacheType === 'shared' && (
+      cacheControlDirectives.private === true ||
+      Object.hasOwn(resHeaders, 'set-cookie')
+    )) ||
     (resHeaders.vary ? isInvalidOrWildcardVaryHeader(resHeaders.vary) : false)
 }
 
@@ -24023,12 +24248,16 @@ function revalidationResponseDisallowsCachedReuse (cacheType, resHeaders, cacheC
  * @see https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-to-authen
  *
  * @param {import('../../types/cache-interceptor.d.ts').default.CacheOptions['type']} cacheType
+ * @param {string} method
  * @param {number} statusCode
  * @param {import('../../types/header.d.ts').IncomingHttpHeaders} resHeaders
  * @param {import('../../types/cache-interceptor.d.ts').default.CacheControlDirectives} cacheControlDirectives
  * @param {import('../../types/header.d.ts').IncomingHttpHeaders} [reqHeaders]
  */
-function canCacheResponse (cacheType, statusCode, resHeaders, cacheControlDirectives, reqHeaders) {
+function canCacheResponse (cacheType, method, statusCode, resHeaders, cacheControlDirectives, reqHeaders) {
+  if (!arrayIncludes(util.safeHTTPMethods, method)) {
+    return false
+  }
   // Status code must be final and understood.
   if (statusCode < 200 || arrayIncludes(NOT_UNDERSTOOD_STATUS_CODES, statusCode)) {
     return false
@@ -24049,7 +24278,10 @@ function canCacheResponse (cacheType, statusCode, resHeaders, cacheControlDirect
     return false
   }
 
-  if (cacheType === 'shared' && cacheControlDirectives.private === true) {
+  if (cacheType === 'shared' && (
+    cacheControlDirectives.private === true ||
+    Object.hasOwn(resHeaders, 'set-cookie')
+  )) {
     return false
   }
 
@@ -24543,7 +24775,13 @@ module.exports = class DecoratorHandler {
   /**
    * @deprecated
    */
-  onBodySent () {}
+  onBodySent (...args) {
+    return this.#handler.onBodySent?.(...args)
+  }
+
+  onRequestSent (...args) {
+    return this.#handler.onRequestSent?.(...args)
+  }
 }
 
 
@@ -24919,12 +25157,22 @@ class DeduplicationHandler {
       get aborted () { return state.aborted },
       get reason () { return state.reason },
       abort: (reason) => {
+        if (state.aborted) {
+          return
+        }
+
         state.aborted = true
         state.reason = reason ?? null
         waitingHandler.done = true
         waitingHandler.pendingTrailers = null
         waitingHandler.bufferedChunks = []
         waitingHandler.bufferedBytes = 0
+
+        try {
+          handler.onResponseError?.(waitingHandler.controller, state.reason ?? new RequestAbortedError())
+        } catch {
+          // Ignore errors from waiting handlers
+        }
       }
     }
 
@@ -24998,12 +25246,8 @@ class DeduplicationHandler {
     waitingHandler.bufferedChunks = []
     waitingHandler.bufferedBytes = 0
 
-    try {
-      waitingHandler.controller.abort(err)
-      waitingHandler.handler.onResponseError?.(waitingHandler.controller, err)
-    } catch {
-      // Ignore errors from waiting handlers
-    }
+    // controller.abort(err) notifies the handler via onResponseError
+    waitingHandler.controller.abort(err)
   }
 
   #pruneDoneWaitingHandlers () {
@@ -25024,6 +25268,7 @@ module.exports = DeduplicationHandler
 const util = __nccwpck_require__(3440)
 const assert = __nccwpck_require__(4589)
 const { InvalidArgumentError } = __nccwpck_require__(8707)
+const { kRequestOrigin } = __nccwpck_require__(6443)
 
 const redirectableStatusCodes = [300, 301, 302, 303, 307, 308]
 
@@ -25064,6 +25309,14 @@ class RedirectHandler {
     this.handler.onRequestStart?.(controller, { ...context, history: this.history })
   }
 
+  onBodySent (chunk) {
+    this.handler.onBodySent?.(chunk)
+  }
+
+  onRequestSent () {
+    this.handler.onRequestSent?.()
+  }
+
   onRequestUpgrade (controller, statusCode, headers, socket) {
     this.handler.onRequestUpgrade?.(controller, statusCode, headers, socket)
   }
@@ -25102,8 +25355,12 @@ class RedirectHandler {
       ? null
       : headers.location
 
-    if (this.opts.origin) {
-      this.history.push(new URL(this.opts.path, this.opts.origin))
+    const requestOrigin = this.opts[kRequestOrigin] === undefined
+      ? this.opts.origin
+      : this.opts[kRequestOrigin]
+
+    if (requestOrigin) {
+      this.history.push(new URL(this.opts.path, requestOrigin))
     }
 
     if (!this.location) {
@@ -25111,7 +25368,10 @@ class RedirectHandler {
       return
     }
 
-    const { origin, pathname, search } = util.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)))
+    const baseUrl = requestOrigin
+      ? new URL(this.opts.path, requestOrigin)
+      : undefined
+    const { origin, pathname, search } = util.parseURL(new URL(this.location, baseUrl))
     const path = search ? `${pathname}${search}` : pathname
 
     // Check for redirect loops by seeing if we've already visited this URL in our history
@@ -25127,9 +25387,10 @@ class RedirectHandler {
     // Remove headers referring to the original URL.
     // By default it is Host only. A 303 or a 301/302 POST-to-GET redirect also removes all Content-* headers.
     // https://tools.ietf.org/html/rfc7231#section-6.4
-    this.opts.headers = cleanRequestHeaders(this.opts.headers, removeContentHeaders, this.opts.origin !== origin, this.stripHeadersOnRedirect, this.stripHeadersOnCrossOriginRedirect)
+    this.opts.headers = cleanRequestHeaders(this.opts.headers, removeContentHeaders, requestOrigin !== origin, this.stripHeadersOnRedirect, this.stripHeadersOnCrossOriginRedirect)
     this.opts.path = path
     this.opts.origin = origin
+    this.opts[kRequestOrigin] = origin
     this.opts.query = null
   }
 
@@ -25251,7 +25512,7 @@ module.exports = RedirectHandler
 const assert = __nccwpck_require__(4589)
 
 const { kRetryHandlerDefaultRetry } = __nccwpck_require__(6443)
-const { RequestRetryError } = __nccwpck_require__(8707)
+const { RequestRetryError, RequestAbortedError } = __nccwpck_require__(8707)
 const {
   isDisturbed,
   parseRangeHeader,
@@ -25290,19 +25551,42 @@ function validatePartialResponseContentLength (headers, range, statusCode, retry
 // new one: backpressure pauses the new connection's controller, but the
 // consumer's resume() targets the old one, so the resumed body stalls forever.
 // The proxy always forwards to the controller of the currently active connection.
+// An abort is additionally reported to the handler so it can cancel a pending
+// retry backoff instead of letting the request hang until the backoff elapses.
+// The notification is a private callback the handler hands over on construction,
+// so nothing outside the handler can trigger it.
 class RetryController {
-  constructor () {
+  #onAbort
+
+  constructor (onAbort) {
+    this.#onAbort = onAbort
     this.target = null
   }
 
   pause () { this.target?.pause() }
   resume () { this.target?.resume() }
-  abort (reason) { this.target?.abort(reason) }
+
+  abort (reason) {
+    this.target?.abort(reason)
+    this.#onAbort(reason)
+  }
+
   get paused () { return this.target?.paused ?? false }
   get aborted () { return this.target?.aborted ?? false }
   get reason () { return this.target?.reason ?? null }
   get rawHeaders () { return this.target?.rawHeaders ?? null }
+  set rawHeaders (value) {
+    if (this.target) {
+      this.target.rawHeaders = value
+    }
+  }
+
   get rawTrailers () { return this.target?.rawTrailers ?? null }
+  set rawTrailers (value) {
+    if (this.target) {
+      this.target.rawTrailers = value
+    }
+  }
 }
 
 class RetryHandler {
@@ -25361,15 +25645,32 @@ class RetryHandler {
     this.etag = null
     this.statusCode = null
     this.headers = null
-    this.controllerProxy = new RetryController()
+    this.controllerProxy = new RetryController(reason => this.#onAbort(reason))
+    // A retry decision is in flight (the policy may be holding a backoff
+    // timer). While pending, a consumer abort cancels the wait.
+    this.retryPending = false
+    // Backoff timer returned by the retry policy, so #onAbort can cancel it.
+    // Null for custom policies that do not return their timer.
+    this.retryTimer = null
+    // Set once an abort during the backoff delivered the terminal error
+    // downstream; late policy callbacks and connection errors are then moot.
+    this.aborted = false
   }
 
   onResponseStartWithRetry (controller, statusCode, headers, statusMessage, err) {
     if (this.retryOpts.throwOnError) {
       // Preserve old behavior for status codes that are not eligible for retry
       if (this.retryOpts.statusCodes.includes(statusCode) === false) {
-        this.headersSent = true
-        this.handler.onResponseStart?.(this.controllerProxy, statusCode, headers, statusMessage)
+        if (this.headersSent) {
+          // The downstream handler already received the response from an
+          // earlier attempt. Forwarding this response would replace the
+          // downstream body and leave the original body pending forever.
+          this.handler.onResponseError?.(this.controllerProxy, err)
+        } else {
+          this.headersSent = true
+          this.checkpointResponseEnd(headers)
+          this.handler.onResponseStart?.(this.controllerProxy, statusCode, headers, statusMessage)
+        }
       } else {
         this.error = err
       }
@@ -25379,14 +25680,30 @@ class RetryHandler {
 
     if (isDisturbed(this.opts.body)) {
       this.headersSent = true
+      this.checkpointResponseEnd(headers)
       this.handler.onResponseStart?.(this.controllerProxy, statusCode, headers, statusMessage)
       return
     }
 
     function shouldRetry (passedErr) {
+      if (this.aborted) {
+        // Aborted while the policy was deciding; the decision is moot.
+        return
+      }
+      this.retryPending = false
+      this.retryTimer = null
+
       if (passedErr) {
-        this.headersSent = true
-        this.handler.onResponseStart?.(this.controllerProxy, statusCode, headers, statusMessage)
+        if (this.headersSent) {
+          // The downstream handler already received the response from an
+          // earlier attempt. Forwarding this response would replace the
+          // downstream body and leave the original body pending forever.
+          this.handler.onResponseError?.(this.controllerProxy, passedErr)
+        } else {
+          this.headersSent = true
+          this.checkpointResponseEnd(headers)
+          this.handler.onResponseStart?.(this.controllerProxy, statusCode, headers, statusMessage)
+        }
         controller.resume()
         return
       }
@@ -25403,14 +25720,31 @@ class RetryHandler {
     // between, leaving this one paused forever -- the very stall the proxy exists
     // to prevent.
     controller.pause()
-    this.retryOpts.retry(
+    // The default policy returns its backoff timer so an abort can cancel it;
+    // a custom policy may return anything (or nothing), which is ignored.
+    this.retryPending = true
+    this.retryTimer = this.retryOpts.retry(
       err,
       {
         state: { counter: this.retryCount },
         opts: { retryOptions: this.retryOpts, ...this.opts }
       },
       shouldRetry.bind(this)
-    )
+    ) ?? null
+  }
+
+  checkpointResponseEnd (headers) {
+    if (this.end == null && this.opts.method !== 'HEAD') {
+      const contentLength = headers['content-length']
+      this.end = contentLength != null ? Number(contentLength) - 1 : null
+
+      assert(
+        this.end == null || Number.isFinite(this.end),
+        'invalid content-length'
+      )
+
+      this.resume = this.end != null
+    }
   }
 
   onRequestStart (controller, context) {
@@ -25423,6 +25757,14 @@ class RetryHandler {
     if (!this.headersSent) {
       this.handler.onRequestStart?.(this.controllerProxy, context)
     }
+  }
+
+  onBodySent (chunk) {
+    this.handler.onBodySent?.(chunk)
+  }
+
+  onRequestSent () {
+    this.handler.onRequestSent?.()
   }
 
   onRequestUpgrade (_controller, statusCode, headers, socket) {
@@ -25439,7 +25781,8 @@ class RetryHandler {
       timeoutFactor,
       statusCodes,
       errorCodes,
-      methods
+      methods,
+      retryAfter
     } = retryOptions
     const { counter } = state
 
@@ -25471,7 +25814,7 @@ class RetryHandler {
       return
     }
 
-    let retryAfterHeader = headers?.['retry-after']
+    let retryAfterHeader = retryAfter === false ? undefined : headers?.['retry-after']
     if (retryAfterHeader) {
       retryAfterHeader = Number(retryAfterHeader)
       retryAfterHeader = Number.isNaN(retryAfterHeader)
@@ -25486,7 +25829,9 @@ class RetryHandler {
           ? Math.min(retryAfterHeader, maxTimeout)
           : Math.min(minTimeout * timeoutFactor ** (counter - 1), maxTimeout)
 
-    setTimeout(() => cb(null), retryTimeout)
+    // Return the backoff timer so the handler can cancel it when the
+    // consumer aborts while the retry decision is pending.
+    return setTimeout(() => cb(null), retryTimeout)
   }
 
   onResponseStart (controller, statusCode, headers, statusMessage) {
@@ -25499,18 +25844,6 @@ class RetryHandler {
     this.retryCount += 1
     this.statusCode = statusCode
     this.headers = headers
-
-    if (statusCode >= 300) {
-      const err = new RequestRetryError('Request failed', statusCode, {
-        headers,
-        data: {
-          count: this.retryCount
-        }
-      })
-
-      this.onResponseStartWithRetry(controller, statusCode, headers, statusMessage, err)
-      return
-    }
 
     // Checkpoint for resume from where we left it
     if (this.headersSent) {
@@ -25548,9 +25881,25 @@ class RetryHandler {
 
       const { start, size, end = size ? size - 1 : null } = contentRange
 
-      assert(this.start === start, 'content-range mismatch')
-      assert(this.end == null || this.end === end, 'content-range mismatch')
+      if (this.start !== start || (this.end != null && this.end !== end)) {
+        throw new RequestRetryError('Content-Range mismatch', statusCode, {
+          headers,
+          data: { count: this.retryCount }
+        })
+      }
 
+      return
+    }
+
+    if (statusCode >= 300) {
+      const err = new RequestRetryError('Request failed', statusCode, {
+        headers,
+        data: {
+          count: this.retryCount
+        }
+      })
+
+      this.onResponseStartWithRetry(controller, statusCode, headers, statusMessage, err)
       return
     }
 
@@ -25684,14 +26033,27 @@ class RetryHandler {
   }
 
   onResponseError (controller, err) {
+    if (this.aborted) {
+      // #onAbort already delivered the terminal error downstream; the late
+      // error of the torn-down connection must not be forwarded twice.
+      return
+    }
+
     // controller is THIS failed connection (not the proxy): we inspect whether
     // the consumer aborted it to decide retry-vs-propagate.
-    if (controller?.aborted || isDisturbed(this.opts.body)) {
+    if (controller?.aborted || isDisturbed(this.opts.body) || (this.headersSent && !this.resume)) {
       this.handler.onResponseError?.(this.controllerProxy, err)
       return
     }
 
     function shouldRetry (returnedErr) {
+      if (this.aborted) {
+        // Aborted while the policy was deciding; the decision is moot.
+        return
+      }
+      this.retryPending = false
+      this.retryTimer = null
+
       if (!returnedErr) {
         this.retry()
         return
@@ -25711,14 +26073,31 @@ class RetryHandler {
       this.retryCount += 1
     }
 
-    this.retryOpts.retry(
+    this.retryPending = true
+    this.retryTimer = this.retryOpts.retry(
       err,
       {
         state: { counter: this.retryCount },
         opts: { retryOptions: this.retryOpts, ...this.opts }
       },
       shouldRetry.bind(this)
-    )
+    ) ?? null
+  }
+
+  #onAbort (reason) {
+    // A consumer abort lands on the controller proxy. If the retry policy is
+    // still deciding (typically holding a backoff timer), cancel the wait and
+    // surface the abort immediately instead of letting the request hang until
+    // the backoff elapses.
+    if (!this.retryPending) {
+      return
+    }
+
+    this.aborted = true
+    this.retryPending = false
+    clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    this.handler.onResponseError?.(this.controllerProxy, reason ?? new RequestAbortedError())
   }
 }
 
@@ -25738,7 +26117,16 @@ const util = __nccwpck_require__(3440)
 const CacheHandler = __nccwpck_require__(9976)
 const MemoryCacheStore = __nccwpck_require__(4889)
 const CacheRevalidationHandler = __nccwpck_require__(7133)
-const { assertCacheStore, assertCacheMethods, makeCacheKey, normalizeHeaders, parseCacheControlHeader, isInvalidOrWildcardVaryHeader } = __nccwpck_require__(7659)
+const {
+  assertCacheStore,
+  assertCacheMethods,
+  getInterceptorOrigin,
+  makeCacheKey,
+  normalizeHeaders,
+  parseCacheControlHeader,
+  isInvalidOrWildcardVaryHeader,
+  parseVaryHeader
+} = __nccwpck_require__(7659)
 const { AbortError } = __nccwpck_require__(8707)
 const { parseHttpDate } = __nccwpck_require__(5453)
 
@@ -25849,7 +26237,10 @@ function staleResponseRequiresRevalidation (result, cacheType) {
  * @returns {boolean}
  */
 function revalidationResponseDisallowsCachedReuse (cacheType, headers) {
-  if (headers.vary && isInvalidOrWildcardVaryHeader(headers.vary)) {
+  if (
+    (headers.vary && isInvalidOrWildcardVaryHeader(headers.vary)) ||
+    (cacheType === 'shared' && Object.hasOwn(headers, 'set-cookie'))
+  ) {
     return true
   }
 
@@ -25865,6 +26256,25 @@ function revalidationResponseDisallowsCachedReuse (cacheType, headers) {
 
 function revalidationResponseUpdatesCacheControl (headers) {
   return headers['cache-control'] !== undefined
+}
+
+/**
+ * @param {import('../../types/cache-interceptor.d.ts').default.GetResult} result
+ * @param {Record<string, string | string[] | null> | undefined} varyDirectives
+ * @returns {boolean}
+ */
+function revalidationResponseAddsVary (result, varyDirectives) {
+  if (!varyDirectives) {
+    return false
+  }
+
+  for (const key in varyDirectives) {
+    if (result.vary == null || !Object.hasOwn(result.vary, key)) {
+      return true
+    }
+  }
+
+  return false
 }
 
 function deleteCachedValue (store, cacheKey) {
@@ -26121,6 +26531,17 @@ function handleResult (
     return handleUncachedResponse(dispatch, globalOpts, cacheKey, handler, opts, reqCacheControl)
   }
 
+  // Shared stores may outlive the Undici version that wrote them. Do not
+  // re-serve a Set-Cookie header from an existing shared-cache entry.
+  if (globalOpts.type === 'shared' && Object.hasOwn(result.headers, 'set-cookie')) {
+    if (util.isStream(result.body)) {
+      result.body.on('error', nop).destroy()
+    }
+
+    deleteCachedValue(globalOpts.store, cacheKey)
+    return handleUncachedResponse(dispatch, globalOpts, cacheKey, handler, opts, reqCacheControl)
+  }
+
   const now = Date.now()
   if (now > result.deleteAt) {
     // Response is expired, cache store shouldn't have given this to us
@@ -26203,6 +26624,13 @@ function handleResult (
 
               if (revalidationResponseUpdatesCacheControl(headers)) {
                 deleteCachedValue(globalOpts.store, cacheKey)
+              } else if (revalidationResponseAddsVary(result, headers.vary ? parseVaryHeader(headers.vary, opts.headers) : undefined)) {
+                if (util.isStream(result.body)) {
+                  result.body.on('error', nop).destroy()
+                }
+
+                deleteCachedValue(globalOpts.store, cacheKey)
+                return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler))
               }
             }
 
@@ -26270,29 +26698,28 @@ module.exports = (opts = {}) => {
     }
   }
 
-  return dispatch => {
+  return (dispatch, interceptorOrigin) => {
     return (opts, handler) => {
-      if (arrayIncludes(safeMethodsToNotCache, opts.method)) {
-        // Not a method we want to cache, skip
+      const requestOrigin = getInterceptorOrigin(opts, interceptorOrigin)
+      if (!requestOrigin || arrayIncludes(safeMethodsToNotCache, opts.method)) {
+        // We cannot safely cache without an authoritative origin, or this is
+        // not a method we want to cache.
         return dispatch(opts, handler)
       }
 
       // Check if origin is in whitelist
       if (origins !== undefined) {
-        if (!opts.origin) {
-          return dispatch(opts, handler)
-        }
-        const requestOrigin = opts.origin.toString().toLowerCase()
+        const normalizedRequestOrigin = requestOrigin.toString().toLowerCase()
         let isAllowed = false
 
         for (let i = 0; i < origins.length; i++) {
           const allowed = origins[i]
           if (typeof allowed === 'string') {
-            if (allowed.toLowerCase() === requestOrigin) {
+            if (allowed.toLowerCase() === normalizedRequestOrigin) {
               isAllowed = true
               break
             }
-          } else if (allowed.test(requestOrigin)) {
+          } else if (allowed.test(normalizedRequestOrigin)) {
             isAllowed = true
             break
           }
@@ -26321,7 +26748,12 @@ module.exports = (opts = {}) => {
       /**
        * @type {import('../../types/cache-interceptor.d.ts').default.CacheKey}
        */
-      const cacheKey = makeCacheKey(opts)
+      const cacheKey = makeCacheKey(opts, requestOrigin)
+
+      if (!arrayIncludes(util.safeHTTPMethods, opts.method)) {
+        return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler))
+      }
+
       const result = store.get(cacheKey)
 
       if (result && typeof result.then === 'function') {
@@ -26358,7 +26790,8 @@ module.exports = (opts = {}) => {
 
 
 const { createInflate, createGunzip, createBrotliDecompress, createZstdDecompress } = __nccwpck_require__(8522)
-const { pipeline } = __nccwpck_require__(7075)
+const { pipeline, Transform: TransformStream } = __nccwpck_require__(7075)
+const { InvalidArgumentError, ResponseExceededMaxSizeError } = __nccwpck_require__(8707)
 const DecoratorHandler = __nccwpck_require__(8155)
 
 /** @typedef {import('node:stream').Transform} Transform */
@@ -26377,6 +26810,31 @@ const supportedEncodings = {
 }
 
 const defaultSkipStatusCodes = /** @type {const} */ ([204, 304])
+const defaultMaxSize = 64 * 1024 * 1024
+
+/**
+ * Limits the output of one stage in a decompression chain.
+ * @param {number} maxSize - Maximum output size in bytes
+ * @returns {Transform}
+ */
+function createMaxSizeLimiter (maxSize) {
+  let size = 0
+
+  return new TransformStream({
+    transform (chunk, _encoding, callback) {
+      const decompressedSize = size + chunk.length
+      if (decompressedSize > maxSize) {
+        callback(new ResponseExceededMaxSizeError(
+          `Decompressed response size (${decompressedSize}) exceeded maxSize (${maxSize})`
+        ))
+        return
+      }
+
+      size = decompressedSize
+      callback(null, chunk)
+    }
+  })
+}
 
 let warningEmitted = /** @type {boolean} */ (false)
 
@@ -26384,6 +26842,7 @@ let warningEmitted = /** @type {boolean} */ (false)
  * @typedef {Object} DecompressHandlerOptions
  * @property {number[]|Readonly<number[]>} [skipStatusCodes=[204, 304]] - List of status codes to skip decompression for
  * @property {boolean} [skipErrorResponses] - Whether to skip decompression for error responses (status codes >= 400)
+ * @property {number} [maxSize=67108864] - Maximum decompressed response size in bytes
  */
 
 class DecompressHandler extends DecoratorHandler {
@@ -26395,11 +26854,24 @@ class DecompressHandler extends DecoratorHandler {
   #skipStatusCodes
   /** @type {boolean} */
   #skipErrorResponses
+  /** @type {number} */
+  #maxSize
+  /** @type {number} */
+  #decompressedSize = 0
+  /** @type {boolean} */
+  #terminated = false
+  /** @type {boolean} */
+  #inputEnded = false
 
-  constructor (handler, { skipStatusCodes = defaultSkipStatusCodes, skipErrorResponses = true } = {}) {
+  constructor (handler, { skipStatusCodes = defaultSkipStatusCodes, skipErrorResponses = true, maxSize = defaultMaxSize } = {}) {
+    if (!Number.isSafeInteger(maxSize) || maxSize < 1) {
+      throw new InvalidArgumentError('maxSize must be a positive integer')
+    }
+
     super(handler)
     this.#skipStatusCodes = skipStatusCodes
     this.#skipErrorResponses = skipErrorResponses
+    this.#maxSize = maxSize
   }
 
   /**
@@ -26419,7 +26891,7 @@ class DecompressHandler extends DecoratorHandler {
    * Creates a chain of decompressors for multiple content encodings
    *
    * @param {string} encodings - Comma-separated list of content encodings
-   * @returns {Array<DecompressorStream>} - Array of decompressor streams
+   * @returns {Array<Transform>} - Array of decompressor and limiting streams
    * @throws {Error} - If the number of content-encodings exceeds the maximum allowed
    */
   #createDecompressionChain (encodings) {
@@ -26447,7 +26919,40 @@ class DecompressHandler extends DecoratorHandler {
       decompressors.push(supportedEncodings[encoding]())
     }
 
-    return decompressors
+    if (decompressors.length < 2) {
+      return decompressors
+    }
+
+    /** @type {Transform[]} */
+    const streams = []
+    for (let i = 0; i < decompressors.length; i++) {
+      streams.push(decompressors[i])
+      if (i < decompressors.length - 1) {
+        streams.push(createMaxSizeLimiter(this.#maxSize))
+      }
+    }
+
+    return streams
+  }
+
+  /**
+   * Stops decompression and reports an error.
+   * @param {Controller} controller - The controller to coordinate with
+   * @param {Error} error - The decompression error
+   * @returns {void}
+   */
+  #fail (controller, error) {
+    if (this.#terminated) {
+      return
+    }
+
+    if (this.#inputEnded) {
+      // The request is already marked complete once the compressed input ends,
+      // so controller.abort() can no longer propagate decoder flush errors.
+      this.onResponseError(controller, error)
+    } else {
+      controller.abort(error)
+    }
   }
 
   /**
@@ -26458,8 +26963,21 @@ class DecompressHandler extends DecoratorHandler {
    */
   #setupDecompressorEvents (decompressor, controller) {
     decompressor.on('readable', () => {
+      if (this.#terminated) {
+        return
+      }
+
       let chunk
       while ((chunk = decompressor.read()) !== null) {
+        const decompressedSize = this.#decompressedSize + chunk.length
+        if (decompressedSize > this.#maxSize) {
+          this.#fail(controller, new ResponseExceededMaxSizeError(
+            `Decompressed response size (${decompressedSize}) exceeded maxSize (${this.#maxSize})`
+          ))
+          return
+        }
+
+        this.#decompressedSize = decompressedSize
         const result = super.onResponseData(controller, chunk)
         if (result === false) {
           break
@@ -26468,7 +26986,7 @@ class DecompressHandler extends DecoratorHandler {
     })
 
     decompressor.on('error', (error) => {
-      super.onResponseError(controller, error)
+      this.#fail(controller, error)
     })
   }
 
@@ -26482,6 +27000,12 @@ class DecompressHandler extends DecoratorHandler {
     this.#setupDecompressorEvents(decompressor, controller)
 
     decompressor.on('end', () => {
+      if (this.#terminated) {
+        return
+      }
+
+      this.#terminated = true
+      this.#cleanupDecompressors()
       super.onResponseEnd(controller, this.#trailers)
     })
   }
@@ -26496,10 +27020,17 @@ class DecompressHandler extends DecoratorHandler {
     this.#setupDecompressorEvents(lastDecompressor, controller)
 
     pipeline(this.#decompressors, (err) => {
-      if (err) {
-        super.onResponseError(controller, err)
+      if (this.#terminated) {
         return
       }
+
+      if (err) {
+        this.#fail(controller, err)
+        return
+      }
+
+      this.#terminated = true
+      this.#cleanupDecompressors()
       super.onResponseEnd(controller, this.#trailers)
     })
   }
@@ -26555,7 +27086,7 @@ class DecompressHandler extends DecoratorHandler {
 
           filteredHeaders.push(rawHeaders[i], rawHeaders[i + 1])
         }
-        controller.rawHeaders = filteredHeaders
+        rawHeaders.splice(0, rawHeaders.length, ...filteredHeaders)
       } else if (typeof rawHeaders === 'object') {
         for (const name of Object.keys(rawHeaders)) {
           const lowerName = name.toLowerCase()
@@ -26595,9 +27126,9 @@ class DecompressHandler extends DecoratorHandler {
    */
   onResponseEnd (controller, trailers) {
     if (this.#decompressors.length > 0) {
+      this.#inputEnded = true
       this.#trailers = trailers
       this.#decompressors[0].end()
-      this.#cleanupDecompressors()
       return
     }
     super.onResponseEnd(controller, trailers)
@@ -26609,12 +27140,15 @@ class DecompressHandler extends DecoratorHandler {
    * @returns {void}
    */
   onResponseError (controller, err) {
-    if (this.#decompressors.length > 0) {
-      for (const decompressor of this.#decompressors) {
-        decompressor.destroy(err)
-      }
-      this.#cleanupDecompressors()
+    if (this.#terminated) {
+      return
     }
+
+    this.#terminated = true
+    for (const decompressor of this.#decompressors) {
+      decompressor.destroy()
+    }
+    this.#cleanupDecompressors()
     super.onResponseError(controller, err)
   }
 }
@@ -26659,7 +27193,7 @@ module.exports = createDecompressInterceptor
 const diagnosticsChannel = __nccwpck_require__(3053)
 const util = __nccwpck_require__(3440)
 const DeduplicationHandler = __nccwpck_require__(3599)
-const { normalizeHeaders, makeCacheKey, makeDeduplicationKey } = __nccwpck_require__(7659)
+const { getInterceptorOrigin, normalizeHeaders, makeCacheKey, makeDeduplicationKey } = __nccwpck_require__(7659)
 
 const pendingRequestsChannel = diagnosticsChannel.channel('undici:request:pending-requests')
 
@@ -26713,9 +27247,10 @@ module.exports = (opts = {}) => {
    */
   const pendingRequests = new Map()
 
-  return dispatch => {
+  return (dispatch, interceptorOrigin) => {
     return (opts, handler) => {
-      if (opts.upgrade || methods.includes(opts.method) === false) {
+      const requestOrigin = getInterceptorOrigin(opts, interceptorOrigin)
+      if (!requestOrigin || opts.upgrade || methods.includes(opts.method) === false) {
         return dispatch(opts, handler)
       }
 
@@ -26733,7 +27268,7 @@ module.exports = (opts = {}) => {
         }
       }
 
-      const cacheKey = makeCacheKey(opts)
+      const cacheKey = makeCacheKey(opts, requestOrigin)
       const dedupeKey = makeDeduplicationKey(cacheKey, excludeHeaderNamesSet)
 
       // Check if there's already a pending request for this key
@@ -26783,6 +27318,7 @@ const { isIP } = __nccwpck_require__(7030)
 const { lookup } = __nccwpck_require__(610)
 const DecoratorHandler = __nccwpck_require__(8155)
 const { InvalidArgumentError, InformationalError } = __nccwpck_require__(8707)
+const { kRequestOrigin } = __nccwpck_require__(6443)
 const maxInt = Math.pow(2, 31) - 1
 
 function hasSafeIterator (headers) {
@@ -27214,6 +27750,9 @@ class DNSDispatchHandler extends DecoratorHandler {
             origin: `${this.#origin.protocol}//${
               ip.family === 6 ? `[${ip.address}]` : ip.address
             }${port}`,
+            [kRequestOrigin]: this.#opts[kRequestOrigin] === undefined
+              ? this.#origin
+              : this.#opts[kRequestOrigin],
             headers: withHostHeader(this.#origin.host, this.#opts.headers)
           }
           this.#dispatch(dispatchOpts, this)
@@ -27337,6 +27876,9 @@ module.exports = interceptorOpts => {
           ...origDispatchOpts,
           servername: origin.hostname, // For SNI on TLS
           origin: newOrigin.origin,
+          [kRequestOrigin]: origDispatchOpts[kRequestOrigin] === undefined
+            ? origin
+            : origDispatchOpts[kRequestOrigin],
           headers: withHostHeader(origin.host, origDispatchOpts.headers)
         }
 
@@ -27369,7 +27911,6 @@ class DumpHandler extends DecoratorHandler {
   #maxSize = 1024 * 1024
   #dumped = false
   #size = 0
-  #controller = null
   aborted = false
   reason = false
 
@@ -27391,7 +27932,6 @@ class DumpHandler extends DecoratorHandler {
 
   onRequestStart (controller, context) {
     controller.abort = this.#abort.bind(this)
-    this.#controller = controller
 
     return super.onRequestStart(controller, context)
   }
@@ -27415,43 +27955,32 @@ class DumpHandler extends DecoratorHandler {
   }
 
   onResponseError (controller, err) {
-    if (this.#dumped) {
-      return
-    }
-
-    // On network errors before connect, controller will be null
-    err = this.#controller?.reason ?? err
-
-    super.onResponseError(controller, err)
+    super.onResponseError(controller, this.aborted === true ? this.reason : err)
   }
 
   onResponseData (controller, chunk) {
     this.#size = this.#size + chunk.length
 
-    if (this.#size >= this.#maxSize) {
-      this.#dumped = true
+    if (this.#size > this.#maxSize) {
+      throw new RequestAbortedError(
+        `Response size (${this.#size}) larger than maxSize (${this.#maxSize})`
+      )
+    }
 
-      if (this.aborted === true) {
-        super.onResponseError(controller, this.reason)
-      } else {
-        super.onResponseEnd(controller, {})
-      }
+    if (this.#size === this.#maxSize) {
+      this.#dumped = true
     }
 
     return true
   }
 
   onResponseEnd (controller, trailers) {
-    if (this.#dumped) {
-      return
-    }
-
-    if (this.#controller.aborted === true) {
+    if (this.aborted === true) {
       super.onResponseError(controller, this.reason)
       return
     }
 
-    super.onResponseEnd(controller, trailers)
+    super.onResponseEnd(controller, this.#dumped ? {} : trailers)
   }
 }
 
@@ -28313,13 +28842,25 @@ class MockAgent extends Dispatcher {
     opts.origin = normalizeOrigin(opts.origin)
 
     // Call MockAgent.get to perform additional setup before dispatching as normal
-    this.get(opts.origin)
+    const mockDispatcher = this.get(opts.origin)
 
     this[kMockAgentAddCallHistoryLog](opts)
 
     const acceptNonStandardSearchParameters = this[kMockAgentAcceptsNonStandardSearchParameters]
 
     const dispatchOpts = { ...opts }
+
+    // Agent keeps HTTP/1.1-only dispatchers under a separate key. Legacy
+    // global dispatcher consumers use that path, so mirror the mock dispatches
+    // before delegating to the internal Agent.
+    if (dispatchOpts.allowH2 === false) {
+      const http1OnlyKey = `${dispatchOpts.origin}#http1-only`
+      if (!this[kClients].has(http1OnlyKey)) {
+        const http1OnlyDispatcher = this[kFactory](dispatchOpts.origin)
+        http1OnlyDispatcher[kDispatches] = mockDispatcher[kDispatches]
+        this[kMockAgentSet](http1OnlyKey, http1OnlyDispatcher)
+      }
+    }
 
     if (acceptNonStandardSearchParameters && dispatchOpts.path) {
       const [path, searchParams] = dispatchOpts.path.split('?')
@@ -29526,8 +30067,7 @@ function mockDispatch (opts, handler) {
             handler.onResponseError(null, new InvalidArgumentError('reply options callback must return an object'))
             return
           }
-          mockDispatch.data = { ...responseDefaults, ...resolvedData }
-          dispatchMockReply(mockDispatches, mockDispatch, key, opts, handler)
+          dispatchMockReply(mockDispatches, mockDispatch, key, opts, handler, { ...responseDefaults, ...resolvedData })
         },
         (error) => {
           handler.onResponseError(null, error)
@@ -29540,7 +30080,7 @@ function mockDispatch (opts, handler) {
       throw new InvalidArgumentError('reply options callback must return an object')
     }
 
-    mockDispatch.data = { ...responseDefaults, ...callbackResult }
+    return dispatchMockReply(mockDispatches, mockDispatch, key, opts, handler, { ...responseDefaults, ...callbackResult })
   }
 
   return dispatchMockReply(mockDispatches, mockDispatch, key, opts, handler)
@@ -29549,9 +30089,13 @@ function mockDispatch (opts, handler) {
 /**
  * Replies to a request once the mock dispatch data is fully resolved
  */
-function dispatchMockReply (mockDispatches, mockDispatch, key, opts, handler) {
-  // Parse mockDispatch data
-  const { data: response, delay } = mockDispatch
+function dispatchMockReply (mockDispatches, mockDispatch, key, opts, handler, resolvedResponse) {
+  // Parse mockDispatch data. When a reply callback has already been resolved
+  // in mockDispatch() (i.e. no body lifecycle hooks are involved), the resolved
+  // response is passed in here, leaving mockDispatch.data untouched so the
+  // callback can be re-invoked for persistent / times() replies.
+  const { data: responseData, delay } = mockDispatch
+  const response = resolvedResponse ?? responseData
 
   // If specified, trigger dispatch error
   if (response.error !== null) {
@@ -29647,8 +30191,7 @@ function dispatchMockReply (mockDispatches, mockDispatch, key, opts, handler) {
               handler.onResponseError(null, new InvalidArgumentError('reply options callback must return an object'))
               return
             }
-            mockDispatch.data = { ...responseDefaults, ...resolvedData }
-            handleReply(dispatches, mockDispatch.data)
+            handleReply(dispatches, { ...responseDefaults, ...resolvedData })
           },
           (err) => {
             handler.onResponseError(null, err)
@@ -29661,8 +30204,7 @@ function dispatchMockReply (mockDispatches, mockDispatch, key, opts, handler) {
         throw new InvalidArgumentError('reply options callback must return an object')
       }
 
-      mockDispatch.data = { ...responseDefaults, ...callbackResult }
-      handleReply(dispatches, mockDispatch.data)
+      handleReply(dispatches, { ...responseDefaults, ...callbackResult })
       return
     }
 
@@ -31150,6 +31692,7 @@ const {
 } = __nccwpck_require__(3440)
 
 const { serializePathWithQuery } = __nccwpck_require__(3440)
+const { kRequestOrigin } = __nccwpck_require__(6443)
 
 const MAX_DELTA_SECONDS = 2147483647
 const RESTRICTIVE_DIRECTIVE_NAMES = ['no-store', 'private', 'no-cache']
@@ -31289,8 +31832,47 @@ function getMalformedRestrictiveDirectiveName (key) {
 /**
  * @param {import('../../types/dispatcher.d.ts').default.DispatchOptions} opts
  */
-function makeCacheKey (opts) {
-  const origin = opts.origin ? opts.origin.toString() : ''
+function getRequestOrigin (opts) {
+  const origin = opts[kRequestOrigin] === undefined
+    ? opts.origin
+    : opts[kRequestOrigin]
+  return typeof origin === 'string' || origin instanceof URL
+    ? origin
+    : null
+}
+
+/**
+ * @param {import('../../types/dispatcher.d.ts').default.DispatchOptions} opts
+ * @param {string|null|undefined} interceptorOrigin
+ */
+function getInterceptorOrigin (opts, interceptorOrigin) {
+  const requestOrigin = getRequestOrigin(opts)
+  if (interceptorOrigin === undefined) {
+    return requestOrigin
+  }
+  if (interceptorOrigin === null) {
+    return null
+  }
+  if (requestOrigin) {
+    try {
+      if (new URL(requestOrigin).origin !== interceptorOrigin) {
+        return null
+      }
+    } catch {
+      return interceptorOrigin
+    }
+  }
+  return interceptorOrigin
+}
+
+/**
+ * @param {import('../../types/dispatcher.d.ts').default.DispatchOptions} opts
+ * @param {string|URL|null} [origin]
+ */
+function makeCacheKey (opts, origin = getRequestOrigin(opts)) {
+  if (!origin) {
+    throw new Error('opts.origin is undefined')
+  }
 
   let fullPath = opts.path || '/'
 
@@ -31299,7 +31881,7 @@ function makeCacheKey (opts) {
   }
 
   return {
-    origin,
+    origin: origin.toString(),
     method: opts.method,
     path: fullPath,
     headers: opts.headers
@@ -31842,6 +32424,8 @@ function makeDeduplicationKey (cacheKey, excludeHeaders) {
 }
 
 module.exports = {
+  getInterceptorOrigin,
+  getRequestOrigin,
   makeCacheKey,
   normalizeHeaders,
   assertCacheKey,
@@ -34510,221 +35094,224 @@ function parseSetCookie (header) {
  * @param {Object.<string, unknown>} [cookieAttributeList={}]
  */
 function parseUnparsedAttributes (unparsedAttributes, cookieAttributeList = {}) {
-  // 1. If the unparsed-attributes string is empty, skip the rest of
-  //    these steps.
-  if (unparsedAttributes.length === 0) {
-    return cookieAttributeList
-  }
+  while (true) {
+    // 1. If the unparsed-attributes string is empty, skip the rest of
+    //    these steps.
+    if (unparsedAttributes.length === 0) {
+      return cookieAttributeList
+    }
 
-  // 2. Discard the first character of the unparsed-attributes (which
-  //    will be a %x3B (";") character).
-  assert(unparsedAttributes[0] === ';')
-  unparsedAttributes = unparsedAttributes.slice(1)
+    // 2. Discard the first character of the unparsed-attributes (which
+    //    will be a %x3B (";") character).
+    assert(unparsedAttributes[0] === ';')
+    unparsedAttributes = unparsedAttributes.slice(1)
 
-  let cookieAv = ''
+    let cookieAv = ''
 
-  // 3. If the remaining unparsed-attributes contains a %x3B (";")
-  //    character:
-  if (unparsedAttributes.includes(';')) {
+    // 3. If the remaining unparsed-attributes contains a %x3B (";")
+    //    character:
+    if (unparsedAttributes.includes(';')) {
     // 1. Consume the characters of the unparsed-attributes up to, but
     //    not including, the first %x3B (";") character.
-    cookieAv = collectASequenceOfCodePointsFast(
-      ';',
-      unparsedAttributes,
-      { position: 0 }
-    )
-    unparsedAttributes = unparsedAttributes.slice(cookieAv.length)
-  } else {
+      cookieAv = collectASequenceOfCodePointsFast(
+        ';',
+        unparsedAttributes,
+        { position: 0 }
+      )
+      unparsedAttributes = unparsedAttributes.slice(cookieAv.length)
+    } else {
     // Otherwise:
 
-    // 1. Consume the remainder of the unparsed-attributes.
-    cookieAv = unparsedAttributes
-    unparsedAttributes = ''
-  }
+      // 1. Consume the remainder of the unparsed-attributes.
+      cookieAv = unparsedAttributes
+      unparsedAttributes = ''
+    }
 
-  // Let the cookie-av string be the characters consumed in this step.
+    // Let the cookie-av string be the characters consumed in this step.
 
-  let attributeName = ''
-  let attributeValue = ''
+    let attributeName = ''
+    let attributeValue = ''
 
-  // 4. If the cookie-av string contains a %x3D ("=") character:
-  if (cookieAv.includes('=')) {
+    // 4. If the cookie-av string contains a %x3D ("=") character:
+    if (cookieAv.includes('=')) {
     // 1. The (possibly empty) attribute-name string consists of the
     //    characters up to, but not including, the first %x3D ("=")
     //    character, and the (possibly empty) attribute-value string
     //    consists of the characters after the first %x3D ("=")
     //    character.
-    const position = { position: 0 }
+      const position = { position: 0 }
 
-    attributeName = collectASequenceOfCodePointsFast(
-      '=',
-      cookieAv,
-      position
-    )
-    attributeValue = cookieAv.slice(position.position + 1)
-  } else {
+      attributeName = collectASequenceOfCodePointsFast(
+        '=',
+        cookieAv,
+        position
+      )
+      attributeValue = cookieAv.slice(position.position + 1)
+    } else {
     // Otherwise:
 
-    // 1. The attribute-name string consists of the entire cookie-av
-    //    string, and the attribute-value string is empty.
-    attributeName = cookieAv
-  }
+      // 1. The attribute-name string consists of the entire cookie-av
+      //    string, and the attribute-value string is empty.
+      attributeName = cookieAv
+    }
 
-  // 5. Remove any leading or trailing WSP characters from the attribute-
-  //    name string and the attribute-value string.
-  attributeName = attributeName.trim()
-  attributeValue = attributeValue.trim()
+    // 5. Remove any leading or trailing WSP characters from the attribute-
+    //    name string and the attribute-value string.
+    attributeName = attributeName.trim()
+    attributeValue = attributeValue.trim()
 
-  // 6. If the attribute-value is longer than 1024 octets, ignore the
-  //    cookie-av string and return to Step 1 of this algorithm.
-  if (attributeValue.length > maxAttributeValueSize) {
-    return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
-  }
+    // 6. If the attribute-value is longer than 1024 octets, ignore the
+    //    cookie-av string and return to Step 1 of this algorithm.
+    if (attributeValue.length > maxAttributeValueSize) {
+      continue
+    }
 
-  // 7. Process the attribute-name and attribute-value according to the
-  //    requirements in the following subsections.  (Notice that
-  //    attributes with unrecognized attribute-names are ignored.)
-  const attributeNameLowercase = attributeName.toLowerCase()
+    // 7. Process the attribute-name and attribute-value according to the
+    //    requirements in the following subsections.  (Notice that
+    //    attributes with unrecognized attribute-names are ignored.)
+    const attributeNameLowercase = attributeName.toLowerCase()
 
-  // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.1
-  // If the attribute-name case-insensitively matches the string
-  // "Expires", the user agent MUST process the cookie-av as follows.
-  if (attributeNameLowercase === 'expires') {
+    // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.1
+    // If the attribute-name case-insensitively matches the string
+    // "Expires", the user agent MUST process the cookie-av as follows.
+    if (attributeNameLowercase === 'expires') {
     // 1. Let the expiry-time be the result of parsing the attribute-value
     //    as cookie-date (see Section 5.1.1).
-    const expiryTime = new Date(attributeValue)
+      const expiryTime = new Date(attributeValue)
 
-    // 2. If the attribute-value failed to parse as a cookie date, ignore
-    //    the cookie-av.
-    if (!Number.isNaN(expiryTime.getTime())) {
-      cookieAttributeList.expires = expiryTime
-    }
-  } else if (attributeNameLowercase === 'max-age') {
+      // 2. If the attribute-value failed to parse as a cookie date, ignore
+      //    the cookie-av.
+      if (!Number.isNaN(expiryTime.getTime())) {
+        cookieAttributeList.expires = expiryTime
+      }
+    } else if (attributeNameLowercase === 'max-age') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.2
     // If the attribute-name case-insensitively matches the string "Max-
     // Age", the user agent MUST process the cookie-av as follows.
 
-    // 1. If the first character of the attribute-value is not a DIGIT or a
-    //    "-" character, ignore the cookie-av.
-    const charCode = attributeValue.charCodeAt(0)
+      // 1. If the first character of the attribute-value is not a DIGIT or a
+      //    "-" character, ignore the cookie-av.
+      const charCode = attributeValue.charCodeAt(0)
+      const startsWithDigit = charCode >= 48 && charCode <= 57
+      const startsWithSignedDigit = attributeValue[0] === '-' && attributeValue.length > 1
 
-    if ((charCode < 48 || charCode > 57) && attributeValue[0] !== '-') {
-      return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
-    }
+      if (!startsWithDigit && !startsWithSignedDigit) {
+        continue
+      }
 
-    // 2. If the remainder of attribute-value contains a non-DIGIT
-    //    character, ignore the cookie-av.
-    if (!/^\d+$/.test(attributeValue)) {
-      return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
-    }
+      // 2. If the remainder of attribute-value contains a non-DIGIT
+      //    character, ignore the cookie-av.
+      if (/[^\d]/.test(attributeValue.slice(1))) {
+        continue
+      }
 
-    // 3. Let delta-seconds be the attribute-value converted to an integer.
-    const deltaSeconds = Number(attributeValue)
+      // 3. Let delta-seconds be the attribute-value converted to an integer.
+      const deltaSeconds = Number(attributeValue)
 
-    // 4. Let cookie-age-limit be the maximum age of the cookie (which
-    //    SHOULD be 400 days or less, see Section 4.1.2.2).
+      // 4. Let cookie-age-limit be the maximum age of the cookie (which
+      //    SHOULD be 400 days or less, see Section 4.1.2.2).
 
-    // 5. Set delta-seconds to the smaller of its present value and cookie-
-    //    age-limit.
-    // deltaSeconds = Math.min(deltaSeconds * 1000, maxExpiresMs)
+      // 5. Set delta-seconds to the smaller of its present value and cookie-
+      //    age-limit.
+      // deltaSeconds = Math.min(deltaSeconds * 1000, maxExpiresMs)
 
-    // 6. If delta-seconds is less than or equal to zero (0), let expiry-
-    //    time be the earliest representable date and time.  Otherwise, let
-    //    the expiry-time be the current date and time plus delta-seconds
-    //    seconds.
-    // const expiryTime = deltaSeconds <= 0 ? Date.now() : Date.now() + deltaSeconds
+      // 6. If delta-seconds is less than or equal to zero (0), let expiry-
+      //    time be the earliest representable date and time.  Otherwise, let
+      //    the expiry-time be the current date and time plus delta-seconds
+      //    seconds.
+      // const expiryTime = deltaSeconds <= 0 ? Date.now() : Date.now() + deltaSeconds
 
-    // 7. Append an attribute to the cookie-attribute-list with an
-    //    attribute-name of Max-Age and an attribute-value of expiry-time.
-    cookieAttributeList.maxAge = deltaSeconds
-  } else if (attributeNameLowercase === 'domain') {
+      // 7. Append an attribute to the cookie-attribute-list with an
+      //    attribute-name of Max-Age and an attribute-value of expiry-time.
+      cookieAttributeList.maxAge = deltaSeconds
+    } else if (attributeNameLowercase === 'domain') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.3
     // If the attribute-name case-insensitively matches the string "Domain",
     // the user agent MUST process the cookie-av as follows.
 
-    // 1. Let cookie-domain be the attribute-value.
-    let cookieDomain = attributeValue
+      // 1. Let cookie-domain be the attribute-value.
+      let cookieDomain = attributeValue
 
-    // 2. If cookie-domain starts with %x2E ("."), let cookie-domain be
-    //    cookie-domain without its leading %x2E (".").
-    if (cookieDomain[0] === '.') {
-      cookieDomain = cookieDomain.slice(1)
-    }
+      // 2. If cookie-domain starts with %x2E ("."), let cookie-domain be
+      //    cookie-domain without its leading %x2E (".").
+      if (cookieDomain[0] === '.') {
+        cookieDomain = cookieDomain.slice(1)
+      }
 
-    // 3. Convert the cookie-domain to lower case.
-    cookieDomain = cookieDomain.toLowerCase()
+      // 3. Convert the cookie-domain to lower case.
+      cookieDomain = cookieDomain.toLowerCase()
 
-    // 4. Append an attribute to the cookie-attribute-list with an
-    //    attribute-name of Domain and an attribute-value of cookie-domain.
-    cookieAttributeList.domain = cookieDomain
-  } else if (attributeNameLowercase === 'path') {
+      // 4. Append an attribute to the cookie-attribute-list with an
+      //    attribute-name of Domain and an attribute-value of cookie-domain.
+      cookieAttributeList.domain = cookieDomain
+    } else if (attributeNameLowercase === 'path') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.4
     // If the attribute-name case-insensitively matches the string "Path",
     // the user agent MUST process the cookie-av as follows.
 
-    // 1. If the attribute-value is empty or if the first character of the
-    //    attribute-value is not %x2F ("/"):
-    let cookiePath = ''
-    if (attributeValue.length === 0 || attributeValue[0] !== '/') {
+      // 1. If the attribute-value is empty or if the first character of the
+      //    attribute-value is not %x2F ("/"):
+      let cookiePath = ''
+      if (attributeValue.length === 0 || attributeValue[0] !== '/') {
       // 1. Let cookie-path be the default-path.
-      cookiePath = '/'
-    } else {
+        cookiePath = '/'
+      } else {
       // Otherwise:
 
-      // 1. Let cookie-path be the attribute-value.
-      cookiePath = attributeValue
-    }
+        // 1. Let cookie-path be the attribute-value.
+        cookiePath = attributeValue
+      }
 
-    // 2. Append an attribute to the cookie-attribute-list with an
-    //    attribute-name of Path and an attribute-value of cookie-path.
-    cookieAttributeList.path = cookiePath
-  } else if (attributeNameLowercase === 'secure') {
+      // 2. Append an attribute to the cookie-attribute-list with an
+      //    attribute-name of Path and an attribute-value of cookie-path.
+      cookieAttributeList.path = cookiePath
+    } else if (attributeNameLowercase === 'secure') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.5
     // If the attribute-name case-insensitively matches the string "Secure",
     // the user agent MUST append an attribute to the cookie-attribute-list
     // with an attribute-name of Secure and an empty attribute-value.
 
-    cookieAttributeList.secure = true
-  } else if (attributeNameLowercase === 'httponly') {
+      cookieAttributeList.secure = true
+    } else if (attributeNameLowercase === 'httponly') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.6
     // If the attribute-name case-insensitively matches the string
     // "HttpOnly", the user agent MUST append an attribute to the cookie-
     // attribute-list with an attribute-name of HttpOnly and an empty
     // attribute-value.
 
-    cookieAttributeList.httpOnly = true
-  } else if (attributeNameLowercase === 'samesite') {
+      cookieAttributeList.httpOnly = true
+    } else if (attributeNameLowercase === 'samesite') {
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis#section-5.4.7
     // If the attribute-name case-insensitively matches the string
     // "SameSite", the user agent MUST process the cookie-av as follows:
 
-    const attributeValueLowercase = attributeValue.toLowerCase()
+      const attributeValueLowercase = attributeValue.toLowerCase()
 
-    // 1. If cookie-av's attribute-value is a case-insensitive match for
-    //    "None", append an attribute to the cookie-attribute-list with an
-    //    attribute-name of "SameSite" and an attribute-value of "None".
-    if (attributeValueLowercase === 'none') {
-      cookieAttributeList.sameSite = 'None'
-    } else if (attributeValueLowercase === 'strict') {
+      // 1. If cookie-av's attribute-value is a case-insensitive match for
+      //    "None", append an attribute to the cookie-attribute-list with an
+      //    attribute-name of "SameSite" and an attribute-value of "None".
+      if (attributeValueLowercase === 'none') {
+        cookieAttributeList.sameSite = 'None'
+      } else if (attributeValueLowercase === 'strict') {
       // 2. If cookie-av's attribute-value is a case-insensitive match for
       //    "Strict", append an attribute to the cookie-attribute-list with
       //    an attribute-name of "SameSite" and an attribute-value of
       //    "Strict".
-      cookieAttributeList.sameSite = 'Strict'
-    } else if (attributeValueLowercase === 'lax') {
+        cookieAttributeList.sameSite = 'Strict'
+      } else if (attributeValueLowercase === 'lax') {
       // 3. If cookie-av's attribute-value is a case-insensitive match for
       //    "Lax", append an attribute to the cookie-attribute-list with an
       //    attribute-name of "SameSite" and an attribute-value of "Lax".
-      cookieAttributeList.sameSite = 'Lax'
-    }
-  } else {
-    cookieAttributeList.unparsed ??= []
+        cookieAttributeList.sameSite = 'Lax'
+      }
+    } else {
+      cookieAttributeList.unparsed ??= []
 
-    cookieAttributeList.unparsed.push(`${attributeName}=${attributeValue}`)
-  }
+      cookieAttributeList.unparsed.push(`${attributeName}=${attributeValue}`)
+    }
 
   // 8. Return to Step 1 of this algorithm.
-  return parseUnparsedAttributes(unparsedAttributes, cookieAttributeList)
+  }
 }
 
 module.exports = {
@@ -35098,6 +35685,7 @@ module.exports = {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 
+const buffer = __nccwpck_require__(4573)
 const { Transform } = __nccwpck_require__(7075)
 const { isASCIINumber, isValidLastEventId } = __nccwpck_require__(4811)
 
@@ -35121,6 +35709,8 @@ const COLON = 0x3A
  * @type {32} SPACE
  */
 const SPACE = 0x20
+
+const defaultMaxEventSize = buffer.kStringMaxLength
 
 const DATA = Buffer.from('data')
 const EVENT = Buffer.from('event')
@@ -35163,6 +35753,12 @@ function isFieldName (line, length, field) {
   }
 
   return true
+}
+
+function createMaxEventSizeExceededError () {
+  const error = new Error('EventSource message size exceeded')
+  error.aborted = false
+  return error
 }
 
 /**
@@ -35213,6 +35809,8 @@ class EventSourceStream extends Transform {
   pos = 0
   lineChunkIndex = 0
   linePos = 0
+  eventDataSize = 0
+  maxEventSize
 
   event = {
     data: undefined,
@@ -35224,6 +35822,7 @@ class EventSourceStream extends Transform {
   /**
    * @param {object} options
    * @param {boolean} [options.readableObjectMode]
+   * @param {number} [options.maxEventSize]
    * @param {eventSourceSettings} [options.eventSourceSettings]
    * @param {(chunk: any, encoding?: BufferEncoding | undefined) => boolean} [options.push]
    */
@@ -35235,6 +35834,7 @@ class EventSourceStream extends Transform {
     super(options)
 
     this.state = options.eventSourceSettings || {}
+    this.maxEventSize = options.maxEventSize ?? defaultMaxEventSize
     if (options.push) {
       this.push = options.push
     }
@@ -35330,7 +35930,12 @@ class EventSourceStream extends Transform {
 
         // In any case, we can process the line as we reached an
         // end-of-line character
-        this.parseLine(this.readLine(), this.event)
+        try {
+          this.parseLine(this.readLine(), this.event)
+        } catch (error) {
+          callback(error)
+          return
+        }
         this.consumeCurrentByte()
         // A line was processed and this could be the end of the event. We need
         // to check if the next line is empty to determine if the event is
@@ -35381,6 +35986,13 @@ class EventSourceStream extends Transform {
     }
 
     if (isFieldName(line, fieldLength, DATA)) {
+      const valueBytes = line.length - valueStart
+      const eventDataSize = this.eventDataSize + (event.data === undefined ? 0 : 1) + valueBytes
+
+      if (this.maxEventSize > 0 && eventDataSize > this.maxEventSize) {
+        throw createMaxEventSizeExceededError()
+      }
+
       const value = line.toString('utf8', valueStart)
 
       if (event.data === undefined) {
@@ -35388,6 +36000,7 @@ class EventSourceStream extends Transform {
       } else {
         event.data += `\n${value}`
       }
+      this.eventDataSize = eventDataSize
       return
     }
 
@@ -35444,6 +36057,7 @@ class EventSourceStream extends Transform {
     this.event.event = undefined
     this.event.id = undefined
     this.event.retry = undefined
+    this.eventDataSize = 0
   }
 
   hasPendingEvent () {
@@ -35607,9 +36221,13 @@ const { EventSourceStream } = __nccwpck_require__(4031)
 const { parseMIMEType } = __nccwpck_require__(1900)
 const { createFastMessageEvent } = __nccwpck_require__(5188)
 const { isNetworkError } = __nccwpck_require__(9051)
-const { kEnumerableProperty } = __nccwpck_require__(3440)
+const { isValidHeaderValue, kEnumerableProperty } = __nccwpck_require__(3440)
 const { environmentSettingsObject } = __nccwpck_require__(3168)
 const { createPotentialCORSRequest } = __nccwpck_require__(4811)
+const { getGlobalDispatcher } = __nccwpck_require__(2581)
+const { isomorphicDecode } = __nccwpck_require__(8116)
+
+const textEncoder = new TextEncoder()
 
 let experimentalWarned = false
 
@@ -35881,6 +36499,7 @@ class EventSource extends EventTarget {
 
       const eventSourceStream = new EventSourceStream({
         eventSourceSettings: this.#state,
+        maxEventSize: this.#dispatcher.eventSourceOptions?.maxEventSize,
         push: (event) => {
           this.dispatchEvent(createFastMessageEvent(
             event.type,
@@ -35940,8 +36559,12 @@ class EventSource extends EventTarget {
       //         string, encoded as UTF-8.
       //      2. Set (`Last-Event-ID`, lastEventIDValue) in request's header
       //         list.
+      this.#request.headersList.delete('last-event-id', true)
       if (this.#state.lastEventId.length) {
-        this.#request.headersList.set('last-event-id', this.#state.lastEventId, true)
+        const lastEventId = isomorphicDecode(textEncoder.encode(this.#state.lastEventId))
+        if (isValidHeaderValue(lastEventId)) {
+          this.#request.headersList.set('last-event-id', lastEventId, true)
+        }
       }
 
       //   4. Fetch request and process the response obtained in this fashion, if any, as described earlier in this section.
@@ -36065,7 +36688,8 @@ webidl.converters.EventSourceInitDict = webidl.dictionaryConverter([
   },
   {
     key: 'dispatcher', // undici only
-    converter: webidl.converters.any
+    converter: webidl.converters.any,
+    defaultValue: () => getGlobalDispatcher()
   },
   {
     key: 'node', // undici only
@@ -39169,6 +39793,7 @@ const {
 const EE = __nccwpck_require__(8474)
 const { Readable, pipeline, finished, isErrored, isReadable } = __nccwpck_require__(7075)
 const { addAbortListener, bufferToLowerCasedHeaderName } = __nccwpck_require__(3440)
+const { SocketError } = __nccwpck_require__(8707)
 const { dataURLProcessor, serializeAMimeType, minimizeSupportedMimeType } = __nccwpck_require__(1900)
 const { getGlobalDispatcher } = __nccwpck_require__(2581)
 const { webidl } = __nccwpck_require__(7879)
@@ -41506,6 +42131,11 @@ async function httpNetworkFetch (
             // We need to support 200 for websocket over h2 as per RFC-8441
             // Absence of session means H1
             if ((socket.session != null && status !== 200) || (socket.session == null && status !== 101)) {
+              if (socket.session != null) {
+                // The server refused the extended CONNECT, and nothing further
+                // will settle this request. Fail the opening handshake here.
+                controller.abort(new SocketError('bad upgrade', null))
+              }
               return false
             }
 
@@ -42466,7 +43096,7 @@ function makeRequest (init) {
     serviceWorkers: init.serviceWorkers ?? 'all',
     initiator: init.initiator ?? '',
     destination: init.destination ?? '',
-    priority: init.priority ?? null,
+    priority: init.priority ?? 'auto',
     origin: init.origin ?? 'client',
     policyContainer: init.policyContainer ?? 'client',
     referrer: init.referrer ?? 'client',
@@ -42672,8 +43302,7 @@ webidl.converters.RequestInit = webidl.dictionaryConverter([
   {
     key: 'priority',
     converter: webidl.converters.DOMString,
-    allowedValues: ['high', 'low', 'auto'],
-    defaultValue: () => 'auto'
+    allowedValues: ['high', 'low', 'auto']
   }
 ])
 
@@ -43568,14 +44197,19 @@ function TAOCheck () {
   return 'success'
 }
 
+// https://w3c.github.io/webappsec-fetch-metadata/#abstract-opdef-append-the-fetch-metadata-headers-for-a-request
 function appendFetchMetadata (httpRequest) {
+  //  1. If r’s url is not a potentially trustworthy URL, return.
+  if (!isURLPotentiallyTrustworthy(requestCurrentURL(httpRequest))) {
+    return
+  }
+
   //  https://w3c.github.io/webappsec-fetch-metadata/#sec-fetch-dest-header
   //  TODO
 
   //  https://w3c.github.io/webappsec-fetch-metadata/#sec-fetch-mode-header
 
   //  1. Assert: r’s url is a potentially trustworthy URL.
-  //  TODO
 
   //  2. Let header be a Structured Header whose value is a token.
   let header = null
@@ -45449,9 +46083,9 @@ const webidl = {
 /**
  * @description Instantiate an error.
  *
- * @param {Object} opts
- * @param {string} opts.header
- * @param {string} opts.message
+ * @param {Object} message
+ * @param {string} message.header
+ * @param {string} message.message
  * @returns {TypeError}
  */
 webidl.errors.exception = function (message) {
@@ -46634,7 +47268,7 @@ function establishWebSocketConnection (url, protocols, client, handler, options)
         // is specified, the server needs to include the same field and one of
         // the selected subprotocol values in its response for the connection to
         // be established.
-        if (!requestProtocols.includes(secProtocol)) {
+        if (requestProtocols === null || !requestProtocols.includes(secProtocol)) {
           failWebsocketConnection(handler, 1002, 'Protocol was not set in the opening handshake.')
           return
         }
@@ -47438,7 +48072,12 @@ class PerMessageDeflate {
 
         if (this.#maxPayloadSize > 0 && this.#inflate[kLength] > this.#maxPayloadSize) {
           callback(new MessageSizeExceededError())
+          // The inflater may still hold buffered input that can emit a late
+          // zlib error. Remove the data listener, then deterministically stop
+          // the stream so a subsequent 'error' cannot fire without a listener
+          // (which would terminate the process as an unhandled error event).
           this.#inflate.removeAllListeners()
+          this.#inflate.destroy()
           this.#inflate = null
           return
         }
@@ -48257,9 +48896,9 @@ class WebSocketStream {
   /** @type {ReadableStreamDefaultController} */
   #readableStreamController
 
-  // Each WebSocketStream object has an associated writable stream , which is a WritableStream .
-  /** @type {WritableStream} */
-  #writableStream
+  // Retain the controller so the writable stream can be errored while locked.
+  /** @type {WritableStreamDefaultController} */
+  #writableStreamController
 
   // Each WebSocketStream object has an associated boolean handshake aborted , which is initially false.
   #handshakeAborted = false
@@ -48523,6 +49162,9 @@ class WebSocketStream {
     // 12. Let writable be a new WritableStream .
     // 13. Set up writable with writeAlgorithm , closeAlgorithm , and abortAlgorithm .
     const writable = new WritableStream({
+      start: (controller) => {
+        this.#writableStreamController = controller
+      },
       write: (chunk) => this.#write(chunk),
       close: () => closeWebSocketConnection(this.#handler, null, null),
       abort: (reason) => this.#closeUsingReason(reason)
@@ -48530,9 +49172,6 @@ class WebSocketStream {
 
     // Set stream ’s readable stream to readable .
     this.#readableStream = readable
-
-    // Set stream ’s writable stream to writable .
-    this.#writableStream = writable
 
     // Resolve stream ’s opened promise with WebSocketOpenInfo «[ " extensions " → extensions , " protocol " → protocol , " readable " → readable , " writable " → writable ]».
     this.#openedPromise.resolve({
@@ -48619,9 +49258,7 @@ class WebSocketStream {
       readableStreamClose(this.#readableStreamController)
 
       // 6.2. Error stream ’s writable stream with an " InvalidStateError " DOMException indicating that a closed WebSocketStream cannot be written to.
-      if (!this.#writableStream.locked) {
-        this.#writableStream.abort(new DOMException('A closed WebSocketStream cannot be written to', 'InvalidStateError'))
-      }
+      this.#writableStreamController.error(new DOMException('A closed WebSocketStream cannot be written to', 'InvalidStateError'))
 
       // 6.3. Resolve stream ’s closed promise with WebSocketCloseInfo «[ " closeCode " → code , " reason " → reason ]».
       this.#closedPromise.resolve({
@@ -48638,7 +49275,7 @@ class WebSocketStream {
       this.#readableStreamController?.error(error)
 
       // 7.3. Error stream ’s writable stream with error .
-      this.#writableStream?.abort(error)
+      this.#writableStreamController?.error(error)
 
       // 7.4. Reject stream ’s closed promise with error .
       this.#closedPromise.reject(error)
@@ -54554,6 +55191,24 @@ const EXPANSION_MAX = 100_000;
 // realistic expansion (100k results hitting `EXPANSION_MAX` measure ~1M
 // characters) so legitimate input is unaffected.
 const EXPANSION_MAX_LENGTH = 4_000_000;
+// `expand_` recurses once per level of brace *nesting* - both when expanding a
+// set's comma members and when re-wrapping a set whose body is a single part.
+// The CVE-2026-14257 fix made the *tail* iterative (recursion on `m.post`, one
+// level per chained group), which left nesting depth unbounded: about 3,100
+// levels of `{{{...a,b...}}}` - only ~6KB of input - exhausted the native stack
+// and crashed the process. `EXPANSION_MAX_DEPTH` bounds how deep the parser
+// will follow nesting. It sits far above any realistic pattern and well below
+// the depth at which the stack runs out.
+const EXPANSION_MAX_DEPTH = 1_000;
+// Bash keeps a quirk where a brace group followed by a comma set still expands
+// (`{a},b}`). The parser implements it by rewriting the string and restarting
+// the scan, absorbing one `}` per pass. `n` trailing braces therefore cost `n`
+// full passes over a string that itself grows by one `escClose` sentinel each
+// time - quadratic in `n`, with a ~26x constant from the sentinel's length.
+// 128KB of `'{a}' + '}'.repeat(n) + ',z}'` blocked the event loop for 27
+// seconds to produce two results. `EXPANSION_MAX_REWRITES` bounds how many
+// times the scan may restart. Real `{a},b}` input needs a handful.
+const EXPANSION_MAX_REWRITES = 1_000;
 function numeric(str) {
     return !isNaN(str) ? parseInt(str, 10) : str.charCodeAt(0);
 }
@@ -54573,37 +55228,52 @@ function unescapeBraces(str) {
         .replace(escCommaPattern, ',')
         .replace(escPeriodPattern, '.');
 }
+// Like `target.push(...items)` but doesn't overflow the stack
+function pushAll(target, items) {
+    for (let i = 0; i < items.length; i++) {
+        target.push(items[i]);
+    }
+}
 /**
  * Basically just str.split(","), but handling cases
  * where we have nested braced sections, which should be
  * treated as individual members, like {a,{b,c},d}
  */
 function parseCommaParts(str) {
-    if (!str) {
-        return [''];
-    }
     const parts = [];
-    const m = balanced('{', '}', str);
-    if (!m) {
-        return str.split(',');
+    // Walk the brace groups iteratively. Recursing on `post` once per group let a
+    // chain of them exhaust the stack - the parsing-side counterpart to
+    // the `expand_` overflow fixed for CVE-2026-14257, and not something `max` or
+    // `maxLength` can bound, since it happens before expansion.
+    //
+    // The part the next chunk continues
+    let carry = '';
+    for (;;) {
+        const m = balanced('{', '}', str);
+        if (!m) {
+            const tail = str.split(',');
+            tail[0] = carry + tail[0];
+            pushAll(parts, tail);
+            return parts;
+        }
+        const { pre, body, post } = m;
+        const p = pre.split(',');
+        p[0] = carry + p[0];
+        p[p.length - 1] += '{' + body + '}';
+        if (!post.length) {
+            pushAll(parts, p);
+            return parts;
+        }
+        carry = p.pop();
+        pushAll(parts, p);
+        str = post;
     }
-    const { pre, body, post } = m;
-    const p = pre.split(',');
-    p[p.length - 1] += '{' + body + '}';
-    const postParts = parseCommaParts(post);
-    if (post.length) {
-        ;
-        p[p.length - 1] += postParts.shift();
-        p.push.apply(p, postParts);
-    }
-    parts.push.apply(parts, p);
-    return parts;
 }
 function expand(str, options = {}) {
     if (!str) {
         return [];
     }
-    const { max = EXPANSION_MAX, maxLength = EXPANSION_MAX_LENGTH } = options;
+    const { max = EXPANSION_MAX, maxLength = EXPANSION_MAX_LENGTH, maxDepth = EXPANSION_MAX_DEPTH, maxRewrites = EXPANSION_MAX_REWRITES, } = options;
     // I don't know why Bash 4.3 does this, but it does.
     // Anything starting with {} will have the first two bytes preserved
     // but *only* at the top level, so {},a}b will not expand to anything,
@@ -54613,7 +55283,7 @@ function expand(str, options = {}) {
     if (str.slice(0, 2) === '{}') {
         str = '\\{\\}' + str.slice(2);
     }
-    return expand_(escapeBraces(str), max, maxLength, true).map(unescapeBraces);
+    return expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, true).map(unescapeBraces);
 }
 function embrace(str) {
     return '{' + str + '}';
@@ -54708,7 +55378,13 @@ function expandSequence(body, isAlphaSequence, max, maxLength) {
     }
     return N;
 }
-function expand_(str, max, maxLength, isTop) {
+function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
+    // Too deeply nested to keep following: treat the rest as literal, the same
+    // way a group that cannot expand is already handled. Truncating rather than
+    // throwing keeps `expand` total, matching `max` and `maxLength`.
+    if (depth > maxDepth) {
+        return [str];
+    }
     // Consume the string's top-level brace groups left to right, threading a
     // running set of combined prefixes (`acc`). Expanding the tail iteratively -
     // rather than recursing on `m.post` once per group - keeps the native stack
@@ -54720,6 +55396,9 @@ function expand_(str, max, maxLength, isTop) {
     // comma set - a sequence like `{a..\}` may legitimately yield ''. The drop
     // is on the final strings, so it is applied to whichever `combine` produces
     // them (the one with no brace set left in the tail).
+    // How many times the `{a},b}` rewrite below has restarted the scan. Each pass
+    // re-reads the whole string, so leaving this unbounded is quadratic.
+    let rewrites = 0;
     let dropEmpties = false;
     let firstGroup = true;
     for (;;) {
@@ -54744,7 +55423,8 @@ function expand_(str, max, maxLength, isTop) {
         const isOptions = m.body.indexOf(',') >= 0;
         if (!isSequence && !isOptions) {
             // {a},b}
-            if (m.post.match(/,(?!,).*\}/)) {
+            if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
+                rewrites++;
                 str = m.pre + '{' + m.body + escClose + m.post;
                 isTop = true;
                 continue;
@@ -54764,7 +55444,7 @@ function expand_(str, max, maxLength, isTop) {
             let n = parseCommaParts(m.body);
             if (n.length === 1 && n[0] !== undefined) {
                 // x{{a,b}}y ==> x{a}y x{b}y
-                n = expand_(n[0], max, maxLength, false).map(embrace);
+                n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, false).map(embrace);
                 //XXX is this necessary? Can't seem to hit it in tests.
                 /* c8 ignore start */
                 if (n.length === 1) {
@@ -54790,12 +55470,13 @@ function expand_(str, max, maxLength, isTop) {
             values = [];
             let valuesLength = 0;
             outer: for (let j = 0; j < n.length; j++) {
-                const expanded = expand_(n[j], max, maxLength, false);
+                const expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, false);
                 for (let k = 0; k < expanded.length; k++) {
                     const v = expanded[k];
                     if (dropsEmpties && !v)
                         continue;
-                    if (values.length >= max || valuesLength + v.length > maxLength) {
+                    if (values.length >= max ||
+                        valuesLength + v.length > maxLength) {
                         break outer;
                     }
                     values.push(v);
