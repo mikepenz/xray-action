@@ -37434,11 +37434,11 @@ var HttpCodes;
     HttpCodes[HttpCodes["ServiceUnavailable"] = 503] = "ServiceUnavailable";
     HttpCodes[HttpCodes["GatewayTimeout"] = 504] = "GatewayTimeout";
 })(HttpCodes || (HttpCodes = {}));
-var Headers;
+var lib_Headers;
 (function (Headers) {
     Headers["Accept"] = "accept";
     Headers["ContentType"] = "content-type";
-})(Headers || (Headers = {}));
+})(lib_Headers || (lib_Headers = {}));
 var MediaTypes;
 (function (MediaTypes) {
     MediaTypes["ApplicationJson"] = "application/json";
@@ -37593,7 +37593,7 @@ class lib_HttpClient {
      */
     getJson(requestUrl_1) {
         return __awaiter(this, arguments, void 0, function* (requestUrl, additionalHeaders = {}) {
-            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[lib_Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, lib_Headers.Accept, MediaTypes.ApplicationJson);
             const res = yield this.get(requestUrl, additionalHeaders);
             return this._processResponse(res, this.requestOptions);
         });
@@ -37601,8 +37601,8 @@ class lib_HttpClient {
     postJson(requestUrl_1, obj_1) {
         return __awaiter(this, arguments, void 0, function* (requestUrl, obj, additionalHeaders = {}) {
             const data = JSON.stringify(obj, null, 2);
-            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
-            additionalHeaders[Headers.ContentType] =
+            additionalHeaders[lib_Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, lib_Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[lib_Headers.ContentType] =
                 this._getExistingOrDefaultContentTypeHeader(additionalHeaders, MediaTypes.ApplicationJson);
             const res = yield this.post(requestUrl, data, additionalHeaders);
             return this._processResponse(res, this.requestOptions);
@@ -37611,8 +37611,8 @@ class lib_HttpClient {
     putJson(requestUrl_1, obj_1) {
         return __awaiter(this, arguments, void 0, function* (requestUrl, obj, additionalHeaders = {}) {
             const data = JSON.stringify(obj, null, 2);
-            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
-            additionalHeaders[Headers.ContentType] =
+            additionalHeaders[lib_Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, lib_Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[lib_Headers.ContentType] =
                 this._getExistingOrDefaultContentTypeHeader(additionalHeaders, MediaTypes.ApplicationJson);
             const res = yield this.put(requestUrl, data, additionalHeaders);
             return this._processResponse(res, this.requestOptions);
@@ -37621,8 +37621,8 @@ class lib_HttpClient {
     patchJson(requestUrl_1, obj_1) {
         return __awaiter(this, arguments, void 0, function* (requestUrl, obj, additionalHeaders = {}) {
             const data = JSON.stringify(obj, null, 2);
-            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
-            additionalHeaders[Headers.ContentType] =
+            additionalHeaders[lib_Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, lib_Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[lib_Headers.ContentType] =
                 this._getExistingOrDefaultContentTypeHeader(additionalHeaders, MediaTypes.ApplicationJson);
             const res = yield this.patch(requestUrl, data, additionalHeaders);
             return this._processResponse(res, this.requestOptions);
@@ -37889,7 +37889,7 @@ class lib_HttpClient {
     _getExistingOrDefaultContentTypeHeader(additionalHeaders, _default) {
         let clientHeader;
         if (this.requestOptions && this.requestOptions.headers) {
-            const headerValue = lowercaseKeys(this.requestOptions.headers)[Headers.ContentType];
+            const headerValue = lowercaseKeys(this.requestOptions.headers)[lib_Headers.ContentType];
             if (headerValue) {
                 if (typeof headerValue === 'number') {
                     clientHeader = String(headerValue);
@@ -37902,7 +37902,7 @@ class lib_HttpClient {
                 }
             }
         }
-        const additionalValue = additionalHeaders[Headers.ContentType];
+        const additionalValue = additionalHeaders[lib_Headers.ContentType];
         // Return the first non-undefined value, converting numbers or arrays to strings if necessary
         if (additionalValue !== undefined) {
             if (typeof additionalValue === 'number') {
@@ -45443,12 +45443,33 @@ function stripUrlAuth(url) {
     const sanitized = new URL(url);
     sanitized.username = '';
     sanitized.password = '';
-    return sanitized.toString();
+    return sanitized.href;
 }
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/errors.js
 
 
+const normalizeError = (error) => {
+    if (error instanceof globalThis.Error) {
+        return error;
+    }
+    if (distribution.object(error)) {
+        const errorLike = error;
+        const message = typeof errorLike.message === 'string' ? errorLike.message : 'Non-error object thrown';
+        const normalizedError = new globalThis.Error(message, { cause: error });
+        if (typeof errorLike.stack === 'string') {
+            normalizedError.stack = errorLike.stack;
+        }
+        if (typeof errorLike.code === 'string') {
+            normalizedError.code = errorLike.code;
+        }
+        if (typeof errorLike.input === 'string') {
+            normalizedError.input = errorLike.input;
+        }
+        return normalizedError;
+    }
+    return new globalThis.Error(String(error));
+};
 // A hacky check to prevent circular references.
 function isRequest(x) {
     return distribution.object(x) && '_onResponse' in x;
@@ -45465,21 +45486,29 @@ class RequestError extends Error {
     response;
     request;
     timings;
-    constructor(message, error, self) {
+    constructor(message, error, self, response) {
         super(message, { cause: error });
+        // The stack is trimmed here so that the frames inside `got` do not appear in the trace the
+        // caller sees. `unicorn/no-useless-error-capture-stack-trace` assumes the call is redundant
+        // for a subclass of `Error`, which is not the case here.
+        // eslint-disable-next-line unicorn/no-useless-error-capture-stack-trace
         Error.captureStackTrace(this, this.constructor);
-        if (error.code) {
-            this.code = error.code;
+        // The cause is kept as thrown, so it can be any value. Only an object can carry details.
+        const errorLike = distribution.object(error) ? error : undefined;
+        if (errorLike?.code) {
+            this.code = errorLike.code;
         }
-        this.input = error.input;
+        this.input = errorLike?.input;
         if (isRequest(self)) {
-            Object.defineProperty(this, 'request', {
-                enumerable: false,
-                value: self,
-            });
-            Object.defineProperty(this, 'response', {
-                enumerable: false,
-                value: self.response,
+            Object.defineProperties(this, {
+                request: {
+                    enumerable: false,
+                    value: self,
+                },
+                response: {
+                    enumerable: false,
+                    value: response ?? self.response,
+                },
             });
             this.options = self.options;
         }
@@ -45488,15 +45517,44 @@ class RequestError extends Error {
         }
         this.timings = this.request?.timings;
         // Recover the original stacktrace
-        if (distribution.string(error.stack) && distribution.string(this.stack)) {
-            const indexOfMessage = this.stack.indexOf(this.message) + this.message.length;
-            const thisStackTrace = this.stack.slice(indexOfMessage).split('\n').toReversed();
-            const errorStackTrace = error.stack.slice(error.stack.indexOf(error.message) + error.message.length).split('\n').toReversed();
+        if (distribution.string(errorLike?.stack) && distribution.string(this.stack)) {
+            // Both stacks start with a `name: message` header, and both headers are rebuilt below
+            // by dropping everything before this point. A multi-line message spans several lines,
+            // so the whole message is the boundary. A message that is empty or absent matches at
+            // zero and would leave the header in the frames, so the first newline is the boundary.
+            // A message that is not in its stack, such as one changed after the stack was read, has no
+            // boundary at all.
+            const frameStart = (stack, message) => {
+                if (!message) {
+                    return stack.indexOf('\n');
+                }
+                const messageStart = stack.indexOf(message);
+                return messageStart === -1 ? -1 : messageStart + message.length;
+            };
+            const headerEnd = frameStart(this.stack, this.message);
+            const thisStackTrace = (headerEnd === -1 ? '' : this.stack.slice(headerEnd)).split('\n').toReversed();
+            const causeStart = frameStart(errorLike.stack, errorLike.message);
+            const originalStack = distribution.string(errorLike.message) && causeStart !== -1
+                ? errorLike.stack.slice(causeStart)
+                : `\n${errorLike.stack}`;
+            const errorStackTrace = originalStack.split('\n').toReversed();
             // Remove duplicated traces
             while (errorStackTrace.length > 0 && errorStackTrace[0] === thisStackTrace[0]) {
                 thisStackTrace.shift();
             }
-            this.stack = `${this.stack.slice(0, indexOfMessage)}${thisStackTrace.toReversed().join('\n')}${errorStackTrace.toReversed().join('\n')}`;
+            const frames = `${thisStackTrace.toReversed().join('\n')}${errorStackTrace.toReversed().join('\n')}`;
+            let assignedStack;
+            // A subclass sets `name` only after `super()` returns, so building the header here
+            // would label every subclass as a plain `RequestError`. Read the names on access
+            // instead, while still honouring an assigned stack the way `Error` does.
+            Object.defineProperty(this, 'stack', {
+                configurable: true,
+                enumerable: false,
+                get: () => assignedStack ?? `${this.name}: ${this.message}${frames}`,
+                set(value) {
+                    assignedStack = distribution.string(value) ? value : undefined;
+                },
+            });
         }
     }
 }
@@ -45520,7 +45578,7 @@ class HTTPError extends RequestError {
     name = 'HTTPError';
     code = 'ERR_NON_2XX_3XX_RESPONSE';
     constructor(response) {
-        super(`Request failed with status code ${response.statusCode} (${response.statusMessage}): ${response.request.options.method} ${stripUrlAuth(response.request.options.url)}`, {}, response.request);
+        super(`Request failed with status code ${response.statusCode} (${response.statusMessage}): ${response.request.options.method} ${stripUrlAuth(response.request.options.url)}`, {}, response.request, response);
     }
 }
 /**
@@ -45529,9 +45587,9 @@ For example, if the database goes down or there's a filesystem error.
 */
 class CacheError extends RequestError {
     name = 'CacheError';
+    code = 'ERR_CACHE_ACCESS';
     constructor(error, request) {
         super(error.message, error, request);
-        this.code = 'ERR_CACHE_ACCESS';
     }
 }
 /**
@@ -45539,9 +45597,9 @@ An error to be thrown when the request body is a stream and an error occurs whil
 */
 class UploadError extends RequestError {
     name = 'UploadError';
+    code = 'ERR_UPLOAD';
     constructor(error, request) {
         super(error.message, error, request);
-        this.code = 'ERR_UPLOAD';
     }
 }
 /**
@@ -45550,11 +45608,13 @@ Includes an `event` and `timings` property.
 */
 class TimeoutError extends RequestError {
     name = 'TimeoutError';
+    code = 'ETIMEDOUT';
     timings;
     event;
     constructor(error, timings, request) {
         super(error.message, error, request);
-        this.event = error.event;
+        // `AbortSignal.timeout()` reports a `DOMException`, which names no phase.
+        this.event = error.event ?? 'request';
         this.timings = timings;
     }
 }
@@ -45589,6 +45649,9 @@ class AbortError extends RequestError {
     code = 'ERR_ABORTED';
     constructor(request) {
         super('This operation was aborted.', {}, request);
+        if (request.options?.signal?.aborted) {
+            this.cause = request.options.signal.reason;
+        }
     }
 }
 
@@ -45600,6 +45663,8 @@ var external_node_buffer_ = __nccwpck_require__(4573);
 var external_node_stream_ = __nccwpck_require__(7075);
 // EXTERNAL MODULE: external "node:http"
 var external_node_http_ = __nccwpck_require__(7067);
+// EXTERNAL MODULE: external "node:http2"
+var external_node_http2_ = __nccwpck_require__(2467);
 ;// CONCATENATED MODULE: ./node_modules/byte-counter/utilities.js
 const textEncoder = new TextEncoder();
 
@@ -45797,6 +45862,10 @@ function isUint8ArrayOrArrayBuffer(value) {
 	return uint8array_extras_isUint8Array(value) || uint8array_extras_isArrayBuffer(value);
 }
 
+function toUint8ArrayIfArrayBuffer(value) {
+	return uint8array_extras_isArrayBuffer(value) ? new Uint8Array(value) : value;
+}
+
 function uint8array_extras_assertUint8Array(value) {
 	if (!uint8array_extras_isUint8Array(value)) {
 		throw new TypeError(`Expected \`Uint8Array\`, got \`${typeof value}\``);
@@ -45826,13 +45895,14 @@ function concatUint8Arrays(arrays, totalLength) {
 		return new Uint8Array(0);
 	}
 
-	totalLength ??= arrays.reduce((accumulator, currentValue) => accumulator + currentValue.length, 0);
+	totalLength ??= arrays.reduce((accumulator, currentValue) => accumulator + currentValue.byteLength, 0);
 
 	const returnValue = new Uint8Array(totalLength);
 
 	let offset = 0;
-	for (const array of arrays) {
-		uint8array_extras_assertUint8Array(array);
+	for (let array of arrays) {
+		assertUint8ArrayOrArrayBuffer(array);
+		array = toUint8ArrayIfArrayBuffer(array);
 		returnValue.set(array, offset);
 		offset += array.length;
 	}
@@ -45841,8 +45911,10 @@ function concatUint8Arrays(arrays, totalLength) {
 }
 
 function areUint8ArraysEqual(a, b) {
-	uint8array_extras_assertUint8Array(a);
-	uint8array_extras_assertUint8Array(b);
+	assertUint8ArrayOrArrayBuffer(a);
+	assertUint8ArrayOrArrayBuffer(b);
+	a = toUint8ArrayIfArrayBuffer(a);
+	b = toUint8ArrayIfArrayBuffer(b);
 
 	if (a === b) {
 		return true;
@@ -45863,8 +45935,10 @@ function areUint8ArraysEqual(a, b) {
 }
 
 function compareUint8Arrays(a, b) {
-	uint8array_extras_assertUint8Array(a);
-	uint8array_extras_assertUint8Array(b);
+	assertUint8ArrayOrArrayBuffer(a);
+	assertUint8ArrayOrArrayBuffer(b);
+	a = toUint8ArrayIfArrayBuffer(a);
+	b = toUint8ArrayIfArrayBuffer(b);
 
 	const length = Math.min(a.length, b.length);
 
@@ -45918,7 +45992,8 @@ function base64UrlToBase64(base64url) {
 const MAX_BLOCK_SIZE = 65_535;
 
 function uint8ArrayToBase64(array, {urlSafe = false} = {}) {
-	uint8array_extras_assertUint8Array(array);
+	assertUint8ArrayOrArrayBuffer(array);
+	array = toUint8ArrayIfArrayBuffer(array);
 
 	let base64 = '';
 
@@ -45949,7 +46024,8 @@ function base64ToString(base64String) {
 const byteToHexLookupTable = Array.from({length: 256}, (_, index) => index.toString(16).padStart(2, '0'));
 
 function uint8ArrayToHex(array) {
-	uint8array_extras_assertUint8Array(array);
+	assertUint8ArrayOrArrayBuffer(array);
+	array = toUint8ArrayIfArrayBuffer(array);
 
 	// Concatenating a string is faster than using an array.
 	let hexString = '';
@@ -46044,11 +46120,14 @@ function getUintBE(view) {
 }
 
 /**
-@param {Uint8Array} array
-@param {Uint8Array} value
+@param {Uint8Array | ArrayBuffer} array
+@param {Uint8Array | ArrayBuffer} value
 @returns {number}
 */
 function indexOf(array, value) {
+	array = toUint8ArrayIfArrayBuffer(array);
+	value = toUint8ArrayIfArrayBuffer(value);
+
 	const arrayLength = array.length;
 	const valueLength = value.length;
 
@@ -46080,8 +46159,8 @@ function indexOf(array, value) {
 }
 
 /**
-@param {Uint8Array} array
-@param {Uint8Array} value
+@param {Uint8Array | ArrayBuffer} array
+@param {Uint8Array | ArrayBuffer} value
 @returns {boolean}
 */
 function includes(array, value) {
@@ -48370,6 +48449,190 @@ const parseWithWhatwg = (raw) => {
 
 const onResponse = "onResponse";
 //# sourceMappingURL=index.js.map
+// EXTERNAL MODULE: external "node:util"
+var external_node_util_ = __nccwpck_require__(7975);
+;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/timer.js
+
+
+const getInitialConnectionTimings = (socket) => Reflect.get(socket, '__initial_connection_timings__');
+const setInitialConnectionTimings = (socket, timings) => {
+    Reflect.set(socket, '__initial_connection_timings__', timings);
+};
+const timer = (request) => {
+    if (request.timings) {
+        return request.timings;
+    }
+    const timings = {
+        start: Date.now(),
+        socket: undefined,
+        lookup: undefined,
+        connect: undefined,
+        secureConnect: undefined,
+        upload: undefined,
+        response: undefined,
+        end: undefined,
+        error: undefined,
+        abort: undefined,
+        phases: {
+            wait: undefined,
+            dns: undefined,
+            tcp: undefined,
+            tls: undefined,
+            request: undefined,
+            firstByte: undefined,
+            download: undefined,
+            total: undefined,
+        },
+    };
+    request.timings = timings;
+    const handleError = (origin) => {
+        origin.once(external_node_events_.errorMonitor, () => {
+            timings.error = Date.now();
+            timings.phases.total = timings.error - timings.start;
+        });
+    };
+    handleError(request);
+    const onAbort = () => {
+        timings.abort = Date.now();
+        timings.phases.total = timings.abort - timings.start;
+    };
+    request.prependOnceListener('abort', onAbort);
+    const onSocket = (socket) => {
+        timings.socket = Date.now();
+        timings.phases.wait = timings.socket - timings.start;
+        if (external_node_util_.types.isProxy(socket)) {
+            // HTTP/2: The socket is a proxy, so connection events won't fire.
+            // We can't measure connection timings, so leave them undefined.
+            // This prevents NaN in phases.request calculation.
+            return;
+        }
+        // Check if socket is already connected (reused from connection pool)
+        const socketAlreadyConnected = socket.writable && !socket.connecting;
+        if (socketAlreadyConnected) {
+            // Socket reuse detected: the socket was already connected from a previous request.
+            // For reused sockets, set all connection timestamps to socket time since no new
+            // connection was made for THIS request. But preserve phase durations from the
+            // original connection so they're not lost.
+            timings.lookup = timings.socket;
+            timings.connect = timings.socket;
+            const initialConnectionTimings = getInitialConnectionTimings(socket);
+            if (initialConnectionTimings) {
+                // Restore the phase timings from the initial connection
+                timings.phases.dns = initialConnectionTimings.dnsPhase;
+                timings.phases.tcp = initialConnectionTimings.tcpPhase;
+                timings.phases.tls = initialConnectionTimings.tlsPhase;
+                // Set secureConnect timestamp if there was TLS
+                if (timings.phases.tls !== undefined) {
+                    timings.secureConnect = timings.socket;
+                }
+            }
+            else {
+                // Socket reused but no initial timings stored (e.g., from external code)
+                // Set phases to 0
+                timings.phases.dns = 0;
+                timings.phases.tcp = 0;
+            }
+            return;
+        }
+        const lookupListener = () => {
+            timings.lookup = Date.now();
+            timings.phases.dns = timings.lookup - timings.socket;
+        };
+        socket.prependOnceListener('lookup', lookupListener);
+        if (!socket.connecting) {
+            return;
+        }
+        const onSecureConnect = () => {
+            timings.secureConnect = Date.now();
+            timings.phases.tls = timings.secureConnect - timings.connect;
+            // Update stored timings with TLS phase timing
+            const initialConnectionTimings = getInitialConnectionTimings(socket);
+            if (initialConnectionTimings) {
+                initialConnectionTimings.tlsPhase = timings.phases.tls;
+            }
+        };
+        socket.once('connect', () => {
+            timings.connect = Date.now();
+            if (timings.lookup === undefined) {
+                // No DNS lookup occurred (e.g., connecting to an IP address directly)
+                // Set lookup to socket time (no time elapsed for DNS)
+                socket.removeListener('lookup', lookupListener);
+                timings.lookup = timings.socket;
+                timings.phases.dns = 0;
+            }
+            timings.phases.tcp = timings.connect - timings.lookup;
+            // If lookup and connect happen at the EXACT same time (tcp = 0),
+            // DNS was served from cache and the dns value is just event loop overhead.
+            // Set dns to 0 to indicate no actual DNS resolution occurred.
+            // Fixes https://github.com/szmarczak/http-timer/issues/35
+            if (timings.phases.tcp === 0 && timings.phases.dns && timings.phases.dns > 0) {
+                timings.phases.dns = 0;
+            }
+            // Store connection phase timings on socket for potential reuse
+            if (!getInitialConnectionTimings(socket)) {
+                setInitialConnectionTimings(socket, {
+                    dnsPhase: timings.phases.dns,
+                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript can't prove this is defined due to callback structure
+                    tcpPhase: timings.phases.tcp,
+                });
+            }
+            if ('encrypted' in socket) {
+                if (socket.authorized) {
+                    onSecureConnect();
+                }
+                else {
+                    // Wait for secureConnect event (even if authorization fails, we need the timing)
+                    socket.once('secureConnect', onSecureConnect);
+                }
+            }
+        });
+    };
+    if (request.socket) {
+        onSocket(request.socket);
+    }
+    else {
+        request.prependOnceListener('socket', onSocket);
+    }
+    const onUpload = () => {
+        timings.upload = Date.now();
+        // Calculate request phase if we have connection timings
+        const secureOrConnect = timings.secureConnect ?? timings.connect;
+        if (secureOrConnect !== undefined) {
+            timings.phases.request = timings.upload - secureOrConnect;
+        }
+        // If both are undefined (HTTP/2), phases.request stays undefined (not NaN)
+    };
+    if (request.writableFinished) {
+        onUpload();
+    }
+    else {
+        request.prependOnceListener('finish', onUpload);
+    }
+    request.prependOnceListener('response', (response) => {
+        timings.response = Date.now();
+        // The server may respond before the upload finishes, for example to reject a large body early. There is no first byte phase to measure then.
+        if (timings.upload !== undefined) {
+            timings.phases.firstByte = timings.response - timings.upload;
+        }
+        response.timings = timings;
+        handleError(response);
+        response.prependOnceListener('end', () => {
+            request.off('abort', onAbort);
+            response.off('aborted', onAbort);
+            if (timings.phases.total !== undefined) {
+                // Aborted or errored
+                return;
+            }
+            timings.end = Date.now();
+            timings.phases.download = timings.end - timings.response;
+            timings.phases.total = timings.end - timings.start;
+        });
+        response.prependOnceListener('aborted', onAbort);
+    });
+    return timings;
+};
+/* harmony default export */ const utils_timer = (timer);
+
 // EXTERNAL MODULE: external "node:zlib"
 var external_node_zlib_ = __nccwpck_require__(8522);
 ;// CONCATENATED MODULE: ./node_modules/decompress-response/index.js
@@ -48464,217 +48727,52 @@ function decompressResponse(response) {
 	return finalStream;
 }
 
-// EXTERNAL MODULE: external "node:util"
-var external_node_util_ = __nccwpck_require__(7975);
-;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/defer-to-connect.js
-function isTlsSocket(socket) {
-    return 'encrypted' in socket;
+;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/decompress-response.js
+
+
+const supportedEncodings = new Set(['gzip', 'deflate', 'br', ...(typeof external_node_zlib_.createZstdDecompress === 'function' ? ['zstd'] : [])]);
+function decompressResponseBody(response) {
+    const encodings = (response.headers['content-encoding'] ?? '')
+        .toLowerCase()
+        .split(',')
+        .map(encoding => encoding.trim())
+        // Empty list members are ignored (RFC 9110, section 5.6.1.1).
+        .filter(encoding => encoding.length > 0)
+        // `identity` means the content was not transformed, so it adds no decoding step.
+        .filter(encoding => encoding !== 'identity')
+        .map(encoding => encoding === 'x-gzip' ? 'gzip' : encoding);
+    if (encodings.some(encoding => !supportedEncodings.has(encoding))) {
+        return decompressResponse(response);
+    }
+    const nativeResponse = response;
+    // Content-Encoding lists codings in application order (RFC 9110, section 8.4).
+    for (const encoding of encodings.toReversed()) {
+        const source = response;
+        const originalHeaders = source.headers;
+        try {
+            // The dependency accepts one coding. Retain the native headers for wire-byte validation.
+            source.headers = { ...originalHeaders, 'content-encoding': encoding };
+            response = decompressResponse(source);
+        }
+        finally {
+            source.headers = originalHeaders;
+        }
+        if (source === nativeResponse) {
+            continue;
+        }
+        const decoded = response;
+        source.once('error', error => {
+            decoded.destroy(error);
+        });
+    }
+    return response;
 }
-const deferToConnect = (socket, fn) => {
-    const listeners = typeof fn === 'function' ? { connect: fn } : fn;
-    const onConnect = () => {
-        listeners.connect?.();
-        if (isTlsSocket(socket) && listeners.secureConnect) {
-            if (socket.authorized) {
-                listeners.secureConnect();
-            }
-            else {
-                // Wait for secureConnect event (even if authorization fails, we need the timing)
-                socket.once('secureConnect', listeners.secureConnect);
-            }
-        }
-        if (listeners.close) {
-            socket.once('close', listeners.close);
-        }
-    };
-    if (socket.writable && !socket.connecting) {
-        onConnect();
-    }
-    else if (socket.connecting) {
-        socket.once('connect', onConnect);
-    }
-    else if (socket.destroyed && listeners.close) {
-        const hadError = '_hadError' in socket ? Boolean(socket._hadError) : false;
-        listeners.close(hadError);
-    }
-};
-/* harmony default export */ const defer_to_connect = (deferToConnect);
-
-;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/timer.js
-
-
-
-const getInitialConnectionTimings = (socket) => Reflect.get(socket, '__initial_connection_timings__');
-const setInitialConnectionTimings = (socket, timings) => {
-    Reflect.set(socket, '__initial_connection_timings__', timings);
-};
-const timer = (request) => {
-    if (request.timings) {
-        return request.timings;
-    }
-    const timings = {
-        start: Date.now(),
-        socket: undefined,
-        lookup: undefined,
-        connect: undefined,
-        secureConnect: undefined,
-        upload: undefined,
-        response: undefined,
-        end: undefined,
-        error: undefined,
-        abort: undefined,
-        phases: {
-            wait: undefined,
-            dns: undefined,
-            tcp: undefined,
-            tls: undefined,
-            request: undefined,
-            firstByte: undefined,
-            download: undefined,
-            total: undefined,
-        },
-    };
-    request.timings = timings;
-    const handleError = (origin) => {
-        origin.once(external_node_events_.errorMonitor, () => {
-            timings.error = Date.now();
-            timings.phases.total = timings.error - timings.start;
-        });
-    };
-    handleError(request);
-    const onAbort = () => {
-        timings.abort = Date.now();
-        timings.phases.total = timings.abort - timings.start;
-    };
-    request.prependOnceListener('abort', onAbort);
-    const onSocket = (socket) => {
-        timings.socket = Date.now();
-        timings.phases.wait = timings.socket - timings.start;
-        if (external_node_util_.types.isProxy(socket)) {
-            // HTTP/2: The socket is a proxy, so connection events won't fire.
-            // We can't measure connection timings, so leave them undefined.
-            // This prevents NaN in phases.request calculation.
-            return;
-        }
-        // Check if socket is already connected (reused from connection pool)
-        const socketAlreadyConnected = socket.writable && !socket.connecting;
-        if (socketAlreadyConnected) {
-            // Socket reuse detected: the socket was already connected from a previous request.
-            // For reused sockets, set all connection timestamps to socket time since no new
-            // connection was made for THIS request. But preserve phase durations from the
-            // original connection so they're not lost.
-            timings.lookup = timings.socket;
-            timings.connect = timings.socket;
-            const initialConnectionTimings = getInitialConnectionTimings(socket);
-            if (initialConnectionTimings) {
-                // Restore the phase timings from the initial connection
-                timings.phases.dns = initialConnectionTimings.dnsPhase;
-                timings.phases.tcp = initialConnectionTimings.tcpPhase;
-                timings.phases.tls = initialConnectionTimings.tlsPhase;
-                // Set secureConnect timestamp if there was TLS
-                if (timings.phases.tls !== undefined) {
-                    timings.secureConnect = timings.socket;
-                }
-            }
-            else {
-                // Socket reused but no initial timings stored (e.g., from external code)
-                // Set phases to 0
-                timings.phases.dns = 0;
-                timings.phases.tcp = 0;
-            }
-            return;
-        }
-        const lookupListener = () => {
-            timings.lookup = Date.now();
-            timings.phases.dns = timings.lookup - timings.socket;
-        };
-        socket.prependOnceListener('lookup', lookupListener);
-        defer_to_connect(socket, {
-            connect() {
-                timings.connect = Date.now();
-                if (timings.lookup === undefined) {
-                    // No DNS lookup occurred (e.g., connecting to an IP address directly)
-                    // Set lookup to socket time (no time elapsed for DNS)
-                    socket.removeListener('lookup', lookupListener);
-                    timings.lookup = timings.socket;
-                    timings.phases.dns = 0;
-                }
-                timings.phases.tcp = timings.connect - timings.lookup;
-                // If lookup and connect happen at the EXACT same time (tcp = 0),
-                // DNS was served from cache and the dns value is just event loop overhead.
-                // Set dns to 0 to indicate no actual DNS resolution occurred.
-                // Fixes https://github.com/szmarczak/http-timer/issues/35
-                if (timings.phases.tcp === 0 && timings.phases.dns && timings.phases.dns > 0) {
-                    timings.phases.dns = 0;
-                }
-                // Store connection phase timings on socket for potential reuse
-                if (!getInitialConnectionTimings(socket)) {
-                    setInitialConnectionTimings(socket, {
-                        dnsPhase: timings.phases.dns,
-                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript can't prove this is defined due to callback structure
-                        tcpPhase: timings.phases.tcp,
-                    });
-                }
-            },
-            secureConnect() {
-                timings.secureConnect = Date.now();
-                timings.phases.tls = timings.secureConnect - timings.connect;
-                // Update stored timings with TLS phase timing
-                const initialConnectionTimings = getInitialConnectionTimings(socket);
-                if (initialConnectionTimings) {
-                    initialConnectionTimings.tlsPhase = timings.phases.tls;
-                }
-            },
-        });
-    };
-    if (request.socket) {
-        onSocket(request.socket);
-    }
-    else {
-        request.prependOnceListener('socket', onSocket);
-    }
-    const onUpload = () => {
-        timings.upload = Date.now();
-        // Calculate request phase if we have connection timings
-        const secureOrConnect = timings.secureConnect ?? timings.connect;
-        if (secureOrConnect !== undefined) {
-            timings.phases.request = timings.upload - secureOrConnect;
-        }
-        // If both are undefined (HTTP/2), phases.request stays undefined (not NaN)
-    };
-    if (request.writableFinished) {
-        onUpload();
-    }
-    else {
-        request.prependOnceListener('finish', onUpload);
-    }
-    request.prependOnceListener('response', (response) => {
-        timings.response = Date.now();
-        timings.phases.firstByte = timings.response - timings.upload;
-        response.timings = timings;
-        handleError(response);
-        response.prependOnceListener('end', () => {
-            request.off('abort', onAbort);
-            response.off('aborted', onAbort);
-            if (timings.phases.total !== undefined) {
-                // Aborted or errored
-                return;
-            }
-            timings.end = Date.now();
-            timings.phases.download = timings.end - timings.response;
-            timings.phases.total = timings.end - timings.start;
-        });
-        response.prependOnceListener('aborted', onAbort);
-    });
-    return timings;
-};
-/* harmony default export */ const utils_timer = (timer);
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/get-body-size.js
 
 
 function getBodySize(body, headers) {
-    if (headers && 'content-length' in headers) {
+    if (headers && 'content-length' in headers && headers['content-length'] !== undefined) {
         return Number(headers['content-length']);
     }
     if (!body) {
@@ -48683,13 +48781,18 @@ function getBodySize(body, headers) {
     if (distribution.string(body)) {
         return stringToUint8Array(body).byteLength;
     }
-    if (distribution.buffer(body)) {
-        return body.length;
-    }
-    if (distribution.typedArray(body)) {
-        return body.byteLength;
-    }
-    return undefined;
+    return ArrayBuffer.isView(body) ? body.byteLength : undefined;
+}
+
+;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/is-non-replayable-body.js
+
+// A body is replayable only if iterating it again restarts from the beginning.
+// Node streams, Web `ReadableStream`s, and iterator objects are consumed by an upload, so they cannot be replayed on a redirect or retry.
+function isNonReplayableBody(body) {
+    // Creating an iterator can open resources or throw. Only create it when actually sending the body.
+    return distribution.nodeStream(body)
+        || body instanceof ReadableStream
+        || (distribution.object(body) && distribution.function(body.next));
 }
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/proxy-events.js
@@ -48711,29 +48814,7 @@ function proxyEvents(from, to, events) {
 
 // EXTERNAL MODULE: external "node:net"
 var external_node_net_ = __nccwpck_require__(7030);
-;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/unhandle.js
-// When attaching listeners, it's very easy to forget about them.
-// Especially if you do error handling and set timeouts.
-// So instead of checking if it's proper to throw an error on every timeout ever,
-// use this simple tool which will remove all listeners you have attached.
-function unhandle() {
-    const handlers = [];
-    return {
-        once(origin, event, function_) {
-            origin.once(event, function_);
-            handlers.push({ origin, event, fn: function_ });
-        },
-        unhandleAll() {
-            for (const { origin, event, fn } of handlers) {
-                origin.removeListener(event, fn);
-            }
-            handlers.length = 0;
-        },
-    };
-}
-
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/timed-out.js
-
 
 const reentry = Symbol('reentry');
 const timed_out_noop = () => { };
@@ -48746,16 +48827,37 @@ class timed_out_TimeoutError extends Error {
         this.event = event;
     }
 }
+// Node.js turns timer delays above the 32-bit limit (including `Infinity`) into 1 ms with a
+// warning, so such a delay means "no timeout" instead of an instant timeout.
+const maximumTimerDelay = 2_147_483_647;
+/**
+Whether a delay can be armed as a Node.js timer without collapsing into an instant timeout.
+*/
+const isArmableTimerDelay = (delay) => delay <= maximumTimerDelay && Number.isFinite(delay);
 function timedOut(request, delays, options) {
+    // `reentry` is a symbol, so it cannot collide with a header name, and the request object is
+    // itself the marker. Rewriting either line as an `Object.hasOwn` call would check something else.
+    // eslint-disable-next-line unicorn/no-computed-property-existence-check
     if (reentry in request) {
         return timed_out_noop;
     }
     request[reentry] = true;
     const cancelers = [];
-    const { once, unhandleAll } = unhandle();
     const handled = new Set();
-    const addTimeout = (delay, callback, event) => {
-        const timeout = setTimeout(callback, delay, delay, event);
+    // When attaching listeners, it's very easy to forget about them.
+    // Especially if you do error handling and set timeouts.
+    // So instead of checking if it's proper to throw an error on every timeout ever,
+    // track every listener attached through `once` below, so `cancelTimeouts` can remove all of them.
+    const listeners = [];
+    const once = (origin, event, listener) => {
+        origin.once(event, listener);
+        listeners.push({ origin, event, listener });
+    };
+    const addTimeout = (delay, event) => {
+        if (!isArmableTimerDelay(delay)) {
+            return timed_out_noop;
+        }
+        const timeout = setTimeout(timeoutHandler, delay, delay, event);
         timeout.unref();
         const cancel = () => {
             handled.add(event);
@@ -48778,7 +48880,10 @@ function timedOut(request, delays, options) {
         for (const cancel of cancelers) {
             cancel();
         }
-        unhandleAll();
+        for (const { origin, event, listener } of listeners) {
+            origin.removeListener(event, listener);
+        }
+        listeners.length = 0;
     };
     request.once('error', error => {
         cancelTimeouts();
@@ -48788,13 +48893,7 @@ function timedOut(request, delays, options) {
             throw error;
         }
     });
-    if (delays.request !== undefined) {
-        const cancelTimeout = addTimeout(delays.request, timeoutHandler, 'request');
-        once(request, 'response', (response) => {
-            once(response, 'end', cancelTimeout);
-        });
-    }
-    if (delays.socket !== undefined) {
+    if (delays.socket !== undefined && isArmableTimerDelay(delays.socket)) {
         const { socket } = delays;
         const socketTimeoutHandler = () => {
             timeoutHandler(socket, 'socket');
@@ -48804,6 +48903,7 @@ function timedOut(request, delays, options) {
         // We can just remove the listener and forget about the timer - it's unreffed.
         // See https://github.com/sindresorhus/got/issues/690
         cancelers.push(() => {
+            handled.add('socket');
             request.removeListener('timeout', socketTimeoutHandler);
         });
     }
@@ -48812,18 +48912,22 @@ function timedOut(request, delays, options) {
     const hasSecureConnect = delays.secureConnect !== undefined;
     const hasSend = delays.send !== undefined;
     if (hasLookup || hasConnect || hasSecureConnect || hasSend) {
-        once(request, 'socket', (socket) => {
+        const onSocket = (socket) => {
             const { socketPath } = request;
             /* istanbul ignore next: hard to test */
             if (socket.connecting) {
-                const hasPath = Boolean(socketPath ?? (external_node_net_.isIP(hostname ?? host ?? '') !== 0));
-                if (hasLookup && !hasPath && socket.address().address === undefined) {
-                    const cancelTimeout = addTimeout(delays.lookup, timeoutHandler, 'lookup');
+                // WHATWG URL hostnames keep IPv6 brackets, which `net.isIP` rejects. Strip them so IPv6 URLs skip DNS correctly.
+                const normalizedHostname = hostname?.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
+                const hasPath = Boolean(socketPath ?? (external_node_net_.isIP(normalizedHostname ?? host ?? '') !== 0));
+                // A synchronous lookup can finish before the socket is assigned to the request.
+                const hasLookupCompleted = socket.address().address !== undefined;
+                if (hasLookup && !hasPath && !hasLookupCompleted) {
+                    const cancelTimeout = addTimeout(delays.lookup, 'lookup');
                     once(socket, 'lookup', cancelTimeout);
                 }
                 if (hasConnect) {
-                    const timeConnect = () => addTimeout(delays.connect, timeoutHandler, 'connect');
-                    if (hasPath) {
+                    const timeConnect = () => addTimeout(delays.connect, 'connect');
+                    if (hasPath || hasLookupCompleted) {
                         once(socket, 'connect', timeConnect());
                     }
                     else {
@@ -48836,13 +48940,13 @@ function timedOut(request, delays, options) {
                 }
                 if (hasSecureConnect && options.protocol === 'https:') {
                     once(socket, 'connect', () => {
-                        const cancelTimeout = addTimeout(delays.secureConnect, timeoutHandler, 'secureConnect');
+                        const cancelTimeout = addTimeout(delays.secureConnect, 'secureConnect');
                         once(socket, 'secureConnect', cancelTimeout);
                     });
                 }
             }
             if (hasSend) {
-                const timeRequest = () => addTimeout(delays.send, timeoutHandler, 'send');
+                const timeRequest = () => addTimeout(delays.send, 'send');
                 /* istanbul ignore next: hard to test */
                 if (socket.connecting) {
                     once(socket, 'connect', () => {
@@ -48853,17 +48957,29 @@ function timedOut(request, delays, options) {
                     once(request, 'upload-complete', timeRequest());
                 }
             }
-        });
+        };
+        if (request.socket) {
+            onSocket(request.socket);
+        }
+        else {
+            once(request, 'socket', onSocket);
+        }
     }
     if (delays.response !== undefined) {
-        once(request, 'upload-complete', () => {
-            const cancelTimeout = addTimeout(delays.response, timeoutHandler, 'response');
-            once(request, 'response', cancelTimeout);
+        let cancelTimeout = timed_out_noop;
+        const startTimeout = () => {
+            cancelTimeout = addTimeout(delays.response, 'response');
+        };
+        once(request, 'upload-complete', startTimeout);
+        once(request, 'response', () => {
+            // A server can respond before the upload finishes.
+            request.removeListener('upload-complete', startTimeout);
+            cancelTimeout();
         });
     }
     if (delays.read !== undefined) {
         once(request, 'response', (response) => {
-            const cancelTimeout = addTimeout(delays.read, timeoutHandler, 'read');
+            const cancelTimeout = addTimeout(delays.read, 'read');
             once(response, 'end', cancelTimeout);
         });
     }
@@ -48883,16 +48999,10 @@ class WeakableMap {
         }
     }
     get(key) {
-        if (typeof key === 'object') {
-            return this.weakMap.get(key);
-        }
-        return this.map.get(key);
+        return typeof key === 'object' ? this.weakMap.get(key) : this.map.get(key);
     }
     has(key) {
-        if (typeof key === 'object') {
-            return this.weakMap.has(key);
-        }
-        return this.map.has(key);
+        return typeof key === 'object' ? this.weakMap.has(key) : this.map.has(key);
     }
 }
 
@@ -48911,16 +49021,18 @@ const calculateRetryDelay = ({ attemptCount, retryOptions, error, retryAfter, co
         return 0;
     }
     if (error.response) {
-        if (retryAfter) {
+        if (retryAfter !== undefined) {
             // In this case `computedValue` is `retryOptions.maxRetryAfter ?? options.timeout.request ?? Infinity`
-            return retryAfter > computedValue ? 0 : retryAfter;
+            // Compare the server delay before applying the minimum nonzero retry timer.
+            return retryAfter > computedValue ? 0 : Math.max(1, retryAfter);
         }
         if (error.response.statusCode === 413) {
             return 0;
         }
     }
     const noise = Math.random() * retryOptions.noise;
-    return Math.min(((2 ** (attemptCount - 1)) * 1000), retryOptions.backoffLimit) + noise;
+    // Zero disables retries, so represent an immediate retry with the minimum timer delay.
+    return Math.max(1, Math.min(((2 ** (attemptCount - 1)) * 1000), retryOptions.backoffLimit) + noise);
 };
 /* harmony default export */ const calculate_retry_delay = (calculateRetryDelay);
 
@@ -48964,34 +49076,26 @@ const splitHeaderValue = (value, separator) => {
     let inReference = false;
     let isEscaped = false;
     for (const character of value) {
-        if (inQuotes && isEscaped) {
-            current += character;
-            isEscaped = false;
-            continue;
+        if (inQuotes) {
+            if (isEscaped) {
+                isEscaped = false;
+            }
+            else if (character === '\\') {
+                isEscaped = true;
+            }
+            else if (character === '"') {
+                inQuotes = false;
+            }
         }
-        if (inQuotes && character === '\\') {
-            current += character;
-            isEscaped = true;
-            continue;
+        else if (character === '"') {
+            inQuotes = true;
         }
-        if (character === '"') {
-            inQuotes = !inQuotes;
-            current += character;
-            continue;
+        else if (character === '<' || character === '>') {
+            inReference = character === '<';
         }
-        if (!inQuotes && character === '<') {
-            inReference = true;
-            current += character;
-            continue;
-        }
-        if (!inQuotes && character === '>') {
-            inReference = false;
-            current += character;
-            continue;
-        }
-        // Link headers use both quoted strings and <URI-reference> values, so raw
-        // splitting on `,` / `;` would break valid values containing those characters.
-        if (!inQuotes && !inReference && character === separator) {
+        else if (!inReference && character === separator) {
+            // Link headers use both quoted strings and <URI-reference> values, so raw
+            // splitting on `,` / `;` would break valid values containing those characters.
             values.push(current);
             current = '';
             continue;
@@ -49006,8 +49110,11 @@ const splitHeaderValue = (value, separator) => {
 };
 function parseLinkHeader(link) {
     const parsed = [];
-    const items = splitHeaderValue(link, ',');
-    for (const item of items) {
+    for (const item of splitHeaderValue(link, ',')) {
+        // HTTP list recipients ignore empty members (RFC 9110, section 5.6.1.2).
+        if (item.trim() === '') {
+            continue;
+        }
         // https://tools.ietf.org/html/rfc5988#section-5
         const [rawUriReference, ...rawLinkParameters] = splitHeaderValue(item, ';');
         const trimmedUriReference = rawUriReference.trim();
@@ -49015,23 +49122,26 @@ function parseLinkHeader(link) {
         if (trimmedUriReference[0] !== '<' || trimmedUriReference.at(-1) !== '>') {
             throw new Error(`Invalid format of the Link header reference: ${trimmedUriReference}`);
         }
-        const reference = trimmedUriReference.slice(1, -1);
-        const parameters = {};
+        // Optional whitespace is allowed inside the angle brackets (RFC 8288, section 3).
+        const reference = trimmedUriReference.slice(1, -1).trim();
         if (reference.includes('<') || reference.includes('>')) {
             throw new Error(`Invalid format of the Link header reference: ${trimmedUriReference}`);
         }
-        if (rawLinkParameters.length === 0) {
-            throw new Error(`Unexpected end of Link header parameters: ${rawLinkParameters.join(';')}`);
-        }
+        // Parameter names can match `Object.prototype` properties, so use a null-prototype object.
+        const parameters = Object.create(null);
         for (const rawParameter of rawLinkParameters) {
             const trimmedRawParameter = rawParameter.trim();
             const center = trimmedRawParameter.indexOf('=');
-            if (center === -1) {
+            // The parameter value is optional. See https://www.rfc-editor.org/rfc/rfc8288#section-3
+            const name = center === -1 ? trimmedRawParameter : trimmedRawParameter.slice(0, center).trim();
+            if (name === '') {
                 throw new Error(`Failed to parse Link header: ${link}`);
             }
-            const name = trimmedRawParameter.slice(0, center).trim();
-            const value = trimmedRawParameter.slice(center + 1).trim();
-            parameters[name] = value;
+            const value = center === -1 ? '' : trimmedRawParameter.slice(center + 1).trim();
+            const normalizedName = name.toLowerCase();
+            if (!Object.hasOwn(parameters, normalizedName)) {
+                parameters[normalizedName] = value;
+            }
         }
         parsed.push({
             reference,
@@ -49040,6 +49150,94 @@ function parseLinkHeader(link) {
     }
     return parsed;
 }
+
+;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/response.js
+
+
+
+const decodedBodyCache = new WeakMap();
+const redirectDecisions = new WeakMap();
+// TextDecoder strips a leading byte order mark, which Buffer#toString keeps.
+const bomStrippingDecoders = new Map([
+    ['utf8', new TextDecoder()],
+    ['utf16le', new TextDecoder('utf-16le')],
+]);
+const normalizeEncoding = (encoding) => (encoding ?? 'utf8').toLowerCase().replace('-', '').replace('ucs2', 'utf16le');
+const isUtf8Encoding = (encoding) => normalizeEncoding(encoding) === 'utf8';
+const decodeUint8Array = (data, encoding) => bomStrippingDecoders.get(normalizeEncoding(encoding))?.decode(data) ?? external_node_buffer_.Buffer.from(data).toString(encoding);
+const isResponseOk = (response) => {
+    const { statusCode } = response;
+    if ((statusCode >= 200 && statusCode <= 299) || statusCode === 304) {
+        return true;
+    }
+    if (statusCode < 300 || statusCode > 399) {
+        return false;
+    }
+    const { followRedirect } = response.request.options;
+    if (typeof followRedirect !== 'function') {
+        return !followRedirect;
+    }
+    let decision = redirectDecisions.get(response);
+    if (decision?.predicate !== followRedirect) {
+        decision = { predicate: followRedirect, follow: followRedirect(response) };
+        redirectDecisions.set(response, decision);
+    }
+    return !decision.follow;
+};
+/**
+Shares the redirect decision when a response stream is wrapped for decompression.
+*/
+const copyRedirectDecision = (source, destination) => {
+    const decision = redirectDecisions.get(source);
+    if (decision !== undefined) {
+        redirectDecisions.set(destination, decision);
+    }
+};
+/**
+An error to be thrown when server response code is 2xx, and parsing body fails.
+Includes a `response` property.
+*/
+class ParseError extends RequestError {
+    name = 'ParseError';
+    code = 'ERR_BODY_PARSE_FAILURE';
+    constructor(error, response) {
+        const { options } = response.request;
+        // The thrown value is kept as the cause, so only its message is normalized.
+        super(`${normalizeError(error).message} in "${stripUrlAuth(options.url)}"`, error, response.request, response);
+    }
+}
+const cacheDecodedBody = (response, decodedBody) => {
+    decodedBodyCache.set(response, decodedBody);
+};
+const parseBody = (response, responseType, parseJson, encoding) => {
+    const { rawBody } = response;
+    const cachedDecodedBody = decodedBodyCache.get(response);
+    // Shortcuts must read the current bytes because callers can mutate `rawBody`.
+    decodedBodyCache.delete(response);
+    try {
+        if (responseType === 'text') {
+            return cachedDecodedBody ?? decodeUint8Array(rawBody, encoding);
+        }
+        if (responseType === 'json') {
+            if (rawBody.length === 0) {
+                return '';
+            }
+            const text = cachedDecodedBody ?? decodeUint8Array(rawBody, encoding);
+            return parseJson(text);
+        }
+        if (responseType === 'buffer') {
+            return rawBody;
+        }
+    }
+    catch (error) {
+        // `ParseError` normalizes the message and keeps the thrown value as the cause.
+        throw new ParseError(error, response);
+    }
+    throw new ParseError({
+        message: `Unknown body type '${responseType}'`,
+        name: 'Error',
+    }, response);
+};
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/is-unix-socket-url.js
 function isUnixSocketUrl(url) {
@@ -49061,10 +49259,7 @@ getUnixSocketPath(new URL('http://example.com'));
 ```
 */
 function getUnixSocketPath(url) {
-    if (!isUnixSocketUrl(url)) {
-        return undefined;
-    }
-    return /^(?<socketPath>[^:]+):/v.exec(`${url.pathname}${url.search}`)?.groups?.socketPath;
+    return isUnixSocketUrl(url) ? /^(?<socketPath>[^:]+):/v.exec(`${url.pathname}${url.search}`)?.groups?.socketPath : undefined;
 }
 
 // EXTERNAL MODULE: external "node:dns"
@@ -49101,29 +49296,16 @@ const deleteExpiredMapEntries = (cache, time = now()) => {
 };
 // eslint-disable-next-line no-bitwise
 const hasFlag = (value, flag) => value !== undefined && (value & flag) === flag;
-const getInterfaceInfo = () => {
-    let has4 = false;
-    let has6 = false;
+const getConfiguredFamilies = () => {
+    const families = new Set();
     for (const networkInterface of Object.values(external_node_os_namespaceObject.networkInterfaces())) {
-        if (networkInterface === undefined) {
-            continue;
-        }
-        for (const address of networkInterface) {
-            if (address.internal) {
-                continue;
-            }
-            if (address.family === 'IPv6') {
-                has6 = true;
-            }
-            else {
-                has4 = true;
-            }
-            if (has4 && has6) {
-                return { has4, has6 };
+        for (const address of networkInterface ?? []) {
+            if (!address.internal) {
+                families.add(address.family === 'IPv6' ? 6 : 4);
             }
         }
     }
-    return { has4, has6 };
+    return families;
 };
 const createNoResultError = (hostname) => {
     const error = new Error(`DNS cache lookup ENOTFOUND ${hostname}`);
@@ -49131,14 +49313,13 @@ const createNoResultError = (hostname) => {
     error.hostname = hostname;
     return error;
 };
-const normalizeLookupOptions = (options) => {
-    if (typeof options === 'number') {
-        return { family: options };
-    }
-    return options ?? {};
-};
+// Caller mutations must not change an in-flight lookup or its callback shape.
+const normalizeLookupOptions = (options) => typeof options === 'number' ? { family: options } : { ...options };
 const normalizeResolverRecord = (record, family, maxTtl) => {
-    const entryTtl = Math.min(record.ttl, maxTtl);
+    // A record without a usable TTL must expire immediately. A `NaN` expiry would never
+    // elapse, which caches the address forever.
+    const recordTtl = record.ttl;
+    const entryTtl = Number.isFinite(recordTtl) ? Math.min(recordTtl, maxTtl) : 0;
     return {
         address: record.address,
         family,
@@ -49162,10 +49343,7 @@ const familyFromOptions = (options) => {
     if (options.family === 'IPv4') {
         return 4;
     }
-    if (options.family === 'IPv6') {
-        return 6;
-    }
-    return undefined;
+    return options.family === 'IPv6' ? 6 : undefined;
 };
 const orderFromOptions = (options) => {
     if (options.order !== undefined) {
@@ -49184,17 +49362,14 @@ const familiesFromOptions = (options) => {
     if (family !== undefined) {
         return [family];
     }
-    if (orderFromOptions(options) === 'ipv6first') {
-        return [6, 4];
-    }
-    return [4, 6];
+    return orderFromOptions(options) === 'ipv6first' ? [6, 4] : [4, 6];
 };
 const filterFamiliesByAddrConfig = (families, options) => {
     if (!hasFlag(options.hints, external_node_dns_.ADDRCONFIG)) {
         return families;
     }
-    const interfaceInfo = getInterfaceInfo();
-    return families.filter(family => family === 6 ? interfaceInfo.has6 : interfaceInfo.has4);
+    const configuredFamilies = getConfiguredFamilies();
+    return families.filter(family => configuredFamilies.has(family));
 };
 const shouldQueryMappedIpv4 = (entries, options) => familyFromOptions(options) === 6
     && hasFlag(options.hints, external_node_dns_.V4MAPPED)
@@ -49268,26 +49443,17 @@ class DnsCache {
         }
         for (const family of [4, 6]) {
             const key = cacheKey(hostname, family);
-            this.#cache.delete(key);
-            this.#cacheKeys.delete(key);
+            this.#deleteCacheEntry(key);
             this.#pending.delete(key);
         }
         if (this.#activeQueriesByHostname.has(hostname)) {
             this.#minimumVersionByHostname.set(hostname, this.#clearVersion);
         }
-        for (const key of this.#pendingFallback.keys()) {
-            if (key.startsWith(`${hostname}:`)) {
-                this.#pendingFallback.delete(key);
-            }
-        }
-        for (const key of this.#lookupOptionsToFallback.keys()) {
-            if (key.startsWith(`${hostname}:`)) {
-                this.#lookupOptionsToFallback.delete(key);
-            }
-        }
-        for (const key of this.#lookupOptionsWithoutFallback.keys()) {
-            if (key.startsWith(`${hostname}:`)) {
-                this.#lookupOptionsWithoutFallback.delete(key);
+        for (const map of [this.#pendingFallback, this.#lookupOptionsToFallback, this.#lookupOptionsWithoutFallback]) {
+            for (const key of map.keys()) {
+                if (key.startsWith(`${hostname}:`)) {
+                    map.delete(key);
+                }
             }
         }
     }
@@ -49431,30 +49597,22 @@ class DnsCache {
             return undefined;
         }
         if (cached.expires <= now()) {
-            this.#cache.delete(key);
-            this.#cacheKeys.delete(key);
+            this.#deleteCacheEntry(key);
             return undefined;
         }
         return cached;
     }
     async #resolveAndCache(hostname, family, clearVersion) {
         const entries = await this.#resolveFamily(hostname, family);
-        const expires = this.#expiresFor(entries);
-        const key = cacheKey(hostname, family);
         if (!this.#isVersionCurrent(hostname, clearVersion)) {
             return entries;
         }
-        if (expires !== undefined) {
-            await this.#setCachedFamily(key, hostname, {
-                entries,
-                expires,
-            }, clearVersion);
+        let expires = this.#expiresFor(entries);
+        if (expires === undefined && entries.length === 0 && this.#errorTtl > 0) {
+            expires = now() + (this.#errorTtl * 1000);
         }
-        else if (entries.length === 0 && this.#errorTtl > 0) {
-            await this.#setCachedFamily(key, hostname, {
-                entries,
-                expires: now() + (this.#errorTtl * 1000),
-            }, clearVersion);
+        if (expires !== undefined) {
+            await this.#setCachedFamily(cacheKey(hostname, family), hostname, { entries, expires }, clearVersion);
         }
         return entries;
     }
@@ -49476,8 +49634,7 @@ class DnsCache {
             current = await current;
         }
         if (current?.clearVersion === clearVersion && !this.#isVersionCurrent(hostname, current.clearVersion)) {
-            this.#cache.delete(key);
-            this.#cacheKeys.delete(key);
+            this.#deleteCacheEntry(key);
         }
     }
     async #deleteExpiredCacheEntries() {
@@ -49501,9 +49658,12 @@ class DnsCache {
             current = await current;
         }
         if (current?.clearVersion === cached.clearVersion && current.expires === cached.expires) {
-            this.#cache.delete(key);
-            this.#cacheKeys.delete(key);
+            this.#deleteCacheEntry(key);
         }
+    }
+    #deleteCacheEntry(key) {
+        this.#cache.delete(key);
+        this.#cacheKeys.delete(key);
     }
     #isVersionCurrent(hostname, clearVersion) {
         const minimumVersion = this.#minimumVersionByHostname.get(hostname) ?? this.#minimumVersion;
@@ -49524,19 +49684,19 @@ class DnsCache {
         }
     }
     #expiresFor(entries) {
-        let expires = Number.POSITIVE_INFINITY;
+        let expires = Infinity;
         for (const entry of entries) {
             if (entry.expires === undefined) {
                 continue;
             }
             expires = Math.min(expires, entry.expires);
         }
-        return expires === Number.POSITIVE_INFINITY ? undefined : expires;
+        return expires === Infinity ? undefined : expires;
     }
     #filterEntries(entries, options) {
         if (hasFlag(options.hints, external_node_dns_.ADDRCONFIG)) {
-            const interfaceInfo = getInterfaceInfo();
-            entries = entries.filter(entry => entry.family === 6 ? interfaceInfo.has6 : interfaceInfo.has4);
+            const configuredFamilies = getConfiguredFamilies();
+            entries = entries.filter(entry => configuredFamilies.has(entry.family));
         }
         const family = familyFromOptions(options);
         if (family === 6) {
@@ -49575,9 +49735,9 @@ class DnsCache {
         if (this.#dnsLookupAsync === undefined) {
             return [];
         }
-        let entries;
+        let result;
         try {
-            entries = await this.#dnsLookupAsync(hostname, {
+            result = await this.#dnsLookupAsync(hostname, {
                 ...options,
                 all: true,
             });
@@ -49588,17 +49748,14 @@ class DnsCache {
             }
             throw error;
         }
-        return entries.map(entry => ({
-            address: entry.address,
-            family: entry.family,
-        }));
+        // Only `dns.lookup` honours `all`, so a custom lookup can resolve with a single address.
+        const entries = Array.isArray(result) ? result : [{ address: result, family: (0,external_node_net_.isIP)(result) }];
+        return entries.map(entry => toLookupResult(entry));
     }
 }
 
-// EXTERNAL MODULE: external "node:http2"
-var external_node_http2_ = __nccwpck_require__(2467);
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/http2-client.js
-/* eslint-disable @typescript-eslint/member-ordering, @typescript-eslint/naming-convention, @typescript-eslint/no-restricted-types, @typescript-eslint/no-deprecated, promise/prefer-await-to-then */
+/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-restricted-types, @typescript-eslint/no-deprecated -- These come from Node's own type definitions, which the lint would otherwise reject here. */
 
 
 
@@ -49609,7 +49766,8 @@ var external_node_http2_ = __nccwpck_require__(2467);
 
 
 
-const { HTTP2_HEADER_AUTHORITY, HTTP2_HEADER_METHOD, HTTP2_HEADER_PATH, HTTP2_HEADER_SCHEME, HTTP2_HEADER_STATUS, HTTP2_METHOD_CONNECT, NGHTTP2_CANCEL, } = external_node_http2_.constants;
+
+const { HTTP2_HEADER_AUTHORITY, HTTP2_HEADER_METHOD, HTTP2_HEADER_PATH, HTTP2_HEADER_SCHEME, HTTP2_HEADER_STATUS, HTTP2_METHOD_CONNECT, NGHTTP2_CANCEL, NGHTTP2_NO_ERROR, } = external_node_http2_.constants;
 const maxProtocolCacheSize = 100;
 const protocolCache = new Map();
 const referenceIds = new WeakMap();
@@ -49623,6 +49781,7 @@ const connectionSpecificHeaders = new Set([
     'upgrade',
 ]);
 const normalizeRequestHeaderName = (name) => name.toLowerCase() === 'host' ? HTTP2_HEADER_AUTHORITY : name.toLowerCase();
+const isPseudoHeader = (name) => name.startsWith(':');
 const getConnectionHeaderTokens = (value) => {
     if (value === undefined) {
         return [];
@@ -49643,11 +49802,13 @@ const isTrailersTeHeader = (value) => {
     if (value === undefined) {
         return true;
     }
-    if (Array.isArray(value)) {
-        return value.length === 1 && value[0].toLowerCase() === 'trailers';
-    }
-    return String(value).trim().toLowerCase() === 'trailers';
+    return Array.isArray(value) ? value.length === 1 && value[0].trim().toLowerCase() === 'trailers' : String(value).trim().toLowerCase() === 'trailers';
 };
+const isConnectionHeader = (lowercasedName) => lowercasedName === 'connection' || lowercasedName === 'proxy-connection';
+// HTTP/2 forbids connection-specific fields, the fields a `connection` header nominates, and any `te` value other than `trailers`.
+const isDroppedHeader = (lowercasedName, value, connectionHeaderNames) => connectionSpecificHeaders.has(lowercasedName)
+    || connectionHeaderNames.has(lowercasedName)
+    || (lowercasedName === 'te' && !isTrailersTeHeader(value));
 const setProtocolCache = (key, value) => {
     if (!protocolCache.has(key) && protocolCache.size >= maxProtocolCacheSize) {
         protocolCache.delete(protocolCache.keys().next().value);
@@ -49692,10 +49853,7 @@ const serializeSessionOption = (value) => {
         if (ArrayBuffer.isView(value)) {
             return ['bytes', external_node_buffer_.Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64')];
         }
-        if (http2_client_isPlainObject(value)) {
-            return ['object', Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, serializeSessionOption(item)])];
-        }
-        return ['object-reference', getReferenceId(value)];
+        return http2_client_isPlainObject(value) ? ['object', Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, serializeSessionOption(item)])] : ['object-reference', getReferenceId(value)];
     }
     return [typeof value];
 };
@@ -49730,6 +49888,20 @@ const destroyReuseSocket = (options) => {
     delete options._reuseSocket;
     delete options._reuseSocketShouldPool;
 };
+const onceConnected = (socket, listener) => {
+    if (socket.connecting) {
+        socket.once('connect', listener);
+    }
+    else {
+        listener();
+    }
+};
+const canPoolSession = (options) => options._reuseSocket === undefined || options._reuseSocketShouldPool === true;
+const rejectQueueEntry = (entry, error) => {
+    delete entry.options._cancelSessionSetup;
+    destroyReuseSocket(entry.options);
+    entry.reject(error);
+};
 const normalizeInput = (input, options, callback) => {
     let normalizedOptions;
     if (typeof input === 'string') {
@@ -49752,6 +49924,7 @@ const normalizeInput = (input, options, callback) => {
     }
     return { options: normalizedOptions, callback };
 };
+const stripIpv6Brackets = (hostname) => hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
 const getAuthority = (options) => {
     const protocol = options.protocol ?? 'https:';
     const defaultPort = protocol === 'https:' ? 443 : 80;
@@ -49766,12 +49939,8 @@ const getAuthority = (options) => {
             // Fall back to hostname normalization for values like bare IPv6 addresses.
         }
     }
-    const hostname = options.hostname ?? options.host ?? 'localhost';
     const port = options.port ?? defaultPort;
-    const hostnameString = String(hostname);
-    const normalizedHostname = hostnameString.startsWith('[') && hostnameString.endsWith(']')
-        ? hostnameString.slice(1, -1)
-        : hostnameString;
+    const normalizedHostname = stripIpv6Brackets(options.hostname ?? options.host ?? 'localhost');
     const formattedHostname = external_node_net_.isIP(normalizedHostname) === 6 ? `[${normalizedHostname}]` : normalizedHostname;
     const authority = new URL(`${protocol}//${formattedHostname}`);
     authority.port = String(port);
@@ -49782,12 +49951,6 @@ const getAuthorityPort = (authority) => {
         return Number(authority.port);
     }
     return authority.protocol === 'https:' ? 443 : 80;
-};
-const getConnectionHostname = (authority) => {
-    const { hostname } = authority;
-    return hostname.startsWith('[') && hostname.endsWith(']')
-        ? hostname.slice(1, -1)
-        : hostname;
 };
 const hasCustomHttpsAgent = (agent) => typeof agent === 'object'
     && 'https' in agent
@@ -49809,9 +49972,12 @@ const resolveProtocol = async (options, sourceOptions) => {
         return { alpnProtocol: cachedProtocol };
     }
     const authority = getAuthority(options);
-    const { path: _path, agent: _agent, h2session: _h2session, _reuseSocket, _reuseSocketShouldPool, _alpnSocket, _socketTimeout, timeout, createConnection, checkServerIdentity, ...connectionOptions } = options;
+    const { path: _path, agent: _agent, h2session: _h2session, _reuseSocket, _reuseSocketShouldPool, _alpnSocket, _socketTimeout, _timeoutPhase: timeoutPhase, timeout, createConnection, checkServerIdentity, 
+    // The socket outlives this request when the session is pooled, so the signal must
+    // not be handed to the TLS connect. Aborting during setup is handled below.
+    signal: _signal, ...connectionOptions } = options;
     const port = getAuthorityPort(authority);
-    const hostname = getConnectionHostname(authority);
+    const hostname = stripIpv6Brackets(authority.hostname);
     const servername = options.servername ?? (external_node_net_.isIP(hostname) === 0 ? hostname : undefined);
     const tlsOptions = {
         ...connectionOptions,
@@ -49819,10 +49985,8 @@ const resolveProtocol = async (options, sourceOptions) => {
         host: hostname,
         port,
         servername,
+        ...(checkServerIdentity && { checkServerIdentity: checkServerIdentity }),
     };
-    if (checkServerIdentity) {
-        tlsOptions.checkServerIdentity = checkServerIdentity;
-    }
     const socket = createConnection
         ? createConnection(tlsOptions, () => { })
         : external_node_tls_.connect(port, hostname, tlsOptions);
@@ -49834,12 +49998,10 @@ const resolveProtocol = async (options, sourceOptions) => {
         let removeAbortListener;
         let socketTimeoutApplied = false;
         const cleanup = () => {
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-            }
+            clearTimeout(timeoutId);
             removeAbortListener?.();
             socket.off('secureConnect', onSecureConnect);
-            socket.off('error', onError);
+            socket.off('error', rejectOnce);
             socket.off('close', onClose);
             socket.off('connect', applySocketTimeout);
             socket.off('timeout', onSocketTimeout);
@@ -49870,16 +50032,17 @@ const resolveProtocol = async (options, sourceOptions) => {
             }
             resolve({ alpnProtocol, socket });
         };
-        const onError = (error) => {
-            rejectOnce(error);
-        };
         const onTimeout = () => {
-            rejectOnce(new timed_out_TimeoutError(Number(timeout), 'request'));
+            rejectOnce(new timed_out_TimeoutError(Number(timeout), timeoutPhase ?? 'request'));
         };
         const onSocketTimeout = () => {
             rejectOnce(new timed_out_TimeoutError(_socketTimeout, 'socket'));
         };
         const applySocketTimeout = () => {
+            // A delay Node.js cannot arm means no socket timeout.
+            if (!isArmableTimerDelay(_socketTimeout)) {
+                return;
+            }
             socketTimeoutApplied = true;
             socket.setTimeout(_socketTimeout);
             socket.once('timeout', onSocketTimeout);
@@ -49900,15 +50063,10 @@ const resolveProtocol = async (options, sourceOptions) => {
             return;
         }
         socket.once('secureConnect', onSecureConnect);
-        socket.once('error', onError);
+        socket.once('error', rejectOnce);
         socket.once('close', onClose);
         if (_socketTimeout !== undefined) {
-            if (socket.connecting) {
-                socket.once('connect', applySocketTimeout);
-            }
-            else {
-                applySocketTimeout();
-            }
+            onceConnected(socket, applySocketTimeout);
         }
         if (options.signal) {
             options.signal.addEventListener('abort', onAbort, { once: true });
@@ -49917,7 +50075,7 @@ const resolveProtocol = async (options, sourceOptions) => {
             };
         }
         if (timeout !== undefined) {
-            timeoutId = setTimeout(onTimeout, Number(timeout));
+            timeoutId = setTimeout(onTimeout, timeout);
             timeoutId.unref();
         }
     });
@@ -49934,7 +50092,7 @@ const toRawHeaders = (headers) => {
             }
         }
         else {
-            rawHeaders.push(key, String(value));
+            rawHeaders.push(key, value);
         }
     }
     return rawHeaders;
@@ -49960,6 +50118,15 @@ const filterHeaders = (headers) => {
     }
     return filteredHeaders;
 };
+const toDistinctHeaders = (rawHeaders) => {
+    const headers = Object.create(null);
+    for (let index = 0; index < rawHeaders.length; index += 2) {
+        const name = rawHeaders[index].toLowerCase();
+        // Preserve individual field values, including commas within a single value.
+        (headers[name] ??= []).push(rawHeaders[index + 1]);
+    }
+    return headers;
+};
 const createSocketProxy = (stream) => new Proxy(stream.session.socket, {
     get(target, property, receiver) {
         if (property === 'destroy') {
@@ -49968,10 +50135,7 @@ const createSocketProxy = (stream) => new Proxy(stream.session.socket, {
         if (property === 'destroyed') {
             return stream.destroyed;
         }
-        if (property === 'setTimeout') {
-            return stream.setTimeout.bind(stream);
-        }
-        return Reflect.get(target, property, receiver);
+        return property === 'setTimeout' ? stream.setTimeout.bind(stream) : Reflect.get(target, property, receiver);
     },
 });
 class Http2IncomingMessage extends external_node_stream_.Readable {
@@ -49995,13 +50159,33 @@ class Http2IncomingMessage extends external_node_stream_.Readable {
     rawHeaders = [];
     rawTrailers = [];
     headers = {};
+    headersDistinct = {};
     trailers = {};
+    trailersDistinct = {};
     statusCode;
     statusMessage;
     socket;
     url = '';
     method;
     upgrade = false;
+    receivedSize = 0;
+    get isCompleteAfterNoErrorReset() {
+        // The reset pushes its own EOF only after the `aborted` event, so a response that already
+        // completed received END_STREAM first.
+        if (this.complete) {
+            return true;
+        }
+        const statusCode = this.statusCode ?? 0;
+        if (this.req.method === 'HEAD' || (statusCode >= 100 && statusCode < 200) || statusCode === 204 || statusCode === 205 || statusCode === 304) {
+            return true;
+        }
+        const contentLength = this.headers['content-length'];
+        if (typeof contentLength !== 'string' || !/^\d+$/v.test(contentLength)) {
+            return false;
+        }
+        const expectedSize = Number(contentLength);
+        return Number.isSafeInteger(expectedSize) && expectedSize === this.receivedSize + this.stream.readableLength;
+    }
     get connection() {
         return this.socket;
     }
@@ -50009,15 +50193,23 @@ class Http2IncomingMessage extends external_node_stream_.Readable {
         this.socket = value;
     }
     setTimeout(ms, callback) {
-        this.req.setTimeout(ms, callback);
+        if (callback) {
+            this.once('timeout', callback);
+        }
+        this.req.setTimeout(ms);
         return this;
     }
     _destroy(error, callback) {
-        if (!this.readableEnded) {
+        if (!this.readableEnded && !this.aborted) {
             this.aborted = true;
+            // A destroy error settles the request itself. Without one, only `aborted` does, because
+            // the stream `close` handler skips a response that is already aborted.
+            if (!error) {
+                this.emit('aborted');
+            }
         }
         this.stream.destroy(error ?? undefined);
-        callback();
+        callback(error);
     }
     _read() {
         this.stream.resume();
@@ -50041,7 +50233,7 @@ class Http2Agent extends external_node_events_.EventEmitter {
         enablePush: false,
         initialWindowSize: 1024 * 1024 * 32,
     };
-    constructor({ timeout = 0, maxSessions = Number.POSITIVE_INFINITY, maxEmptySessions = 10 } = {}) {
+    constructor({ timeout = 0, maxSessions = Infinity, maxEmptySessions = 10 } = {}) {
         super();
         this.timeout = timeout;
         this.maxSessions = maxSessions;
@@ -50063,14 +50255,8 @@ class Http2Agent extends external_node_events_.EventEmitter {
     }
     async getSessionWithMetadata(origin, options = {}, reserveStream = false) {
         const normalizedOrigin = typeof origin === 'string' ? new URL(origin) : origin;
-        const key = this.normalizeOptions(normalizedOrigin, options);
-        const canUsePooledSession = options._reuseSocket === undefined || options._reuseSocketShouldPool === true;
-        const session = canUsePooledSession ? this.getAvailableSession(key) : undefined;
+        const session = this.claimAvailableSession(this.normalizeOptions(normalizedOrigin, options), options, reserveStream);
         if (session) {
-            if (reserveStream) {
-                this.reserveStream(session);
-            }
-            destroyReuseSocket(options);
             return {
                 session,
                 reusedSocket: true,
@@ -50088,9 +50274,7 @@ class Http2Agent extends external_node_events_.EventEmitter {
                 const index = this.queue.indexOf(entry);
                 if (index !== -1) {
                     this.queue.splice(index, 1);
-                    delete options._cancelSessionSetup;
-                    destroyReuseSocket(options);
-                    reject(new Error('HTTP/2 session setup canceled'));
+                    rejectQueueEntry(entry, new Error('HTTP/2 session setup canceled'));
                 }
             };
             this.queue.push(entry);
@@ -50103,16 +50287,17 @@ class Http2Agent extends external_node_events_.EventEmitter {
             ...getTlsSessionOptions(options),
         ]);
     }
-    closeEmptySessions(maxCount = Number.POSITIVE_INFINITY) {
+    closeEmptySessions(maxCount = Infinity) {
         let closedCount = 0;
         for (const sessions of this.sessions.values()) {
             for (const session of sessions) {
-                if ((session.currentStreamCount ?? 0) === 0) {
-                    closedCount++;
-                    session.close();
-                    if (closedCount >= maxCount) {
-                        return closedCount;
-                    }
+                if ((session.currentStreamCount ?? 0) !== 0) {
+                    continue;
+                }
+                closedCount++;
+                session.close();
+                if (closedCount >= maxCount) {
+                    return closedCount;
                 }
             }
         }
@@ -50130,11 +50315,19 @@ class Http2Agent extends external_node_events_.EventEmitter {
         this.sessions.clear();
         this.pendingSessionKeys.clear();
         while (this.queue.length > 0) {
-            const entry = this.queue.shift();
-            delete entry.options._cancelSessionSetup;
-            destroyReuseSocket(entry.options);
-            entry.reject(reason ?? new Error('Agent has been destroyed'));
+            rejectQueueEntry(this.queue.shift(), reason ?? new Error('Agent has been destroyed'));
         }
+    }
+    // Takes an available pooled session for the request, and drops the socket it would otherwise have reused.
+    claimAvailableSession(key, options, reserveStream) {
+        const session = canPoolSession(options) ? this.getAvailableSession(key) : undefined;
+        if (session) {
+            if (reserveStream) {
+                this.reserveStream(session);
+            }
+            destroyReuseSocket(options);
+        }
+        return session;
     }
     getAvailableSession(key) {
         const sessions = this.sessions.get(key);
@@ -50151,21 +50344,17 @@ class Http2Agent extends external_node_events_.EventEmitter {
         while (index < this.queue.length) {
             const entry = this.queue[index];
             const key = this.normalizeOptions(entry.origin, entry.options);
-            const canUsePooledSession = entry.options._reuseSocket === undefined || entry.options._reuseSocketShouldPool === true;
-            const session = canUsePooledSession ? this.getAvailableSession(key) : undefined;
+            const session = this.claimAvailableSession(key, entry.options, entry.reserveStream);
             if (session) {
                 this.queue.splice(index, 1);
                 delete entry.options._cancelSessionSetup;
-                if (entry.reserveStream) {
-                    this.reserveStream(session);
-                }
-                destroyReuseSocket(entry.options);
                 entry.resolve({
                     session,
                     reusedSocket: true,
                 });
                 continue;
             }
+            const canUsePooledSession = canPoolSession(entry.options);
             if (canUsePooledSession && this.pendingSessionKeys.has(key)) {
                 index++;
                 continue;
@@ -50184,14 +50373,18 @@ class Http2Agent extends external_node_events_.EventEmitter {
             this.createSession(entry, key);
         }
     }
-    reserveStream(session) {
+    // `isCapacityReservation` is false when the capacity was not reserved ahead of time, so
+    // the stream is only counted. Reserving again would strand the reservation.
+    reserveStream(session, isCapacityReservation = true) {
         session.ref();
         if (session.currentStreamCount === 0 && session.emptySessionCounted) {
             this.emptySessionCount--;
             session.emptySessionCounted = false;
         }
         session.currentStreamCount = (session.currentStreamCount ?? 0) + 1;
-        session.reservedStreamCount = (session.reservedStreamCount ?? 0) + 1;
+        if (isCapacityReservation) {
+            session.reservedStreamCount = (session.reservedStreamCount ?? 0) + 1;
+        }
     }
     releaseStream(session, shouldPoolSession) {
         session.currentStreamCount = session.currentStreamCount - 1;
@@ -50213,15 +50406,18 @@ class Http2Agent extends external_node_events_.EventEmitter {
     }
     createSession(entry, key) {
         this.sessionCount++;
-        const { path: _path, agent: _agent, h2session: _h2session, _reuseSocketShouldPool, _socketTimeout, timeout: setupTimeout, ...sessionOptions } = entry.options;
+        const { path: _path, agent: _agent, h2session: _h2session, _reuseSocketShouldPool, _socketTimeout, _timeoutPhase: timeoutPhase, timeout: setupTimeout, 
+        // The session is pooled, so a per-request signal must not tear it down for the
+        // requests that follow. Got aborts its own request instead.
+        signal: _signal, ...sessionOptions } = entry.options;
         const options = {
             ...sessionOptions,
             settings: entry.options.settings ?? this.settings,
             ALPNProtocols: ['h2'],
         };
         const reuseSocket = options._reuseSocket;
-        const shouldPoolSession = reuseSocket === undefined || _reuseSocketShouldPool === true;
-        if (options._reuseSocket) {
+        const shouldPoolSession = canPoolSession(entry.options);
+        if (reuseSocket) {
             options.createConnection = () => reuseSocket;
             delete options._reuseSocket;
         }
@@ -50232,9 +50428,7 @@ class Http2Agent extends external_node_events_.EventEmitter {
         catch (error) {
             this.sessionCount--;
             this.pendingSessionKeys.delete(key);
-            delete entry.options._cancelSessionSetup;
-            reuseSocket?.destroy();
-            entry.reject(error);
+            rejectQueueEntry(entry, error);
             this.processQueue();
             return;
         }
@@ -50248,12 +50442,6 @@ class Http2Agent extends external_node_events_.EventEmitter {
         let socketTimeoutApplied = false;
         const sessionSocket = session.socket;
         const removeSessionSocketListener = sessionSocket.removeListener.bind(sessionSocket);
-        const clearSessionSetupTimeout = () => {
-            if (sessionSetupTimeout) {
-                clearTimeout(sessionSetupTimeout);
-                sessionSetupTimeout = undefined;
-            }
-        };
         const clearSocketTimeout = () => {
             removeSessionSocketListener('connect', applySocketTimeout);
             if (!socketTimeoutApplied) {
@@ -50266,7 +50454,7 @@ class Http2Agent extends external_node_events_.EventEmitter {
             }
         };
         const clearSessionSetup = () => {
-            clearSessionSetupTimeout();
+            clearTimeout(sessionSetupTimeout);
             clearSocketTimeout();
             this.pendingSessions.delete(session);
             this.pendingSessionKeys.delete(key);
@@ -50287,6 +50475,10 @@ class Http2Agent extends external_node_events_.EventEmitter {
             rejectSessionSetup(new timed_out_TimeoutError(_socketTimeout, 'socket'));
         };
         const applySocketTimeout = () => {
+            // A delay Node.js cannot arm means no socket timeout.
+            if (!isArmableTimerDelay(_socketTimeout)) {
+                return;
+            }
             socketTimeoutApplied = true;
             session.setTimeout(_socketTimeout, onSocketTimeout);
         };
@@ -50296,17 +50488,12 @@ class Http2Agent extends external_node_events_.EventEmitter {
             });
         }
         if (_socketTimeout !== undefined) {
-            if (sessionSocket.connecting) {
-                sessionSocket.once('connect', applySocketTimeout);
-            }
-            else {
-                applySocketTimeout();
-            }
+            onceConnected(sessionSocket, applySocketTimeout);
         }
         if (setupTimeout !== undefined) {
             sessionSetupTimeout = setTimeout(() => {
-                rejectSessionSetup(new timed_out_TimeoutError(Number(setupTimeout), 'request'));
-            }, Number(setupTimeout));
+                rejectSessionSetup(new timed_out_TimeoutError(setupTimeout, timeoutPhase ?? 'request'));
+            }, setupTimeout);
             sessionSetupTimeout.unref();
         }
         const removeSession = () => {
@@ -50344,6 +50531,9 @@ class Http2Agent extends external_node_events_.EventEmitter {
                 session,
                 reusedSocket: false,
             });
+        });
+        // Updated stream limits can make room for queued requests without an active stream closing.
+        session.on('remoteSettings', () => {
             this.processQueue();
         });
         session.once('error', error => {
@@ -50392,7 +50582,7 @@ class Http2Agent extends external_node_events_.EventEmitter {
                 throw new Error('The session is gracefully closing. No new streams are allowed.');
             }
             if (!hasReservedStream) {
-                this.reserveStream(session);
+                this.reserveStream(session, false);
             }
             let stream;
             try {
@@ -50419,8 +50609,8 @@ class Http2ClientRequest extends external_node_stream_.Writable {
         this.options = normalized.options;
         this.callback = normalized.callback;
         this.method = (this.options.method ?? 'GET').toUpperCase();
-        this.path = this.method === HTTP2_METHOD_CONNECT ? String(this.options.path ?? '') : String(this.options.path ?? '/');
-        this.protocol = String(this.options.protocol ?? 'https:');
+        this.path = this.method === HTTP2_METHOD_CONNECT ? this.options.path ?? '' : this.options.path ?? '/';
+        this.protocol = this.options.protocol ?? 'https:';
         this.headers = Object.create(null);
         if (this.protocol !== 'https:' && !this.options.h2session) {
             throw new Error(`Protocol "${this.protocol}" not supported. Expected "https:"`);
@@ -50473,62 +50663,47 @@ class Http2ClientRequest extends external_node_stream_.Writable {
         return true;
     }
     _write(chunk, encoding, callback) {
-        const write = () => {
-            this.stream.write(chunk, encoding, callback);
-        };
-        if (this.stream) {
-            write();
-        }
-        else {
-            this.pendingJobs.push({
-                run: write,
-                cancel: callback,
-            });
-        }
+        this.runWithStream({
+            run: () => {
+                this.stream.write(chunk, encoding, callback);
+            },
+            cancel: callback,
+        });
         void this.flushHeaders();
     }
     _final(callback) {
-        const end = () => {
-            if (this.trailers) {
-                this.stream.once('wantTrailers', () => {
-                    this.stream.sendTrailers(this.trailers);
-                });
-            }
-            this.stream.end(callback);
-        };
-        if (this.stream) {
-            end();
-        }
-        else {
-            this.pendingJobs.push({
-                run: end,
-                cancel: callback,
-            });
-        }
+        this.runWithStream({
+            run: () => {
+                if (this.trailers) {
+                    this.stream.once('wantTrailers', () => {
+                        this.stream.sendTrailers(this.trailers);
+                    });
+                }
+                this.stream.end(callback);
+            },
+            cancel: callback,
+        });
         void this.flushHeaders();
     }
     _destroy(error, callback) {
         if (this.res && typeof this.res._dump === 'function') {
             this.res._dump();
         }
+        void this.pendingAgentPromise?.catch(() => { });
         if (this.stream) {
             this.stream.close(NGHTTP2_CANCEL);
         }
         else {
             this.options._cancelSessionSetup?.();
-            if (error === null) {
-                queueMicrotask(() => {
-                    this.emit('close');
-                });
-            }
-        }
-        if (this.pendingAgentPromise) {
-            void this.pendingAgentPromise.catch(() => { });
-        }
-        if (!this.stream) {
             this.cancelPendingJobs(error ?? new Error('The HTTP/2 request was destroyed before a stream was created'));
         }
         callback(error);
+        if (!this.stream) {
+            // Node.js emits the `error` event on the next tick after the destroy callback, so `close` must be queued after it to keep the `http.ClientRequest` event order.
+            external_node_process_namespaceObject.nextTick(() => {
+                this.emit('close');
+            });
+        }
     }
     abort() {
         if (this.res?.complete) {
@@ -50547,20 +50722,18 @@ class Http2ClientRequest extends external_node_stream_.Writable {
             return;
         }
         this.headersSent = true;
+        const streamOptions = {
+            endStream: false,
+            waitForTrailers: this.trailers !== undefined,
+        };
         try {
             if (this.options.h2session) {
                 this.reusedSocket = true;
-                this.onStream(this.options.h2session.request(this.headers, {
-                    endStream: false,
-                    waitForTrailers: this.trailers !== undefined,
-                }));
+                this.onStream(this.options.h2session.request(this.headers, streamOptions));
                 return;
             }
             this.agent = this.options.agent === false ? new Http2Agent({ maxEmptySessions: 0 }) : this.options.agent ?? globalAgent;
-            const streamPromise = this.agent.request(this.origin, this.options, this.headers, {
-                endStream: false,
-                waitForTrailers: this.trailers !== undefined,
-            });
+            const streamPromise = this.agent.request(this.origin, this.options, this.headers, streamOptions);
             this.pendingAgentPromise = streamPromise;
             const { stream, reusedSocket } = await streamPromise;
             this.reusedSocket = reusedSocket;
@@ -50582,20 +50755,14 @@ class Http2ClientRequest extends external_node_stream_.Writable {
             (0,external_node_http_.validateHeaderName)(name);
             (0,external_node_http_.validateHeaderValue)(name, value);
             const lowercasedName = name.toLowerCase();
-            if (lowercasedName === 'connection' || lowercasedName === 'proxy-connection') {
+            if (isConnectionHeader(lowercasedName)) {
                 for (const token of getConnectionHeaderTokens(value)) {
                     connectionHeaderNames.add(token);
                     Reflect.deleteProperty(trailers, token);
                 }
                 continue;
             }
-            if (connectionSpecificHeaders.has(lowercasedName)) {
-                continue;
-            }
-            if (connectionHeaderNames.has(lowercasedName)) {
-                continue;
-            }
-            if (lowercasedName === 'te' && !isTrailersTeHeader(value)) {
+            if (isDroppedHeader(lowercasedName, value, connectionHeaderNames)) {
                 continue;
             }
             trailers[lowercasedName] = value;
@@ -50609,33 +50776,51 @@ class Http2ClientRequest extends external_node_stream_.Writable {
         (0,external_node_http_.validateHeaderName)(name);
         (0,external_node_http_.validateHeaderValue)(name, value);
         const lowercasedName = name.toLowerCase();
-        if (lowercasedName === 'connection' || lowercasedName === 'proxy-connection') {
+        if (isConnectionHeader(lowercasedName)) {
             for (const token of getConnectionHeaderTokens(value)) {
                 this.connectionHeaderNames.add(token);
                 Reflect.deleteProperty(this.headers, normalizeRequestHeaderName(token));
             }
             return this;
         }
-        if (connectionSpecificHeaders.has(lowercasedName)) {
+        if (isDroppedHeader(lowercasedName, value, this.connectionHeaderNames)) {
             return this;
         }
-        if (this.connectionHeaderNames.has(lowercasedName)) {
-            return this;
-        }
-        if (lowercasedName === 'te' && !isTrailersTeHeader(value)) {
-            return this;
-        }
-        this.headers[normalizeRequestHeaderName(name)] = value;
+        // Node's HTTP/2 API requires the canonical spelling of this case-insensitive token.
+        this.headers[normalizeRequestHeaderName(name)] = lowercasedName === 'te' ? 'trailers' : value;
         return this;
+    }
+    setHeaders(headers) {
+        if (this.headersSent) {
+            throw new Error('Cannot set headers after they are sent to the client');
+        }
+        if (!(headers instanceof Headers) && !(headers instanceof Map)) {
+            throw new TypeError('Headers must be a Headers instance or a Map');
+        }
+        for (const [name, value] of headers) {
+            // Fetch Headers can contain multiple Set-Cookie fields, including commas within individual values.
+            const headerValue = headers instanceof Headers && name === 'set-cookie' ? headers.getSetCookie() : value;
+            this.setHeader(name, typeof headerValue === 'string' || typeof headerValue === 'number' ? headerValue : [...headerValue]);
+        }
+        return this;
+    }
+    appendHeader(name, value) {
+        const current = this.getHeader(name);
+        if (current === undefined) {
+            return this.setHeader(name, typeof value === 'string' ? value : [...value]);
+        }
+        const values = Array.isArray(current) ? current : [String(current)];
+        return this.setHeader(name, [...values, ...(typeof value === 'string' ? [value] : value)]);
     }
     getHeader(name) {
         return this.headers[normalizeRequestHeaderName(name)];
     }
     getHeaders() {
-        return { ...this.headers };
+        // HTTP/2 pseudo-headers are not header fields, so they stay out of the public view.
+        return Object.fromEntries(Object.entries(this.headers).filter(([name]) => !isPseudoHeader(name)));
     }
     getHeaderNames() {
-        return Object.keys(this.headers);
+        return Object.keys(this.getHeaders());
     }
     hasHeader(name) {
         return this.getHeader(name) !== undefined;
@@ -50644,21 +50829,36 @@ class Http2ClientRequest extends external_node_stream_.Writable {
         if (this.headersSent) {
             throw new Error('Cannot remove headers after they are sent to the client');
         }
+        // A removed `connection` header must stop nominating the headers it listed.
+        if (isConnectionHeader(name.toLowerCase())) {
+            for (const token of this.connectionHeaderNames) {
+                Reflect.deleteProperty(this.headers, normalizeRequestHeaderName(token));
+            }
+            this.connectionHeaderNames.clear();
+        }
         Reflect.deleteProperty(this.headers, normalizeRequestHeaderName(name));
     }
     setNoDelay() { }
     setSocketKeepAlive() { }
     setTimeout(ms, callback) {
-        const applyTimeout = () => {
-            this.stream.setTimeout(ms, callback);
-        };
+        if (callback) {
+            this.once('timeout', callback);
+        }
+        this.runWithStream({
+            run: () => {
+                this.stream.setTimeout(ms);
+            },
+        });
+        return this;
+    }
+    // Runs the job now when the stream exists, or once `onStream` receives it.
+    runWithStream(job) {
         if (this.stream) {
-            applyTimeout();
+            job.run();
         }
         else {
-            this.pendingJobs.push({ run: applyTimeout });
+            this.pendingJobs.push(job);
         }
-        return this;
     }
     cancelPendingJobs(error) {
         const jobs = this.pendingJobs;
@@ -50675,14 +50875,25 @@ class Http2ClientRequest extends external_node_stream_.Writable {
             stream.destroy();
             return;
         }
+        let streamErrorSeen = false;
         stream.once('error', error => {
+            streamErrorSeen = true;
             if (this.destroyed) {
                 return;
             }
             this.destroy(error);
         });
+        stream.on('timeout', () => {
+            this.emit('timeout');
+            this.res?.emit('timeout');
+        });
         stream.once('aborted', () => {
+            // A NO_ERROR reset can come with or without END_STREAM, so only preserve responses that already completed, or whose completeness can be verified from their semantics or Content-Length.
+            if (this.res && stream.rstCode === NGHTTP2_NO_ERROR && this.res.isCompleteAfterNoErrorReset) {
+                return;
+            }
             if (this.res) {
+                this.res.complete = false;
                 this.res.aborted = true;
                 this.res.emit('aborted');
                 this.res.destroy();
@@ -50697,16 +50908,21 @@ class Http2ClientRequest extends external_node_stream_.Writable {
             response.statusCode = Number(headers[HTTP2_HEADER_STATUS]);
             response.headers = filterHeaders(headers);
             response.rawHeaders = rawHeaders ? filterRawHeaders(rawHeaders) : toRawHeaders(headers);
+            response.headersDistinct = toDistinctHeaders(response.rawHeaders);
             response.url = `${this.origin.origin}${this.path}`;
             incomingResponse.req = this;
             this.res = incomingResponse;
             stream.on('data', chunk => {
+                response.receivedSize += chunk.length;
                 if (!response.push(chunk)) {
                     stream.pause();
                 }
             });
             stream.once('end', () => {
-                if (!this.aborted) {
+                // A reset also ends the stream. An EOF that comes with an error code, including the
+                // `CANCEL` of a request teardown, cut the body short, and an aborted response stays
+                // aborted.
+                if (!response.aborted && (stream.rstCode ?? NGHTTP2_NO_ERROR) === NGHTTP2_NO_ERROR) {
                     response.complete = true;
                     response.push(null);
                 }
@@ -50726,16 +50942,24 @@ class Http2ClientRequest extends external_node_stream_.Writable {
                 rawHeaders: rawHeaders ? filterRawHeaders(rawHeaders) : toRawHeaders(headers),
             });
         });
+        stream.on('continue', () => {
+            this.emit('continue');
+        });
         stream.once('trailers', (trailers, _flags, rawTrailers) => {
             if (!this.res) {
                 return;
             }
             this.res.trailers = trailers;
             this.res.rawTrailers = Array.isArray(rawTrailers) ? rawTrailers : toRawHeaders(trailers);
+            this.res.trailersDistinct = toDistinctHeaders(this.res.rawTrailers);
         });
         stream.once('close', () => {
             if (this.res) {
-                if (this.aborted) {
+                if (this.aborted || (!this.res.aborted && !streamErrorSeen && !this.res.complete && !this.res.readableEnded)) {
+                    // `abort()` and a self-initiated `destroy()` cancel the stream without an
+                    // `aborted` event, so complete the response the way a premature close would.
+                    // A peer reset already completed it through the stream's `aborted` event, and
+                    // a stream error propagates through the request error.
                     this.res.aborted = true;
                     this.res.emit('aborted');
                     this.res.destroy();
@@ -50778,32 +51002,32 @@ const getSourceOptions = (input, options) => {
     }
     return typeof options === 'object' ? options : {};
 };
+const requestHttps = (options, callback) => {
+    options.ALPNProtocols = ['http/1.1'];
+    delete options.timeout;
+    delete options._socketTimeout;
+    delete options._timeoutPhase;
+    return external_node_https_namespaceObject.request(options, callback);
+};
 const requestHttp1 = (options, agent, callback) => {
     if (typeof agent === 'object' && 'https' in agent) {
         options.agent = agent.https;
     }
-    options.ALPNProtocols = ['http/1.1'];
-    delete options.timeout;
-    delete options._socketTimeout;
     if (options.headers) {
         const headers = { ...options.headers };
         Reflect.deleteProperty(headers, HTTP2_HEADER_METHOD);
         Reflect.deleteProperty(headers, HTTP2_HEADER_SCHEME);
         Reflect.deleteProperty(headers, HTTP2_HEADER_PATH);
+        // The test is on the value rather than on the presence of the key, so an `Object.hasOwn`
+        // rewrite would forward an empty `:authority` as a host.
+        // eslint-disable-next-line unicorn/no-computed-property-existence-check
         if (headers[HTTP2_HEADER_AUTHORITY] && !headers.host) {
             headers.host = headers[HTTP2_HEADER_AUTHORITY];
         }
         Reflect.deleteProperty(headers, HTTP2_HEADER_AUTHORITY);
         options.headers = headers;
     }
-    return external_node_https_namespaceObject.request(options, callback);
-};
-const requestWithCustomHttpsAgent = (options, agent, callback) => {
-    options.agent = agent.https;
-    options.ALPNProtocols = ['http/1.1'];
-    delete options.timeout;
-    delete options._socketTimeout;
-    return external_node_https_namespaceObject.request(options, callback);
+    return requestHttps(options, callback);
 };
 const requestHttp2 = (options, agent, socket, callback) => {
     options.agent = typeof agent === 'object' && 'http2' in agent ? agent.http2 : agent;
@@ -50823,14 +51047,14 @@ const auto = async (input, options, callback) => {
     if (options.h2session) {
         return request(options, callback);
     }
-    const isHttps = options.protocol === 'https:';
-    if (!isHttps) {
+    if (options.protocol !== 'https:') {
         options.agent = options.agent?.http;
         return external_node_http_.request(options, callback);
     }
     const agent = options.agent;
     if (hasCustomHttpsAgent(agent) && options.createConnection === undefined) {
-        return requestWithCustomHttpsAgent(options, agent, callback);
+        options.agent = agent.https;
+        return requestHttps(options, callback);
     }
     const { alpnProtocol, socket } = await resolveProtocol(options, sourceOptions);
     if (alpnProtocol === 'h2') {
@@ -50860,40 +51084,14 @@ const http2Client = {
 
 
 
+
+
 const isAgentObject = (agent) => distribution.object(agent) && ('http' in agent || 'https' in agent || 'http2' in agent);
 const getNativeAgent = (url, agent) => {
     if (!isAgentObject(agent)) {
         return agent;
     }
     return url.protocol === 'https:' ? agent.https : agent.http;
-};
-const resolveWithRequestTimeout = async (promise, timeout, onLateResolution) => {
-    let timeoutId;
-    let didTimeOut = false;
-    const timeoutPromise = new Promise((_resolve, reject) => {
-        timeoutId = setTimeout(() => {
-            didTimeOut = true;
-            reject(new timed_out_TimeoutError(timeout, 'request'));
-        }, timeout);
-        timeoutId.unref();
-    });
-    void (async () => {
-        try {
-            const value = await promise;
-            if (didTimeOut) {
-                onLateResolution?.(value);
-            }
-        }
-        catch { }
-    })();
-    try {
-        return await Promise.race([promise, timeoutPromise]);
-    }
-    finally {
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-        }
-    }
 };
 /**
 Generic helper that wraps any assertion function to add context to error messages.
@@ -50918,6 +51116,13 @@ function options_assertAny(optionName, validators, value) {
         assert.any(validators, value);
     });
 }
+// A count. `Infinity` stays a valid "never" value.
+function assertCount(optionName, value) {
+    if (value === Infinity) {
+        return;
+    }
+    options_assertAny(optionName, [distribution.nonNegativeInteger], value);
+}
 /**
 Helper function that wraps assert.plainObject() to provide better error messages.
 When assertion fails, it includes the option name in the error message.
@@ -50932,7 +51137,7 @@ function isSameOrigin(previousUrl, nextUrl) {
         && getUnixSocketPath(previousUrl) === getUnixSocketPath(nextUrl);
 }
 const crossOriginStripHeaders = ['host', 'cookie', 'cookie2', 'authorization', 'proxy-authorization'];
-const bodyHeaderNames = ['content-length', 'content-encoding', 'content-language', 'content-location', 'content-type', 'transfer-encoding'];
+const bodyHeaderNames = ['content-length', 'content-encoding', 'content-language', 'content-location', 'content-type', 'transfer-encoding', 'digest', 'content-digest', 'repr-digest', 'last-modified'];
 function usesUnixSocket(url) {
     return url.protocol === 'unix:' || getUnixSocketPath(url) !== undefined;
 }
@@ -50952,6 +51157,16 @@ function hasCredentialInUrl(url, credential) {
 }
 const hasExplicitCredentialInUrlChange = (changedState, url, credential) => (changedState.has(credential)
     || ((changedState.has('url') || changedState.has('prefixUrl')) && url?.[credential] !== ''));
+const hasBodyOptionChanged = (changedState) => changedState.has('body') || changedState.has('json') || changedState.has('form');
+// The URL parser leaves malformed percent-escapes untouched, so decoding must not throw.
+function safeDecode(value) {
+    try {
+        return decodeURIComponent(value);
+    }
+    catch {
+        return value;
+    }
+}
 const hasProtocolSlashes = (value) => /^[a-z][\d+\-.a-z]*:\/\//iv.test(value);
 const hasHttpProtocolWithoutSlashes = (value) => /^https?:(?!\/\/)/iv.test(value);
 const hasUnixProtocolWithoutSlashes = (value) => /^unix:/iv.test(value);
@@ -51016,7 +51231,7 @@ function applyUrlOverride(options, url, { username, password, baseUrl } = {}) {
     assertRelativeUrlIfNeeded(options, url);
     if (distribution.string(url) && options.url) {
         const resolvedUrl = new URL(url, baseUrl ?? options.url);
-        url = resolvedUrl.toString();
+        url = resolvedUrl.href;
     }
     if (options.allowAbsoluteUrls) {
         options.prefixUrl = '';
@@ -51044,6 +51259,10 @@ function assertValidHeaderName(name) {
     if (name.startsWith(':')) {
         throw new TypeError(`HTTP/2 pseudo-headers are not supported in \`options.headers\`: ${name}`);
     }
+    // Assigning it would re-prototype the live headers object instead of adding a header.
+    if (name === '__proto__') {
+        throw new TypeError('The `__proto__` header name is not supported in `options.headers`');
+    }
 }
 /**
 Safely assign own properties from source to target, skipping `__proto__` to prevent prototype pollution from JSON.parse'd input.
@@ -51056,32 +51275,62 @@ function safeObjectAssign(target, source) {
         Reflect.set(target, key, value);
     }
 }
-const isToughCookieJar = (cookieJar) => cookieJar.setCookie.length === 4 && cookieJar.getCookieString.length === 0;
-const destroyLateRequestResult = (result) => {
-    if (result && 'destroy' in result && distribution.function(result.destroy)) {
-        if ('once' in result && distribution.function(result.once)) {
-            result.once('error', () => { });
-        }
-        result.destroy();
-    }
-};
-function validateSearchParameters(searchParameters) {
-    for (const key of Object.keys(searchParameters)) {
+// `__proto__` is skipped like in `safeObjectAssign`, which never assigns it.
+function assertKnownKeys(value, knownOptions, createError) {
+    for (const key of Object.keys(value)) {
         if (key === '__proto__') {
             continue;
         }
-        const value = searchParameters[key];
+        if (!Object.hasOwn(knownOptions, key)) {
+            throw createError(key);
+        }
+    }
+}
+const isToughCookieJar = (cookieJar) => cookieJar.setCookie.length === 4 && cookieJar.getCookieString.length === 0;
+function validateSearchParameters(searchParameters) {
+    for (const [key, value] of Object.entries(searchParameters)) {
+        if (key === '__proto__') {
+            continue;
+        }
         options_assertAny(`searchParams.${key}`, [distribution.string, distribution.number, distribution.boolean, distribution.null, distribution.undefined], value);
     }
 }
 const globalCache = new Map();
+const dnsCacheLookups = new WeakMap();
+const adaptedDnsLookups = new WeakMap();
 let globalDnsCache;
 const getGlobalDnsCache = () => {
-    if (globalDnsCache) {
-        return globalDnsCache;
-    }
-    globalDnsCache = new DnsCache();
+    globalDnsCache ??= new DnsCache();
     return globalDnsCache;
+};
+// Node asks a lookup for every address when it selects a family itself, so a lookup written
+// against the documented single-result shape has to be adapted.
+const getAdaptedLookup = (lookup) => {
+    let adapted = adaptedDnsLookups.get(lookup);
+    if (!adapted) {
+        adapted = (hostname, options, callback) => {
+            lookup(hostname, options, (error, address, family) => {
+                if (error) {
+                    callback(error, address, family);
+                    return;
+                }
+                callback(null, options.all && !Array.isArray(address) ? [{ address, family: family }] : address, family);
+            });
+        };
+        adaptedDnsLookups.set(lookup, adapted);
+    }
+    return adapted;
+};
+const getDnsCacheLookup = (cache) => {
+    let lookup = dnsCacheLookups.get(cache);
+    if (!lookup) {
+        // Preserve the cache receiver and stable lookup identity for HTTP/2 session reuse.
+        lookup = (hostname, options, callback) => {
+            cache.lookup(hostname, options, callback);
+        };
+        dnsCacheLookups.set(cache, lookup);
+    }
+    return lookup;
 };
 // Detects and wraps QuickLRU v7+ instances to make them compatible with the StorageAdapter interface
 const wrapQuickLruIfNeeded = (value) => {
@@ -51206,7 +51455,7 @@ const defaultInternals = {
         ],
         maxRetryAfter: undefined,
         calculateDelay: ({ computedValue }) => computedValue,
-        backoffLimit: Number.POSITIVE_INFINITY,
+        backoffLimit: Infinity,
         noise: 100,
         enforceRetryRules: true,
     },
@@ -51250,7 +51499,10 @@ const defaultInternals = {
             if (response.request.options.responseType === 'json') {
                 return response.body;
             }
-            return JSON.parse(response.body);
+            const body = response.request.options.responseType === 'buffer'
+                ? decodeUint8Array(response.body, response.request.options.encoding)
+                : response.body;
+            return response.request.options.parseJson(body);
         },
         paginate({ response }) {
             const rawLinkHeader = response.headers.link;
@@ -51258,7 +51510,9 @@ const defaultInternals = {
                 return false;
             }
             const parsed = parseLinkHeader(rawLinkHeader);
-            const next = parsed.find(entry => entry.parameters.rel === 'next' || entry.parameters.rel === '"next"');
+            // The `rel` parameter is a space-separated list of relation types compared case-insensitively. See https://www.rfc-editor.org/rfc/rfc8288#section-3.3
+            // Ignore links with an anchor instead of changing their context (RFC 8288, section 3.2).
+            const next = parsed.find(entry => !Object.hasOwn(entry.parameters, 'anchor') && entry.parameters.rel?.replaceAll('"', '').toLowerCase().split(/\s+/v).includes('next'));
             if (next) {
                 return {
                     url: next.reference,
@@ -51268,7 +51522,7 @@ const defaultInternals = {
         },
         filter: () => true,
         shouldContinue: () => true,
-        countLimit: Number.POSITIVE_INFINITY,
+        countLimit: Infinity,
         backoff: 0,
         requestLimit: 10_000,
         stackAllItems: false,
@@ -51279,15 +51533,26 @@ const defaultInternals = {
     enableUnixSockets: false,
     strictContentLength: true,
 };
+const cloneHeaderValue = (value) => {
+    if (Array.isArray(value)) {
+        return [...value];
+    }
+    return typeof value === 'number' ? String(value) : value;
+};
+// `__proto__` is skipped so a `JSON.parse`d headers object cannot become a request header.
+const cloneHeaders = (headers) => Object.fromEntries(Object.entries(headers).filter(([name]) => name !== '__proto__').map(([name, value]) => [name, cloneHeaderValue(value)]));
+// TLS option lists and key/PFX descriptors must not be shared between requests.
+const cloneHttps = (https) => Object.fromEntries(Object.entries(https).map(([key, value]) => [key, Array.isArray(value) ? value.map(item => distribution.plainObject(item) ? { ...item } : item) : value]));
 const cloneInternals = (internals) => {
     const { hooks, retry } = internals;
     const result = {
         ...internals,
+        url: internals.url ? new URL(internals.url) : undefined,
         context: { ...internals.context },
         cacheOptions: { ...internals.cacheOptions },
-        https: { ...internals.https },
+        https: cloneHttps(internals.https),
         agent: { ...internals.agent },
-        headers: { ...internals.headers },
+        headers: cloneHeaders(internals.headers),
         retry: {
             ...retry,
             errorCodes: [...retry.errorCodes],
@@ -51295,15 +51560,7 @@ const cloneInternals = (internals) => {
             statusCodes: [...retry.statusCodes],
         },
         timeout: { ...internals.timeout },
-        hooks: {
-            init: [...hooks.init],
-            beforeRequest: [...hooks.beforeRequest],
-            beforeError: [...hooks.beforeError],
-            beforeRedirect: [...hooks.beforeRedirect],
-            beforeRetry: [...hooks.beforeRetry],
-            beforeCache: [...hooks.beforeCache],
-            afterResponse: [...hooks.afterResponse],
-        },
+        hooks: Object.fromEntries(Object.entries(hooks).map(([event, handlers]) => [event, [...handlers]])),
         searchParams: internals.searchParams ? new URLSearchParams(internals.searchParams) : undefined,
         pagination: { ...internals.pagination },
     };
@@ -51311,20 +51568,18 @@ const cloneInternals = (internals) => {
 };
 const cloneRaw = (raw) => {
     const result = { ...raw };
-    if (Object.hasOwn(raw, 'context') && distribution.object(raw.context)) {
-        result.context = { ...raw.context };
-    }
-    if (Object.hasOwn(raw, 'cacheOptions') && distribution.object(raw.cacheOptions)) {
-        result.cacheOptions = { ...raw.cacheOptions };
-    }
+    // The result is a copy that is meant to be filled in, so assigning onto it is the point.
+    // eslint-disable-next-line unicorn/no-immediate-mutation
     if (Object.hasOwn(raw, 'https') && distribution.object(raw.https)) {
-        result.https = { ...raw.https };
+        result.https = cloneHttps(raw.https);
     }
-    if (Object.hasOwn(raw, 'agent') && distribution.object(raw.agent)) {
-        result.agent = { ...raw.agent };
+    for (const key of ['context', 'cacheOptions', 'agent', 'timeout', 'pagination']) {
+        if (Object.hasOwn(raw, key) && distribution.object(raw[key])) {
+            result[key] = { ...raw[key] };
+        }
     }
     if (Object.hasOwn(raw, 'headers') && distribution.object(raw.headers)) {
-        result.headers = { ...raw.headers };
+        result.headers = cloneHeaders(raw.headers);
     }
     if (Object.hasOwn(raw, 'retry') && distribution.object(raw.retry)) {
         const { retry } = raw;
@@ -51339,34 +51594,17 @@ const cloneRaw = (raw) => {
             result.retry.statusCodes = [...retry.statusCodes];
         }
     }
-    if (Object.hasOwn(raw, 'timeout') && distribution.object(raw.timeout)) {
-        result.timeout = { ...raw.timeout };
-    }
     if (Object.hasOwn(raw, 'hooks') && distribution.object(raw.hooks)) {
         const { hooks } = raw;
         result.hooks = {
             ...hooks,
         };
-        if (distribution.array(hooks.init)) {
-            result.hooks.init = [...hooks.init];
-        }
-        if (distribution.array(hooks.beforeRequest)) {
-            result.hooks.beforeRequest = [...hooks.beforeRequest];
-        }
-        if (distribution.array(hooks.beforeError)) {
-            result.hooks.beforeError = [...hooks.beforeError];
-        }
-        if (distribution.array(hooks.beforeRedirect)) {
-            result.hooks.beforeRedirect = [...hooks.beforeRedirect];
-        }
-        if (distribution.array(hooks.beforeRetry)) {
-            result.hooks.beforeRetry = [...hooks.beforeRetry];
-        }
-        if (distribution.array(hooks.beforeCache)) {
-            result.hooks.beforeCache = [...hooks.beforeCache];
-        }
-        if (distribution.array(hooks.afterResponse)) {
-            result.hooks.afterResponse = [...hooks.afterResponse];
+        for (const event of Object.keys(defaultInternals.hooks)) {
+            const handlers = hooks[event];
+            if (distribution.array(handlers)) {
+                // @ts-expect-error Indexing by a widened `keyof Hooks` loses the correlation to `handlers`'s specific array type.
+                result.hooks[event] = [...handlers];
+            }
         }
     }
     if (Object.hasOwn(raw, 'searchParams') && raw.searchParams) {
@@ -51376,23 +51614,35 @@ const cloneRaw = (raw) => {
         else if (raw.searchParams instanceof URLSearchParams) {
             result.searchParams = new URLSearchParams(raw.searchParams);
         }
-        else if (distribution.object(raw.searchParams)) {
+        else {
+            // A `URL`, `Map` or `Set` is an object without enumerable own keys, so it has to be
+            // rejected before the spread turns it into an empty object.
+            options_assertPlainObject('searchParams', raw.searchParams);
             result.searchParams = { ...raw.searchParams };
         }
     }
-    if (Object.hasOwn(raw, 'pagination') && distribution.object(raw.pagination)) {
-        result.pagination = { ...raw.pagination };
-    }
     return result;
 };
-const getHttp2TimeoutOption = (internals) => {
+// The HTTP/2 client uses one timer for these phases, so the smallest value decides both when
+// it fires and which phase the resulting error reports. Delays Node.js cannot arm mean no
+// constraint and are excluded instead of winning the minimum.
+const getHttp2Timeout = (internals) => {
     const delays = [
-        internals.timeout.connect,
-        internals.timeout.lookup,
-        internals.timeout.request,
-        internals.timeout.secureConnect,
-    ].filter(delay => typeof delay === 'number');
-    return delays.length > 0 ? Math.min(...delays) : undefined;
+        ['lookup', internals.timeout.lookup],
+        ['connect', internals.timeout.connect],
+        ['secureConnect', internals.timeout.secureConnect],
+        ['request', internals.timeout.request],
+    ].filter((entry) => typeof entry[1] === 'number' && isArmableTimerDelay(entry[1]));
+    if (delays.length === 0) {
+        return undefined;
+    }
+    let lowest = delays[0];
+    for (const entry of delays) {
+        if (entry[1] < lowest[1]) {
+            lowest = entry;
+        }
+    }
+    return { timeout: lowest[1], phase: lowest[0] };
 };
 const usesHttp2Alpn = (internals, url) => {
     const usesCustomHttpsAgent = internals.agent.https !== undefined
@@ -51403,23 +51653,13 @@ const usesHttp2Alpn = (internals, url) => {
         && !internals.h2session
         && !usesCustomHttpsAgent;
 };
-const trackStateMutation = (trackedStateMutations, name) => {
-    trackedStateMutations?.add(name);
-};
-const addExplicitHeader = (explicitHeaders, name) => {
-    explicitHeaders.add(name);
-};
-const markHeaderAsExplicit = (explicitHeaders, trackedStateMutations, name) => {
-    addExplicitHeader(explicitHeaders, name);
-    trackStateMutation(trackedStateMutations, name);
-};
 const trackReplacedHeaderMutations = (trackedStateMutations, previousHeaders, nextHeaders) => {
     if (!trackedStateMutations) {
         return;
     }
     for (const header of new Set([...Object.keys(previousHeaders), ...Object.keys(nextHeaders)])) {
         if (previousHeaders[header] !== nextHeaders[header]) {
-            trackStateMutation(trackedStateMutations, header);
+            trackedStateMutations.add(header);
         }
     }
 };
@@ -51433,6 +51673,12 @@ const init = (options, withOptions, self) => {
 };
 // Keys never merged: got.extend() internals, url (passed as first arg), control flags, security
 const nonMergeableKeys = new Set(['mutableDefaults', 'handlers', 'url', 'preserveHooks', 'isStream', '__proto__']);
+// Options where an explicit `undefined` resets the inherited value instead of keeping it.
+const resettableByUndefined = new Set(['searchParams', 'cookieJar']);
+// Whether the options supply a body, JSON, or form payload explicitly.
+const hasExplicitBodyOption = (options) => (Object.hasOwn(options, 'body') && options.body !== undefined)
+    || (Object.hasOwn(options, 'json') && options.json !== undefined)
+    || (Object.hasOwn(options, 'form') && options.form !== undefined);
 class Options {
     #internals;
     #headersProxy;
@@ -51469,6 +51715,11 @@ class Options {
         /* eslint-disable no-unsafe-finally -- `finally` is used intentionally here to ensure `url` is always set last, overwriting any merged searchParams */
         try {
             if (distribution.plainObject(input)) {
+                // The plain object carries the url, so one in the second argument would be
+                // silently ignored, the same conflict the string input reports.
+                if (options?.url !== undefined) {
+                    throw new TypeError('The `url` option is mutually exclusive with the `input` argument');
+                }
                 try {
                     this.merge(input);
                     this.merge(options);
@@ -51497,8 +51748,9 @@ class Options {
             }
         }
         catch (error) {
-            error.options = this;
-            throw error;
+            const optionsError = normalizeError(error);
+            optionsError.options = this;
+            throw optionsError;
         }
         /* eslint-enable no-unsafe-finally */
     }
@@ -51525,12 +51777,12 @@ class Options {
                 if (nonMergeableKeys.has(key)) {
                     continue;
                 }
-                if (!(key in this)) {
+                if (!optionNames.has(key)) {
                     throw new Error(`Unexpected option: ${key}`);
                 }
                 // @ts-expect-error Type 'unknown' is not assignable to type 'never'.
                 const value = options[key];
-                if (value === undefined) {
+                if (value === undefined && !resettableByUndefined.has(key)) {
                     continue;
                 }
                 // @ts-expect-error Type 'unknown' is not assignable to type 'never'.
@@ -51589,7 +51841,7 @@ class Options {
             if (key === '__proto__') {
                 continue;
             }
-            if (!(key in this.#internals.agent)) {
+            if (!Object.hasOwn(defaultInternals.agent, key)) {
                 throw new TypeError(`Unexpected agent option: ${key}`);
             }
             const validators = key === 'http2'
@@ -51597,17 +51849,13 @@ class Options {
                 : [distribution.object, distribution.undefined, (v) => v === false];
             options_assertAny(`agent.${key}`, validators, value[key]);
         }
-        if (this.#merging) {
-            safeObjectAssign(this.#internals.agent, value);
-        }
-        else {
-            this.#internals.agent = { ...value };
-        }
+        this.#mergeOrReplace('agent', value);
     }
     get h2session() {
         return this.#internals.h2session;
     }
     set h2session(value) {
+        options_assertAny('h2session', [distribution.object, distribution.undefined], value);
         this.#internals.h2session = value;
     }
     /**
@@ -51653,21 +51901,16 @@ class Options {
             if (key === '__proto__') {
                 continue;
             }
-            if (!(key in this.#internals.timeout)) {
+            if (!Object.hasOwn(defaultInternals.timeout, key)) {
                 throw new Error(`Unexpected timeout option: ${key}`);
             }
             options_assertAny(`timeout.${key}`, [distribution.number, distribution.undefined], value[key]);
         }
-        if (this.#merging) {
-            safeObjectAssign(this.#internals.timeout, value);
-        }
-        else {
-            this.#internals.timeout = { ...value };
-        }
+        this.#mergeOrReplace('timeout', value);
     }
     /**
     When specified, `prefixUrl` will be prepended to relative string `url` input.
-    The prefix can be any valid URL, either relative or absolute.
+    The prefix must be an absolute URL, since Got has no base to resolve it against. It must not contain a query string or a fragment.
     A trailing slash `/` is optional - one will be added automatically.
 
     __Note__: Absolute string URLs and URL instances bypass `prefixUrl` by default. Other instance defaults, including headers, still apply. For untrusted URLs, set `allowAbsoluteUrls` to `false`.
@@ -51718,6 +51961,14 @@ class Options {
             return;
         }
         value = value.toString();
+        if (hasProtocolSlashes(value)) {
+            // The prefix is concatenated with the path, so a query or a fragment would swallow it.
+            // A scheme-relative prefix has no base to parse against and fails at request time.
+            const prefix = new URL(value);
+            if (prefix.search !== '' || prefix.hash !== '') {
+                throw new TypeError('The `prefixUrl` option must not contain a query string or a fragment');
+            }
+        }
         if (!value.endsWith('/')) {
             value += '/';
         }
@@ -51740,6 +51991,9 @@ class Options {
                 prefixUrl.password = '';
                 prefixUrlWithoutCredentials = prefixUrl.href;
             }
+            if (!urlWithoutCredentials.href.startsWith(prefixUrlWithoutCredentials)) {
+                throw new Error('The `url` option must include the `prefixUrl` option');
+            }
             url.href = value + urlWithoutCredentials.href.slice(prefixUrlWithoutCredentials.length);
             const isSameOriginUrl = isSameOrigin(previousUrl, url);
             if (username && !url.username && isSameOriginUrl && !hasNewPrefixCredentials) {
@@ -51750,7 +52004,7 @@ class Options {
             }
         }
         this.#internals.prefixUrl = value;
-        trackStateMutation(this.#trackedStateMutations, 'prefixUrl');
+        this.#trackedStateMutations?.add('prefixUrl');
     }
     /**
     __Note #1__: The `body` option cannot be used with the `json` or `form` option.
@@ -51761,7 +52015,7 @@ class Options {
 
     __Note #4__: This option is not enumerable and will not be merged with the instance defaults.
 
-    The `content-length` header will be automatically set if `body` is a `string` / `Uint8Array` / typed array, and `content-length` and `transfer-encoding` are not manually set in `options.headers`.
+    The `content-length` header will be automatically set if `body` is a `string` or an `ArrayBufferView` (including `Uint8Array`, other typed arrays, and `DataView`), and `content-length` and `transfer-encoding` are not manually set in `options.headers`.
 
     Since Got 12, the `content-length` is not automatically set when `body` is a `fs.createReadStream`.
 
@@ -51786,7 +52040,7 @@ class Options {
         return this.#internals.body;
     }
     set body(value) {
-        options_assertAny('body', [distribution.string, distribution.buffer, distribution.nodeStream, distribution.generator, distribution.asyncGenerator, distribution.iterable, distribution.asyncIterable, distribution.typedArray, distribution.undefined], value);
+        options_assertAny('body', [distribution.string, distribution.buffer, distribution.nodeStream, distribution.generator, distribution.asyncGenerator, distribution.iterable, distribution.asyncIterable, ArrayBuffer.isView, distribution.undefined], value);
         if (distribution.nodeStream(value)) {
             assert.truthy(value.readable);
         }
@@ -51795,7 +52049,7 @@ class Options {
             assert.undefined(this.#internals.json);
         }
         this.#internals.body = value;
-        trackStateMutation(this.#trackedStateMutations, 'body');
+        this.#trackedStateMutations?.add('body');
     }
     /**
     The form body is converted to a query string using [`(new URLSearchParams(object)).toString()`](https://nodejs.org/api/url.html#url_constructor_new_urlsearchparams_obj).
@@ -51816,7 +52070,7 @@ class Options {
             assert.undefined(this.#internals.json);
         }
         this.#internals.form = value;
-        trackStateMutation(this.#trackedStateMutations, 'form');
+        this.#trackedStateMutations?.add('form');
     }
     /**
     JSON request body. If the `content-type` header is not set, it will be set to `application/json`.
@@ -51836,10 +52090,12 @@ class Options {
             assert.undefined(this.#internals.form);
         }
         this.#internals.json = value;
-        trackStateMutation(this.#trackedStateMutations, 'json');
+        this.#trackedStateMutations?.add('json');
     }
     /**
-    The URL to request, as a string, a [`https.request` options object](https://nodejs.org/api/https.html#https_https_request_options_callback), or a [WHATWG `URL`](https://nodejs.org/api/url.html#url_class_url).
+    The URL to request, as a string or a [WHATWG `URL`](https://nodejs.org/api/url.html#url_class_url).
+
+    Pass it as the first argument to `got(url, options)`. Setting `url` inside an options object is not supported.
 
     Properties from `options` will override properties in the parsed `url`.
 
@@ -51863,7 +52119,7 @@ class Options {
         options_assertAny('url', [distribution.string, distribution.urlInstance, distribution.undefined], value);
         if (value === undefined) {
             this.#internals.url = undefined;
-            trackStateMutation(this.#trackedStateMutations, 'url');
+            this.#trackedStateMutations?.add('url');
             return;
         }
         if (distribution.string(value) && value.startsWith('/')) {
@@ -51872,7 +52128,9 @@ class Options {
         const valueString = value.toString();
         if (distribution.string(value)
             && !this.prefixUrl
-            && hasHttpProtocolWithoutSlashes(valueString)) {
+            // The URL parser strips leading C0 control characters and spaces, so the guard has
+            // to see the normalized string or whitespace would smuggle a protocol past it.
+            && hasHttpProtocolWithoutSlashes(stripLeadingC0ControlOrSpace(removeAsciiTabOrNewline(value)))) {
             throw new Error('`url` protocol must be followed by `//`');
         }
         // Detect if URL is already absolute.
@@ -51881,8 +52139,7 @@ class Options {
         // Only concatenate prefixUrl if the URL is relative
         const urlString = isAbsolute ? valueString : `${this.prefixUrl}${valueString}`;
         const url = new URL(urlString);
-        this.#internals.url = url;
-        trackStateMutation(this.#trackedStateMutations, 'url');
+        // Validate before storing, so a rejected url never stays on the instance.
         if (usesUnixSocket(url) && !this.#internals.enableUnixSockets) {
             throw new Error('Using UNIX domain sockets but option `enableUnixSockets` is not enabled');
         }
@@ -51894,6 +52151,8 @@ class Options {
             error.code = 'ERR_UNSUPPORTED_PROTOCOL';
             throw error;
         }
+        this.#internals.url = url;
+        this.#trackedStateMutations?.add('url');
         if (this.#internals.username) {
             url.username = this.#internals.username;
             this.#internals.username = '';
@@ -51992,6 +52251,12 @@ class Options {
     ```
     */
     get searchParams() {
+        if (Object.isFrozen(this.#internals)) {
+            // A frozen instance is read-only, so a copy is handed out. Writing to it is
+            // discarded instead of reaching the live parameters or the url they belong to.
+            const { url } = this.#internals;
+            return new URLSearchParams(url ? url.searchParams : this.#internals.searchParams);
+        }
         if (this.#internals.url) {
             return this.#internals.url.searchParams;
         }
@@ -52000,6 +52265,12 @@ class Options {
     }
     set searchParams(value) {
         options_assertAny('searchParams', [distribution.string, distribution.object, distribution.undefined], value);
+        // A frozen instance is read-only, and the url it holds is part of that state. Without
+        // this the assignment below would rewrite the query string of a frozen url instead of
+        // failing like every other frozen option does.
+        if (Object.isFrozen(this.#internals)) {
+            throw new TypeError('Cannot assign to read only option `searchParams`');
+        }
         const url = this.#internals.url;
         if (value === undefined) {
             this.#internals.searchParams = undefined;
@@ -52010,21 +52281,20 @@ class Options {
         }
         const searchParameters = this.searchParams;
         let updated;
-        if (distribution.string(value)) {
-            updated = new URLSearchParams(value);
-        }
-        else if (value instanceof URLSearchParams) {
-            // Clone so the caller-owned object is not stored by reference.
+        if (distribution.string(value) || value instanceof URLSearchParams) {
+            // A `URLSearchParams` is cloned so the caller-owned object is not stored by reference.
             updated = new URLSearchParams(value);
         }
         else {
+            // A `URL`, `Map` or `Set` is an object without enumerable own keys, which would
+            // silently erase the query string instead of being reported.
+            options_assertPlainObject('searchParams', value);
             validateSearchParameters(value);
             updated = new URLSearchParams();
-            for (const key of Object.keys(value)) {
+            for (const [key, entry] of Object.entries(value)) {
                 if (key === '__proto__') {
                     continue;
                 }
-                const entry = value[key];
                 if (entry === null) {
                     updated.append(key, '');
                 }
@@ -52072,7 +52342,7 @@ class Options {
 
     __Note__: This should stay disabled when making requests to internal hostnames such as `localhost`, `database.local` etc.
 
-    @default false
+    @default undefined
     */
     get dnsCache() {
         return this.#internals.dnsCache;
@@ -52129,12 +52399,7 @@ class Options {
     }
     set context(value) {
         assert.object(value);
-        if (this.#merging) {
-            safeObjectAssign(this.#internals.context, value);
-        }
-        else {
-            this.#internals.context = { ...value };
-        }
+        this.#mergeOrReplace('context', value);
     }
     /**
     Hooks allow modifications during the request lifecycle.
@@ -52149,27 +52414,24 @@ class Options {
             if (knownHookEvent === '__proto__') {
                 continue;
             }
-            if (!(knownHookEvent in this.#internals.hooks)) {
+            if (!Object.hasOwn(this.#internals.hooks, knownHookEvent)) {
                 throw new Error(`Unexpected hook event: ${knownHookEvent}`);
             }
             const typedKnownHookEvent = knownHookEvent;
             const hooks = value[typedKnownHookEvent];
             options_assertAny(`hooks.${knownHookEvent}`, [distribution.array, distribution.undefined], hooks);
-            if (hooks) {
-                for (const hook of hooks) {
-                    assert.function(hook);
-                }
+            // An `undefined` value is ignored, matching every other option.
+            if (!hooks) {
+                continue;
+            }
+            for (const hook of hooks) {
+                assert.function(hook);
             }
             if (this.#merging) {
-                if (hooks) {
-                    // @ts-expect-error Indexing by a widened `keyof Hooks` loses the correlation to `hooks`'s specific array type.
-                    this.#internals.hooks[typedKnownHookEvent].push(...hooks);
-                }
+                // @ts-expect-error Indexing by a widened `keyof Hooks` loses the correlation to `hooks`'s specific array type.
+                this.#internals.hooks[typedKnownHookEvent].push(...hooks);
             }
             else {
-                if (!hooks) {
-                    throw new Error(`Missing hook event: ${knownHookEvent}`);
-                }
                 // @ts-expect-error Indexing by a widened `keyof Hooks` loses the correlation to `hooks`'s specific array type.
                 this.#internals.hooks[knownHookEvent] = [...hooks];
             }
@@ -52178,7 +52440,7 @@ class Options {
     /**
     Whether redirect responses should be followed automatically.
 
-    Optionally, pass a function to dynamically decide based on the response object.
+    Optionally, pass a function to dynamically decide based on the response object. The function is only called for 3xx responses, and an unchanged function is evaluated only once per response.
 
     Note that if a `303` is sent by the server in response to any request type (`POST`, `DELETE`, etc.), Got will automatically request the resource pointed to in the location header via `GET`.
     This is in accordance with [the spec](https://tools.ietf.org/html/rfc7231#section-6.4.4). You can optionally turn on this behavior also for other redirect codes - see `methodRewriting`.
@@ -52202,13 +52464,13 @@ class Options {
         return this.#internals.maxRedirects;
     }
     set maxRedirects(value) {
-        assert.number(value);
+        assertCount('maxRedirects', value);
         this.#internals.maxRedirects = value;
     }
     /**
     A cache adapter instance for storing cached response data.
 
-    @default false
+    @default undefined
     */
     get cache() {
         return this.#internals.cache;
@@ -52241,38 +52503,18 @@ class Options {
         this.#internals.throwHttpErrors = value;
     }
     get username() {
-        const url = this.#internals.url;
-        const value = url ? url.username : this.#internals.username;
-        return decodeURIComponent(value);
+        return this.#getCredential('username');
     }
     set username(value) {
         assert.string(value);
-        const url = this.#internals.url;
-        const fixedValue = encodeURIComponent(value);
-        if (url) {
-            url.username = fixedValue;
-        }
-        else {
-            this.#internals.username = fixedValue;
-        }
-        trackStateMutation(this.#trackedStateMutations, 'username');
+        this.#setCredential('username', value);
     }
     get password() {
-        const url = this.#internals.url;
-        const value = url ? url.password : this.#internals.password;
-        return decodeURIComponent(value);
+        return this.#getCredential('password');
     }
     set password(value) {
         assert.string(value);
-        const url = this.#internals.url;
-        const fixedValue = encodeURIComponent(value);
-        if (url) {
-            url.password = fixedValue;
-        }
-        else {
-            this.#internals.password = fixedValue;
-        }
-        trackStateMutation(this.#trackedStateMutations, 'password');
+        this.#setCredential('password', value);
     }
     /**
     If set to `true`, Got will additionally accept HTTP/2 requests.
@@ -52404,6 +52646,10 @@ class Options {
         return this.#internals.headers;
     }
     setInternalHeader(name, value) {
+        if (value === undefined) {
+            this.deleteInternalHeader(name);
+            return;
+        }
         assertValidHeaderName(name);
         this.#internals.headers[name.toLowerCase()] = value;
     }
@@ -52439,10 +52685,7 @@ class Options {
         }
     }
     restoreCookieHeader(previousState, headers) {
-        if (!previousState) {
-            return;
-        }
-        if (Object.hasOwn(headers ?? {}, 'cookie')) {
+        if (!previousState || Object.keys(headers ?? {}).some(name => name.toLowerCase() === 'cookie')) {
             return;
         }
         if (previousState.cookieWasExplicitlySet) {
@@ -52466,13 +52709,12 @@ class Options {
                 this.deleteInternalHeader(header);
             }
         }
-        if (!hasExplicitCredentialInUrlChange(changedState, url, 'username')) {
-            this.username = '';
+        for (const credential of ['username', 'password']) {
+            if (!hasExplicitCredentialInUrlChange(changedState, url, credential)) {
+                this[credential] = '';
+            }
         }
-        if (!hasExplicitCredentialInUrlChange(changedState, url, 'password')) {
-            this.password = '';
-        }
-        if (clearBody && !changedState.has('body') && !changedState.has('json') && !changedState.has('form') && isBodyUnchanged(this, previousState)) {
+        if (clearBody && !hasBodyOptionChanged(changedState) && isBodyUnchanged(this, previousState)) {
             this.clearBody();
         }
     }
@@ -52490,36 +52732,79 @@ class Options {
                 this.deleteInternalHeader(header);
             }
         }
-        const explicitUsername = Object.hasOwn(userOptions, 'username') ? userOptions.username : undefined;
-        const explicitPassword = Object.hasOwn(userOptions, 'password') ? userOptions.password : undefined;
-        const hasExplicitUsername = explicitUsername !== undefined
-            || hasCredentialInUrl(userOptions.url, 'username')
-            || hasCredentialInUrl(userOptions.prefixUrl, 'username')
-            || isCrossOriginCredentialChanged(previousUrl, nextUrl, 'username');
-        const hasExplicitPassword = explicitPassword !== undefined
-            || hasCredentialInUrl(userOptions.url, 'password')
-            || hasCredentialInUrl(userOptions.prefixUrl, 'password')
-            || isCrossOriginCredentialChanged(previousUrl, nextUrl, 'password');
-        if (!hasExplicitUsername && this.username) {
-            this.username = '';
+        for (const credential of ['username', 'password']) {
+            const hasExplicitCredential = (Object.hasOwn(userOptions, credential) && userOptions[credential] !== undefined)
+                || hasCredentialInUrl(userOptions.url, credential)
+                || hasCredentialInUrl(userOptions.prefixUrl, credential)
+                || isCrossOriginCredentialChanged(previousUrl, nextUrl, credential);
+            if (!hasExplicitCredential && this[credential] !== '') {
+                this[credential] = '';
+            }
         }
-        if (!hasExplicitPassword && this.password) {
-            this.password = '';
+    }
+    /**
+    Merge the options for a follow-up request into `this` and apply the cross-origin rules. This is shared by `afterResponse` retries (when the hook passes a new options object) and by pagination.
+
+    Returns the resolved `nextUrl` when `updatedOptions.url` was supplied, so callers can run their own checks on it, and whether the caller supplied an explicit body.
+    */
+    mergeNextRequestOptions(updatedOptions, { previousUrl, previousState, previousBoundary, baseUrl, }) {
+        const hasExplicitBody = hasExplicitBodyOption(updatedOptions);
+        const clearsCookieJar = Object.hasOwn(updatedOptions, 'cookieJar') && updatedOptions.cookieJar === undefined;
+        if (hasExplicitBody) {
+            const contentType = this.isHeaderExplicitlySet('content-type') ? this.headers['content-type'] : undefined;
+            this.clearBody();
+            this.setInternalHeader('content-type', contentType);
         }
+        if (clearsCookieJar) {
+            this.cookieJar = undefined;
+        }
+        const { url, ...updatedOptionsWithoutUrl } = updatedOptions;
+        this.merge(updatedOptionsWithoutUrl);
+        this.syncCookieHeaderAfterMerge(previousState, updatedOptionsWithoutUrl.headers);
+        const currentUrl = this.url;
+        if (previousUrl
+            && currentUrl instanceof URL
+            && hasUrlOrPrefixUrlBoundaryChanged(this, currentUrl, previousBoundary)) {
+            assertUrlHasSameOriginAsPrefixUrlIfNeeded(this, currentUrl);
+        }
+        if (url === undefined
+            && previousUrl
+            && currentUrl instanceof URL
+            && !isSameOrigin(previousUrl, currentUrl)) {
+            this.stripSensitiveHeaders(previousUrl, currentUrl, updatedOptions);
+            if (!hasExplicitBody) {
+                this.clearBody();
+            }
+        }
+        let nextUrl;
+        if (url !== undefined) {
+            nextUrl = applyUrlOverride(this, url, { ...updatedOptions, baseUrl });
+            // Explicit search parameters override the query string in the new URL.
+            if (updatedOptions.searchParams !== undefined) {
+                this.searchParams = updatedOptions.searchParams;
+            }
+            if (previousUrl) {
+                this.stripSensitiveHeaders(previousUrl, nextUrl, updatedOptions);
+                if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
+                    this.clearBody();
+                }
+            }
+        }
+        return { nextUrl, hasExplicitBody };
     }
     /**
     Request headers.
 
-    Existing headers will be overwritten. Headers set to `undefined` will be omitted.
+    Existing headers will be overwritten. Headers set to `undefined` will be omitted. Number values are stored and sent as strings.
 
-    @default {}
+    @default {'user-agent': 'got (https://github.com/sindresorhus/got)'}
     */
     get headers() {
         return this.#headersProxy;
     }
     set headers(value) {
         options_assertPlainObject('headers', value);
-        const normalizedHeaders = node_modules_lowercase_keys_lowercaseKeys(value);
+        const normalizedHeaders = node_modules_lowercase_keys_lowercaseKeys(cloneHeaders(value));
         for (const header of Object.keys(normalizedHeaders)) {
             assertValidHeaderName(header);
         }
@@ -52534,11 +52819,9 @@ class Options {
             trackReplacedHeaderMutations(this.#trackedStateMutations, previousHeaders, normalizedHeaders);
         }
         for (const header of Object.keys(normalizedHeaders)) {
+            this.#explicitHeaders.add(header);
             if (this.#merging) {
-                markHeaderAsExplicit(this.#explicitHeaders, this.#trackedStateMutations, header);
-            }
-            else {
-                addExplicitHeader(this.#explicitHeaders, header);
+                this.#trackedStateMutations?.add(header);
             }
         }
     }
@@ -52584,10 +52867,11 @@ class Options {
     @example
     ```
     import got from 'got';
-    import Bourne from '@hapi/bourne';
+    import {parse} from '@hapi/bourne';
 
+    // Preventing prototype pollution by using Bourne
     const parsed = await got('https://example.com', {
-        parseJson: text => Bourne.parse(text)
+        parseJson: text => parse(text)
     }).json();
 
     console.log(parsed);
@@ -52651,10 +52935,14 @@ class Options {
     /**
     An object representing `limit`, `calculateDelay`, `methods`, `statusCodes`, `maxRetryAfter` and `errorCodes` fields for maximum retry count, retry handler, allowed methods, allowed status codes, maximum [`Retry-After`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After) time and allowed error codes.
 
-    Delays between retries counts with function `1000 * Math.pow(2, retry) + Math.random() * 100`, where `retry` is attempt number (starts from 1).
+    Undefined settings preserve inherited values, except `maxRetryAfter`, where `undefined` restores the request timeout fallback.
+
+    Delays between retries are calculated with `Math.max(1, Math.min((2 ** (attemptCount - 1)) * 1000, backoffLimit) + noise)`, where `attemptCount` starts at 1 and `noise` is the randomized retry noise. Setting both `backoffLimit` and `noise` to `0` requests an immediate retry; returning `0` from `calculateDelay` still aborts the retry.
 
     The `calculateDelay` property is a `function` that receives an object with `attemptCount`, `retryOptions`, `error` and `computedValue` properties for current retry count, the retry options, error and default computed value.
     The function must return a delay in milliseconds (or a Promise resolving with it) (`0` return value cancels retry).
+
+    Delays above `2_147_483_647` milliseconds (Node.js's timer limit), including `Infinity`, abort the retry instead of triggering an immediate retry. This also applies to delays computed from `Retry-After`.
 
     The `enforceRetryRules` property is a `boolean` that, when set to `true` (default), enforces the `limit`, `methods`, `statusCodes`, and `errorCodes` options before calling `calculateDelay`. Your `calculateDelay` function is only invoked when a retry is allowed based on these criteria. When `false`, `calculateDelay` receives the computed value but can override all retry logic.
 
@@ -52681,28 +52969,35 @@ class Options {
         options_assertPlainObject('retry', value);
         options_assertAny('retry.calculateDelay', [distribution.function, distribution.undefined], value.calculateDelay);
         options_assertAny('retry.maxRetryAfter', [distribution.number, distribution.undefined], value.maxRetryAfter);
-        options_assertAny('retry.limit', [distribution.number, distribution.undefined], value.limit);
+        // `undefined` restores the inherited limit, so only a defined value is a count.
+        if (!distribution.undefined(value.limit)) {
+            assertCount('retry.limit', value.limit);
+        }
         options_assertAny('retry.methods', [distribution.array, distribution.undefined], value.methods);
         options_assertAny('retry.statusCodes', [distribution.array, distribution.undefined], value.statusCodes);
         options_assertAny('retry.errorCodes', [distribution.array, distribution.undefined], value.errorCodes);
         options_assertAny('retry.noise', [distribution.number, distribution.undefined], value.noise);
+        options_assertAny('retry.backoffLimit', [distribution.number, distribution.undefined], value.backoffLimit);
         options_assertAny('retry.enforceRetryRules', [distribution.boolean, distribution.undefined], value.enforceRetryRules);
+        // The members are compared against a method name and a numeric status code, so a
+        // wrong type would silently disable the retry instead of being reported here.
+        for (const [key, predicate] of [['methods', distribution.string], ['statusCodes', distribution.number], ['errorCodes', distribution.string]]) {
+            for (const [index, member] of (value[key] ?? []).entries()) {
+                options_assertAny(`retry.${key}[${index}]`, [predicate], member);
+            }
+        }
         if (value.noise && Math.abs(value.noise) > 100) {
             throw new Error(`The maximum acceptable retry noise is +/- 100ms, got ${value.noise}`);
         }
-        for (const key of Object.keys(value)) {
-            if (key === '__proto__') {
-                continue;
-            }
-            if (!(key in this.#internals.retry)) {
-                throw new Error(`Unexpected retry option: ${key}`);
-            }
-        }
+        assertKnownKeys(value, this.#internals.retry, key => new Error(`Unexpected retry option: ${key}`));
+        // Keep the undefined reset for maxRetryAfter, which falls back to the request timeout.
+        const updatedRetry = Object.fromEntries(Object.entries(value).filter(([key, option]) => option !== undefined || key === 'maxRetryAfter'));
         if (this.#merging) {
-            safeObjectAssign(this.#internals.retry, value);
+            safeObjectAssign(this.#internals.retry, updatedRetry);
         }
         else {
-            this.#internals.retry = { ...value };
+            // A partial object must not drop the other retry settings, as the normalization below and the retry logic require them.
+            this.#internals.retry = { ...this.#internals.retry, ...updatedRetry };
         }
         const { retry } = this.#internals;
         retry.methods = [...new Set(retry.methods.map(method => method.toUpperCase()))];
@@ -52723,6 +53018,7 @@ class Options {
     }
     /**
     The HTTP method used to make the request.
+    Custom methods such as `PROPFIND` are supported. Method names are normalized to uppercase.
 
     @default 'GET'
     */
@@ -52730,9 +53026,19 @@ class Options {
         return this.#internals.method;
     }
     set method(value) {
-        assert.string(value);
+        // An empty method would be sent as the default `GET`, hiding the mistake.
+        options_assertAny('method', [distribution.nonEmptyString], value);
         this.#internals.method = value.toUpperCase();
+        // A hook that switches to a method without a body slot has to drop or replace the body.
+        this.#trackedStateMutations?.add('method');
     }
+    /**
+    The function used to retrieve a `net.Socket` instance when the `agent` option is not used.
+
+    For HTTP/1, either return the socket synchronously or call `callback(null, socket)` asynchronously. Call `callback(error)` if socket creation fails.
+
+    When `http2` is enabled for HTTPS, this function must synchronously return a `tls.TLSSocket`. Callback-based creation is not supported by HTTP/2 negotiation.
+    */
     get createConnection() {
         return this.#internals.createConnection;
     }
@@ -52754,20 +53060,8 @@ class Options {
         options_assertAny('cacheOptions.cacheHeuristic', [distribution.number, distribution.undefined], value.cacheHeuristic);
         options_assertAny('cacheOptions.immutableMinTimeToLive', [distribution.number, distribution.undefined], value.immutableMinTimeToLive);
         options_assertAny('cacheOptions.ignoreCargoCult', [distribution.boolean, distribution.undefined], value.ignoreCargoCult);
-        for (const key of Object.keys(value)) {
-            if (key === '__proto__') {
-                continue;
-            }
-            if (!(key in this.#internals.cacheOptions)) {
-                throw new Error(`Cache option \`${key}\` does not exist`);
-            }
-        }
-        if (this.#merging) {
-            safeObjectAssign(this.#internals.cacheOptions, value);
-        }
-        else {
-            this.#internals.cacheOptions = { ...value };
-        }
+        assertKnownKeys(value, defaultInternals.cacheOptions, key => new Error(`Cache option \`${key}\` does not exist`));
+        this.#mergeOrReplace('cacheOptions', value);
     }
     /**
     Options for the advanced HTTPS API.
@@ -52784,7 +53078,7 @@ class Options {
         options_assertAny('https.key', [distribution.string, distribution.object, distribution.array, distribution.undefined], value.key);
         options_assertAny('https.certificate', [distribution.string, distribution.object, distribution.array, distribution.undefined], value.certificate);
         options_assertAny('https.passphrase', [distribution.string, distribution.undefined], value.passphrase);
-        options_assertAny('https.pfx', [distribution.string, distribution.buffer, distribution.array, distribution.undefined], value.pfx);
+        options_assertAny('https.pfx', [distribution.string, distribution.uint8Array, distribution.array, distribution.undefined], value.pfx);
         options_assertAny('https.alpnProtocols', [distribution.array, distribution.undefined], value.alpnProtocols);
         options_assertAny('https.ciphers', [distribution.string, distribution.undefined], value.ciphers);
         options_assertAny('https.dhparam', [distribution.string, distribution.buffer, distribution.undefined], value.dhparam);
@@ -52796,20 +53090,8 @@ class Options {
         options_assertAny('https.ecdhCurve', [distribution.string, distribution.undefined], value.ecdhCurve);
         options_assertAny('https.certificateRevocationLists', [distribution.string, distribution.buffer, distribution.array, distribution.undefined], value.certificateRevocationLists);
         options_assertAny('https.secureOptions', [distribution.number, distribution.undefined], value.secureOptions);
-        for (const key of Object.keys(value)) {
-            if (key === '__proto__') {
-                continue;
-            }
-            if (!(key in this.#internals.https)) {
-                throw new Error(`HTTPS option \`${key}\` does not exist`);
-            }
-        }
-        if (this.#merging) {
-            safeObjectAssign(this.#internals.https, value);
-        }
-        else {
-            this.#internals.https = { ...value };
-        }
+        assertKnownKeys(value, defaultInternals.https, key => new Error(`HTTPS option \`${key}\` does not exist`));
+        this.#mergeOrReplace('https', cloneHttps(value));
     }
     /**
     [Encoding](https://nodejs.org/api/buffer.html#buffer_buffers_and_character_encodings) to be used on `setEncoding` of the response data.
@@ -52819,7 +53101,7 @@ class Options {
 
     __Note__: This doesn't affect streams! Instead, you need to do `got.stream(...).setEncoding(encoding)`.
 
-    @default 'utf-8'
+    @default undefined, which decodes the response as UTF-8
     */
     get encoding() {
         return this.#internals.encoding;
@@ -52901,11 +53183,13 @@ class Options {
     }
     set pagination(value) {
         assert.object(value);
+        const updatedPagination = Object.fromEntries(Object.entries(value).filter(([, option]) => option !== undefined));
         if (this.#merging) {
-            safeObjectAssign(this.#internals.pagination, value);
+            safeObjectAssign(this.#internals.pagination, updatedPagination);
         }
         else {
-            this.#internals.pagination = value;
+            // A partial object must not drop the other pagination settings, as the pagination logic requires them.
+            this.#internals.pagination = { ...this.#internals.pagination, ...updatedPagination };
         }
     }
     get setHost() {
@@ -52936,6 +53220,7 @@ class Options {
 
     __Note__: Responses without a `content-length` header are not validated.
     __Note__: When enabled and validation fails, a `ReadError` with code `ERR_HTTP_CONTENT_LENGTH_MISMATCH` will be thrown.
+    __Note__: Keep custom native responses in byte mode for exact validation. Calling `setEncoding()` on the native response can lose the original byte count when decoding malformed input.
 
     @default true
     */
@@ -52948,7 +53233,8 @@ class Options {
     }
     // eslint-disable-next-line @typescript-eslint/naming-convention
     toJSON() {
-        return { ...this.#internals };
+        // A copy of the nested state, so editing the result cannot change these options.
+        return cloneInternals(this.#internals);
     }
     [Symbol.for('nodejs.util.inspect.custom')](_depth, options) {
         return (0,external_node_util_.inspect)(this.#internals, options);
@@ -52958,6 +53244,7 @@ class Options {
         const url = internals.url;
         const usesAlpn = usesHttp2Alpn(internals, url);
         const socketTimeout = usesAlpn ? internals.timeout.socket : undefined;
+        const http2Timeout = usesAlpn ? getHttp2Timeout(internals) : undefined;
         let agent;
         if (url.protocol === 'https:') {
             if (internals.http2) {
@@ -52977,11 +53264,13 @@ class Options {
         }
         const { https } = internals;
         let { pfx } = https;
-        if (distribution.array(pfx) && distribution.plainObject(pfx[0])) {
-            pfx = pfx.map(object => ({
-                buf: object.buffer,
-                passphrase: object.passphrase,
-            }));
+        if (distribution.array(pfx)) {
+            pfx = pfx.map(entry => distribution.plainObject(entry)
+                ? {
+                    buf: entry.buffer,
+                    passphrase: entry.passphrase,
+                }
+                : entry);
         }
         const unixSocketPath = getUnixSocketPath(url);
         if (usesUnixSocket(url) && !internals.enableUnixSockets) {
@@ -52992,7 +53281,8 @@ class Options {
             unixSocketGroups = /^(?<socketPath>[^:]+):(?<path>.+)$/v.exec(`${url.pathname}${url.search}`)?.groups;
         }
         const unixOptions = unixSocketGroups
-            ? { socketPath: unixSocketGroups.socketPath, path: unixSocketGroups.path, host: '' }
+            // The URL parser percent-encodes the path, but the socket path is a filesystem path.
+            ? { socketPath: safeDecode(unixSocketGroups.socketPath), path: unixSocketGroups.path, host: '' }
             : undefined;
         const nativeRequestOptions = {
             ...internals.cacheOptions,
@@ -53019,18 +53309,20 @@ class Options {
             crl: https.certificateRevocationLists,
             secureOptions: https.secureOptions,
             // HTTP options
-            lookup: internals.dnsLookup ?? internals.dnsCache?.lookup,
+            lookup: internals.dnsLookup ? getAdaptedLookup(internals.dnsLookup) : (internals.dnsCache ? getDnsCacheLookup(internals.dnsCache) : undefined),
             family: internals.dnsLookupIpVersion,
             agent,
             setHost: internals.setHost,
             method: internals.method,
             maxHeaderSize: internals.maxHeaderSize,
             localAddress: internals.localAddress,
-            headers: internals.headers,
+            // A copy, so a caller editing the native options cannot change these options.
+            headers: cloneHeaders(internals.headers),
             createConnection: internals.createConnection,
             signal: internals.http2 ? internals.signal : undefined,
-            timeout: usesAlpn ? getHttp2TimeoutOption(internals) : undefined,
-            ...(socketTimeout === undefined ? {} : { _socketTimeout: socketTimeout }),
+            timeout: http2Timeout?.timeout,
+            ...(http2Timeout !== undefined && { _timeoutPhase: http2Timeout.phase }),
+            ...(socketTimeout !== undefined && { _socketTimeout: socketTimeout }),
             // HTTP/2 options
             h2session: internals.h2session,
         };
@@ -53042,9 +53334,9 @@ class Options {
             return this.#getFallbackRequestFunction();
         }
         const requestWithFallback = (url, options, callback) => {
-            const requestStartedAt = Date.now();
             const nativeAgent = getNativeAgent(url, options.agent);
             const hasInternalSocketTimeout = Object.hasOwn(options, '_socketTimeout');
+            const hasInternalTimeoutPhase = Object.hasOwn(options, '_timeoutPhase');
             const customRequestOptions = options.timeout !== undefined || hasInternalSocketTimeout || nativeAgent !== options.agent
                 ? {
                     ...options,
@@ -53055,19 +53347,18 @@ class Options {
             if (hasInternalSocketTimeout) {
                 Reflect.deleteProperty(customRequestOptions, '_socketTimeout');
             }
+            if (hasInternalTimeoutPhase) {
+                Reflect.deleteProperty(customRequestOptions, '_timeoutPhase');
+            }
             const result = customRequest(url, customRequestOptions, callback);
             if (distribution.promise(result)) {
                 return this.#resolveRequestWithFallback(result, {
                     url,
                     options,
                     callback,
-                    requestStartedAt,
                 });
             }
-            if (result !== undefined) {
-                return result;
-            }
-            return this.#callFallbackRequest(url, options, callback);
+            return result ?? this.#callFallbackRequest(url, options, callback);
         };
         return requestWithFallback;
     }
@@ -53075,32 +53366,70 @@ class Options {
         const options = this.#internals;
         Object.freeze(options);
         Object.freeze(options.hooks);
-        Object.freeze(options.hooks.afterResponse);
-        Object.freeze(options.hooks.beforeCache);
-        Object.freeze(options.hooks.beforeError);
-        Object.freeze(options.hooks.beforeRedirect);
-        Object.freeze(options.hooks.beforeRequest);
-        Object.freeze(options.hooks.beforeRetry);
-        Object.freeze(options.hooks.init);
+        for (const handlers of Object.values(options.hooks)) {
+            Object.freeze(handlers);
+        }
         Object.freeze(options.https);
+        for (const value of Object.values(options.https)) {
+            if (!Array.isArray(value)) {
+                continue;
+            }
+            for (const item of value) {
+                if (distribution.plainObject(item)) {
+                    Object.freeze(item);
+                }
+            }
+            Object.freeze(value);
+        }
         Object.freeze(options.cacheOptions);
         Object.freeze(options.agent);
         Object.freeze(options.headers);
         Object.freeze(options.timeout);
+        Object.freeze(options.pagination);
         Object.freeze(options.retry);
         Object.freeze(options.retry.errorCodes);
         Object.freeze(options.retry.methods);
         Object.freeze(options.retry.statusCodes);
+        for (const value of Object.values(options.headers)) {
+            Object.freeze(value);
+        }
+    }
+    #getCredential(credential) {
+        const url = this.#internals.url;
+        const value = url ? url[credential] : this.#internals[credential];
+        return safeDecode(value);
+    }
+    #setCredential(credential, value) {
+        const url = this.#internals.url;
+        const fixedValue = encodeURIComponent(value);
+        if (url) {
+            url[credential] = fixedValue;
+        }
+        else {
+            this.#internals[credential] = fixedValue;
+        }
+        this.#trackedStateMutations?.add(credential);
+    }
+    // Merging assigns into the existing object, while a direct assignment replaces it with a copy.
+    #mergeOrReplace(key, value) {
+        if (this.#merging) {
+            safeObjectAssign(this.#internals[key], value);
+        }
+        else {
+            this.#internals[key] = { ...value };
+        }
     }
     #createHeadersProxy() {
         return new Proxy(this.#internals.headers, {
             get(target, property, receiver) {
                 if (typeof property === 'string') {
-                    if (Reflect.has(target, property)) {
+                    // Only own properties are headers, so an inherited `Object.prototype` member
+                    // must not read as one.
+                    if (Object.hasOwn(target, property)) {
                         return Reflect.get(target, property, receiver);
                     }
                     const normalizedProperty = property.toLowerCase();
-                    return Reflect.get(target, normalizedProperty, receiver);
+                    return Object.hasOwn(target, normalizedProperty) ? Reflect.get(target, normalizedProperty, receiver) : undefined;
                 }
                 return Reflect.get(target, property, receiver);
             },
@@ -53108,9 +53437,10 @@ class Options {
                 if (typeof property === 'string') {
                     const normalizedProperty = property.toLowerCase();
                     assertValidHeaderName(normalizedProperty);
-                    const isSuccess = Reflect.set(target, normalizedProperty, value);
+                    const isSuccess = Reflect.set(target, normalizedProperty, typeof value === 'number' ? String(value) : value);
                     if (isSuccess) {
-                        markHeaderAsExplicit(this.#explicitHeaders, this.#trackedStateMutations, normalizedProperty);
+                        this.#explicitHeaders.add(normalizedProperty);
+                        this.#trackedStateMutations?.add(normalizedProperty);
                     }
                     return isSuccess;
                 }
@@ -53122,7 +53452,7 @@ class Options {
                     const isSuccess = Reflect.deleteProperty(target, normalizedProperty);
                     if (isSuccess) {
                         this.#explicitHeaders.delete(normalizedProperty);
-                        trackStateMutation(this.#trackedStateMutations, normalizedProperty);
+                        this.#trackedStateMutations?.add(normalizedProperty);
                     }
                     return isSuccess;
                 }
@@ -53139,10 +53469,7 @@ class Options {
             return http2_client.auto;
         }
         if (url.protocol === 'https:') {
-            if (this.#internals.http2) {
-                return http2_client.auto;
-            }
-            return external_node_https_namespaceObject.request;
+            return this.#internals.http2 ? http2_client.auto : external_node_https_namespaceObject.request;
         }
         return external_node_http_.request;
     }
@@ -53155,26 +53482,11 @@ class Options {
         if (fallbackResult === undefined) {
             throw new TypeError('The request function must return a value');
         }
-        if (distribution.promise(fallbackResult)) {
-            return this.#resolveFallbackRequestResult(fallbackResult);
-        }
-        return fallbackResult;
+        return distribution.promise(fallbackResult) ? this.#resolveFallbackRequestResult(fallbackResult) : fallbackResult;
     }
-    async #resolveRequestWithFallback(requestResult, { url, options, callback, requestStartedAt }) {
-        let resolvedRequestResult = requestResult;
-        if (this.#internals.timeout.request !== undefined) {
-            const remainingRequestTimeout = this.#internals.timeout.request - (Date.now() - requestStartedAt);
-            resolvedRequestResult = resolveWithRequestTimeout(requestResult, Math.max(0, remainingRequestTimeout), destroyLateRequestResult);
-        }
-        const result = await resolvedRequestResult;
-        if (result !== undefined) {
-            return result;
-        }
-        if (this.#internals.timeout.request !== undefined && options.timeout !== undefined) {
-            const remainingRequestTimeout = this.#internals.timeout.request - (Date.now() - requestStartedAt);
-            options.timeout = Math.min(options.timeout, Math.max(0, remainingRequestTimeout));
-        }
-        return this.#callFallbackRequest(url, options, callback);
+    async #resolveRequestWithFallback(requestResult, { url, options, callback }) {
+        const result = await requestResult;
+        return result ?? this.#callFallbackRequest(url, options, callback);
     }
     async #resolveFallbackRequestResult(fallbackResult) {
         const resolvedFallbackResult = await fallbackResult;
@@ -53184,6 +53496,12 @@ class Options {
         return resolvedFallbackResult;
     }
 }
+/**
+The option names are the accessor properties. Everything else on the prototype chain is a
+method or an `Object.prototype` member, neither of which is an option.
+*/
+const optionDescriptors = Object.getOwnPropertyDescriptors(Options.prototype);
+const optionNames = new Set(Object.entries(optionDescriptors).filter(([, descriptor]) => descriptor.get !== undefined && descriptor.set !== undefined).map(([name]) => name));
 const snapshotCrossOriginState = (options) => ({
     headers: { ...options.getInternalHeaders() },
     hadCookieJar: options.cookieJar !== undefined,
@@ -53202,7 +53520,13 @@ const cloneCrossOriginBodyValue = (value) => {
         return value;
     }
     try {
-        return structuredClone(value);
+        const clone = structuredClone(value);
+        // `structuredClone` drops prototypes it does not know, so a `Buffer` would never
+        // compare equal to the value it was cloned from.
+        if (Object.getPrototypeOf(clone) !== Object.getPrototypeOf(value)) {
+            Object.setPrototypeOf(clone, Object.getPrototypeOf(value));
+        }
+        return clone;
     }
     catch {
         return undefined;
@@ -53212,84 +53536,12 @@ const isUnchangedCrossOriginBodyValue = (currentValue, previousValue, previousSn
     if (currentValue !== previousValue) {
         return false;
     }
-    if (currentValue === undefined || currentValue === null || typeof currentValue !== 'object') {
-        return true;
-    }
-    if (previousSnapshot === undefined) {
-        return true;
-    }
-    return (0,external_node_util_.isDeepStrictEqual)(currentValue, previousSnapshot);
+    return currentValue === undefined || currentValue === null || typeof currentValue !== 'object' || (previousSnapshot === undefined) ? true : (0,external_node_util_.isDeepStrictEqual)(currentValue, previousSnapshot);
 };
 const isCrossOriginCredentialChanged = (previousUrl, nextUrl, credential) => (nextUrl[credential] !== '' && nextUrl[credential] !== previousUrl[credential]);
 const isBodyUnchanged = (options, previousState) => isUnchangedCrossOriginBodyValue(options.body, previousState.body, previousState.bodySnapshot)
     && isUnchangedCrossOriginBodyValue(options.json, previousState.json, previousState.jsonSnapshot)
     && isUnchangedCrossOriginBodyValue(options.form, previousState.form, previousState.formSnapshot);
-
-;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/response.js
-
-
-
-const decodedBodyCache = new WeakMap();
-// Intentionally uses TextDecoder so the UTF-8 path strips a leading BOM.
-const textDecoder = new TextDecoder();
-const isUtf8Encoding = (encoding) => encoding === undefined || encoding.toLowerCase().replace('-', '') === 'utf8';
-const decodeUint8Array = (data, encoding) => {
-    if (isUtf8Encoding(encoding)) {
-        return textDecoder.decode(data);
-    }
-    return external_node_buffer_.Buffer.from(data).toString(encoding);
-};
-const isResponseOk = (response) => {
-    const { statusCode } = response;
-    const { followRedirect } = response.request.options;
-    const shouldFollow = typeof followRedirect === 'function' ? followRedirect(response) : followRedirect;
-    const limitStatusCode = shouldFollow ? 299 : 399;
-    return (statusCode >= 200 && statusCode <= limitStatusCode) || statusCode === 304;
-};
-/**
-An error to be thrown when server response code is 2xx, and parsing body fails.
-Includes a `response` property.
-*/
-class ParseError extends RequestError {
-    name = 'ParseError';
-    code = 'ERR_BODY_PARSE_FAILURE';
-    constructor(error, response) {
-        const { options } = response.request;
-        super(`${error.message} in "${stripUrlAuth(options.url)}"`, error, response.request);
-    }
-}
-const cacheDecodedBody = (response, decodedBody) => {
-    decodedBodyCache.set(response, decodedBody);
-};
-const parseBody = (response, responseType, parseJson, encoding) => {
-    const { rawBody } = response;
-    const cachedDecodedBody = decodedBodyCache.get(response);
-    try {
-        if (responseType === 'text') {
-            if (cachedDecodedBody !== undefined) {
-                return cachedDecodedBody;
-            }
-            return decodeUint8Array(rawBody, encoding);
-        }
-        if (responseType === 'json') {
-            if (rawBody.length === 0) {
-                return '';
-            }
-            const text = cachedDecodedBody ?? decodeUint8Array(rawBody, encoding);
-            return parseJson(text);
-        }
-        if (responseType === 'buffer') {
-            return rawBody;
-        }
-    }
-    catch (error) {
-        throw new ParseError(error, response);
-    }
-    throw new ParseError({
-        message: `Unknown body type '${responseType}'`,
-        name: 'Error',
-    }, response);
-};
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/is-client-request.js
 function isClientRequest(clientRequest) {
@@ -53366,34 +53618,41 @@ function publishRedirect(message) {
 
 
 
+
+
 const supportsBrotli = distribution.string(external_node_process_namespaceObject.versions.brotli);
 const core_supportsZstd = distribution.string(external_node_process_namespaceObject.versions.zstd);
 const methodsWithoutBody = new Set(['GET', 'HEAD']);
 const singleValueRequestHeaders = new Set([
     'authorization',
     'content-length',
+    'host',
     'proxy-authorization',
 ]);
 const cacheableStore = new WeakableMap();
 const redirectCodes = new Set([301, 302, 303, 307, 308]);
 
 const transientWriteErrorCodes = new Set(['EPIPE', 'ECONNRESET']);
-const omittedPipedHeaders = new Set([
-    'host',
+// See https://www.rfc-editor.org/rfc/rfc9110#section-7.6.1
+const hopByHopHeaders = new Set([
     'connection',
-    'authorization',
-    'cookie',
-    'cookie2',
     'keep-alive',
     'proxy-authenticate',
     'proxy-authorization',
     'proxy-connection',
-    'set-cookie',
-    'set-cookie2',
     'te',
     'trailer',
     'transfer-encoding',
     'upgrade',
+]);
+const omittedPipedHeaders = new Set([
+    ...hopByHopHeaders,
+    'host',
+    'authorization',
+    'cookie',
+    'cookie2',
+    'set-cookie',
+    'set-cookie2',
 ]);
 // Track errors that have been processed by beforeError hooks to preserve custom error types
 const errorsProcessedByHooks = new WeakSet();
@@ -53405,6 +53664,17 @@ const proxiedRequestEvents = [
     'upgrade',
 ];
 const core_noop = () => { };
+const isPipedServerResponse = (destination) => destination instanceof external_node_http_.ServerResponse
+    || destination instanceof external_node_http2_.Http2ServerResponse;
+const destroyRequestResult = (result) => {
+    if (!distribution.object(result) || !('destroy' in result) || !distribution.function(result.destroy)) {
+        return;
+    }
+    if ('once' in result && distribution.function(result.once)) {
+        result.once('error', core_noop);
+    }
+    result.destroy();
+};
 const createPreRequestErrorTimings = () => {
     const now = Date.now();
     return {
@@ -53422,13 +53692,6 @@ const serializeNativeFormDataBody = (form) => {
         contentType: response.headers.get('content-type') ?? 'multipart/form-data',
     };
 };
-// A body is replayable only if iterating it again restarts from the beginning.
-// Node streams, Web `ReadableStream`s, generators, and self-iterating (one-shot) iterators all yield their data only once, so they cannot be replayed on a redirect.
-const isNonReplayableBody = (body) => distribution.nodeStream(body)
-    || body instanceof ReadableStream
-    || distribution.generator(body)
-    || (distribution.asyncIterable(body) && body[Symbol.asyncIterator]() === body)
-    || (distribution.iterable(body) && body[Symbol.iterator]() === body);
 const isTransientWriteError = (error) => {
     const { code } = error;
     return typeof code === 'string' && transientWriteErrorCodes.has(code);
@@ -53455,28 +53718,8 @@ const getConnectionListedHeaders = (headers) => {
     }
     return connectionListedHeaders;
 };
-const normalizeError = (error) => {
-    if (error instanceof globalThis.Error) {
-        return error;
-    }
-    if (distribution.object(error)) {
-        const errorLike = error;
-        const message = typeof errorLike.message === 'string' ? errorLike.message : 'Non-error object thrown';
-        const normalizedError = new globalThis.Error(message, { cause: error });
-        if (typeof errorLike.stack === 'string') {
-            normalizedError.stack = errorLike.stack;
-        }
-        if (typeof errorLike.code === 'string') {
-            normalizedError.code = errorLike.code;
-        }
-        if (typeof errorLike.input === 'string') {
-            normalizedError.input = errorLike.input;
-        }
-        return normalizedError;
-    }
-    return new globalThis.Error(String(error));
-};
 const getSanitizedUrl = (options) => options?.url ? stripUrlAuth(options.url) : '';
+const methodCanHaveBody = (options) => !methodsWithoutBody.has(options.method) || (options.method === 'GET' && options.allowGetBody);
 const makeProgress = (transferred, total) => {
     let percent = 0;
     if (total === transferred) {
@@ -53488,6 +53731,22 @@ const makeProgress = (transferred, total) => {
     }
     return { percent, transferred, total };
 };
+const parseContentLength = (value) => {
+    const length = Number(value);
+    return Number.isNaN(length) ? undefined : length;
+};
+const hasBodyOption = (options) => !distribution.undefined(options?.body) || !distribution.undefined(options?.json) || !distribution.undefined(options?.form);
+const isIterableBody = (body) => distribution.asyncIterable(body) || (distribution.iterable(body) && !distribution.string(body) && !isBuffer(body));
+const hasResponse = (request) => Boolean(request.res);
+const toRequestError = (thrown, request) => {
+    const normalizedError = normalizeError(thrown);
+    return new RequestError(normalizedError.message, normalizedError, request);
+};
+const createServerAbortedError = (request) => new ReadError({
+    name: 'Error',
+    message: 'The server aborted pending request',
+    code: 'ECONNRESET',
+}, request);
 class Request extends external_node_stream_.Duplex {
     // @ts-expect-error - Ignoring for now.
     ['constructor'];
@@ -53507,39 +53766,58 @@ class Request extends external_node_stream_.Duplex {
     _responseSize;
     _bodySize;
     _nativeFormDataBody;
+    _activeWebBodyReader;
     _unproxyEvents;
     _triggerRead = false;
     _jobs = [];
     _cancelTimeouts;
     _abortListenerDisposer;
     _flushed = false;
+    _startedAt;
+    _requestTimeout;
+    _dispatchedBody;
     _aborted = false;
+    _retrying = false;
     _expectedContentLength;
     _compressedBytesCount;
     _skipRequestEndInFinal = false;
+    _dispatchingOwnBody = false;
     _hasWrittenBody = false;
     _hasWritableBody = false;
     _discardBodyWrites = false;
     _incrementalDecode;
-    _requestId = generateRequestId();
+    _requestId;
     // We need this because `this._request` if `undefined` when using cache
     _requestInitialized = false;
-    constructor(url, options, defaults) {
+    constructor(url, options, defaults, retrySource) {
         super({
             // Don't destroy immediately, as the error may be emitted on unsuccessful retry
             autoDestroy: false,
             // It needs to be zero because we're just proxying the data to another stream
             highWaterMark: 0,
         });
+        this._requestId = retrySource?._requestId ?? generateRequestId();
+        // Observe the terminal error without consuming unhandled stream errors.
+        const onError = (error) => {
+            // The Promise API routes writable errors through retry and beforeError hooks first.
+            if (this._noPipe && !this._stopReading) {
+                return;
+            }
+            this.off(external_node_events_.errorMonitor, onError);
+            publishError({
+                requestId: this._requestId,
+                url: getSanitizedUrl(this.options),
+                error,
+                timings: this.timings,
+            });
+        };
+        this.on(external_node_events_.errorMonitor, onError);
         this.on('pipe', (source) => {
             if (this.options.copyPipedHeaders && source?.headers) {
                 const connectionListedHeaders = getConnectionListedHeaders(source.headers);
                 for (const [header, value] of Object.entries(source.headers)) {
                     const normalizedHeader = header.toLowerCase();
-                    if (omittedPipedHeaders.has(normalizedHeader) || connectionListedHeaders.has(normalizedHeader)) {
-                        continue;
-                    }
-                    if (!this.options.shouldCopyPipedHeader(normalizedHeader)) {
+                    if (omittedPipedHeaders.has(normalizedHeader) || connectionListedHeaders.has(normalizedHeader) || !this.options.shouldCopyPipedHeader(normalizedHeader)) {
                         continue;
                     }
                     this.options.setPipedHeader(normalizedHeader, value);
@@ -53553,13 +53831,14 @@ class Request extends external_node_stream_.Duplex {
         });
         try {
             this.options = new Options(url, options, defaults);
+            this._nativeFormDataBody = retrySource?._nativeFormDataBody;
             if (!this.options.url) {
                 if (this.options.prefixUrl === '') {
                     throw new TypeError('Missing `url` property');
                 }
                 this.options.url = '';
             }
-            this.requestUrl = this.options.url;
+            this.requestUrl = new URL(retrySource?.requestUrl ?? this.options.url);
             // Publish request creation event
             publishRequestCreate({
                 requestId: this._requestId,
@@ -53578,7 +53857,7 @@ class Request extends external_node_stream_.Duplex {
                 external_node_process_namespaceObject.nextTick(() => {
                     // _beforeError requires options to access retry logic and hooks
                     if (this.options) {
-                        this._beforeError(normalizeError(error));
+                        this._beforeError(error);
                     }
                     else {
                         // Options is undefined, skip _beforeError and destroy directly
@@ -53626,18 +53905,19 @@ class Request extends external_node_stream_.Duplex {
             this._requestInitialized = true;
         }
         catch (error) {
-            this._beforeError(normalizeError(error));
+            this._beforeError(error);
         }
     }
-    _beforeError(error) {
+    _beforeError(thrown) {
         if (this._stopReading) {
             return;
         }
+        let error = normalizeError(thrown);
         const { response, options } = this;
-        const attemptCount = this.retryCount + (error.name === 'RetryError' ? 0 : 1);
+        const attemptCount = this.retryCount + 1;
         this._stopReading = true;
         if (error instanceof timed_out_TimeoutError) {
-            error = new TimeoutError(error, this.timings ?? createPreRequestErrorTimings(), this);
+            error = this._createTimeoutError(error);
         }
         else if (!(error instanceof RequestError)) {
             error = new RequestError(error.message, error, this);
@@ -53648,16 +53928,20 @@ class Request extends external_node_stream_.Duplex {
             // It emits post-request Parse Errors on the same instance as previous request. WTF.
             // Therefore, we need to check if it has been destroyed as well.
             if (response?.readable && !response.rawBody && !this._request?.socket?.destroyed) {
-                // @types/node has incorrect typings. `setEncoding` accepts `null` as well.
-                response.setEncoding(this.readableEncoding);
                 await this._setRawBody(response);
             }
             if (response?.rawBody && response.body === undefined) {
                 try {
-                    response.body = decodeUint8Array(response.rawBody, options.encoding);
+                    // `error.response` is typed with the request's `responseType`, so honour it here. The
+                    // body is assigned right below, so the cast is only visible while parsing.
+                    response.body = parseBody(response, options.responseType, options.parseJson, options.encoding);
                 }
                 catch {
-                    // Preserve the original request error when decoding its response body also fails.
+                    // Preserve the original request error when parsing its response body also fails.
+                    try {
+                        response.body = decodeUint8Array(response.rawBody, options.encoding);
+                    }
+                    catch { }
                 }
             }
             if (this.listenerCount('retry') !== 0) {
@@ -53665,15 +53949,21 @@ class Request extends external_node_stream_.Duplex {
                 try {
                     let retryAfter;
                     if (response && 'retry-after' in response.headers) {
-                        retryAfter = Number(response.headers['retry-after']);
-                        if (Number.isNaN(retryAfter)) {
-                            retryAfter = Date.parse(response.headers['retry-after']) - Date.now();
+                        const retryAfterHeader = response.headers['retry-after'];
+                        if (/^\d+$/v.test(retryAfterHeader)) {
+                            retryAfter = Number(retryAfterHeader) * 1000;
                         }
-                        else {
-                            retryAfter *= 1000;
+                        else if (Number.isNaN(Number(retryAfterHeader))) {
+                            // The asctime HTTP-date format has no timezone marker, but represents UTC (RFC 9110, section 5.6.7).
+                            const date = /^\w{3} \w{3} [\d ]\d \d{2}:\d{2}:\d{2} \d{4}$/v.test(retryAfterHeader) ? `${retryAfterHeader} GMT` : retryAfterHeader;
+                            retryAfter = Date.parse(date) - Date.now();
                         }
-                        if (retryAfter <= 0) {
-                            retryAfter = 1;
+                        if (retryAfter === undefined || Number.isNaN(retryAfter)) {
+                            // Invalid `Retry-After` values must be ignored. See https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3
+                            retryAfter = undefined;
+                        }
+                        else if (retryAfter < 0) {
+                            retryAfter = 0;
                         }
                     }
                     const retryOptions = options.retry;
@@ -53682,7 +53972,7 @@ class Request extends external_node_stream_.Duplex {
                         retryOptions,
                         error: typedError,
                         retryAfter,
-                        computedValue: retryOptions.maxRetryAfter ?? options.timeout.request ?? Number.POSITIVE_INFINITY,
+                        computedValue: retryOptions.maxRetryAfter ?? options.timeout.request ?? Infinity,
                     });
                     // When enforceRetryRules is true, respect the retry rules (limit, methods, statusCodes, errorCodes)
                     // before calling the user's calculateDelay function. If computedValue is 0 (meaning retry is not allowed
@@ -53702,11 +53992,11 @@ class Request extends external_node_stream_.Duplex {
                     }
                 }
                 catch (error_) {
-                    const normalizedError = normalizeError(error_);
-                    void this._error(new RequestError(normalizedError.message, normalizedError, this));
+                    void this._error(toRequestError(error_, this));
                     return;
                 }
-                if (backoff) {
+                // Node turns overflowing timer delays into 1 ms. Stop retrying instead of running before the requested delay.
+                if (backoff && backoff <= 2_147_483_647) {
                     await new Promise(resolve => {
                         const timeout = setTimeout(resolve, backoff);
                         this._stopRetry = () => {
@@ -53720,15 +54010,18 @@ class Request extends external_node_stream_.Duplex {
                     }
                     // Capture body BEFORE hooks run to detect reassignment
                     const bodyBeforeHooks = this.options.body;
+                    let changedState;
                     try {
-                        for (const hook of this.options.hooks.beforeRetry) {
-                            // eslint-disable-next-line no-await-in-loop
-                            await hook(typedError, this.retryCount + 1);
-                        }
+                        changedState = await this.options.trackStateMutations(async (changedState) => {
+                            for (const hook of this.options.hooks.beforeRetry) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await hook(typedError, this.retryCount + 1);
+                            }
+                            return changedState;
+                        });
                     }
                     catch (error_) {
-                        const normalizedError = normalizeError(error_);
-                        void this._error(new RequestError(normalizedError.message, normalizedError, this));
+                        void this._error(toRequestError(error_, this));
                         return;
                     }
                     // Something forced us to abort the retry
@@ -53748,16 +54041,25 @@ class Request extends external_node_stream_.Duplex {
                     // 2. If body was reassigned, we MUST destroy the OLD stream to prevent memory leaks
                     // 3. We must restore the body reference after destroy() for identity checks in promise wrapper
                     // 4. We cannot use the normal setter after destroy() because it validates stream readability
+                    this._retrying = true;
+                    /*
+                    Everything from here on runs after `destroy()`, so any failure leaves the
+                    request without a next attempt. The piped destination is therefore this
+                    request's to close, and the error still has to reach the caller.
+                    */
                     try {
                         if (bodyWasReassigned) {
+                            if (!changedState.has('content-length')) {
+                                this._refreshBodySize(this.options);
+                            }
                             const oldBody = bodyBeforeHooks;
                             // Temporarily clear body to prevent destroy() from destroying the new stream
                             this.options.body = undefined;
                             this.destroy();
-                            // Clean up the old stream resource if it's a stream and different from new body
-                            // (edge case: if old and new are same stream object, don't destroy it)
-                            if (distribution.nodeStream(oldBody) && oldBody !== bodyAfterHooks) {
-                                oldBody.destroy();
+                            // `_destroy` already tore down the dispatched body, so only clean up a
+                            // different one here.
+                            if (oldBody !== bodyAfterHooks && oldBody !== this._dispatchedBody?.body) {
+                                this._destroyBody(oldBody);
                             }
                             // Restore new body for promise wrapper's identity check
                             if (distribution.nodeStream(bodyAfterHooks) && (bodyAfterHooks.readableEnded || bodyAfterHooks.destroyed)) {
@@ -53772,27 +54074,31 @@ class Request extends external_node_stream_.Duplex {
                             // and should not be accessed. The promise wrapper will see that body identity hasn't changed
                             // and will detect it's a consumed stream, which is the correct behavior.
                         }
+                        // Native FormData can be re-serialized, so replay it instead of failing with a consumed body.
+                        if (this._nativeFormDataBody !== undefined && this.options.body === this._nativeFormDataBody.body) {
+                            this._reserializeFormDataBody(this.options, changedState.has('content-type'));
+                        }
+                        // Publish retry event
+                        publishRetry({
+                            requestId: this._requestId,
+                            retryCount: this.retryCount + 1,
+                            error: typedError,
+                            delay: backoff,
+                        });
+                        this.emit('retry', this.retryCount + 1, error, (updatedOptions) => {
+                            const request = new Request(undefined, updatedOptions, options, this);
+                            request.retryCount = this.retryCount + 1;
+                            external_node_process_namespaceObject.nextTick(() => {
+                                void request.flush();
+                            });
+                            return request;
+                        });
                     }
                     catch (error_) {
-                        const normalizedError = normalizeError(error_);
-                        void this._error(new RequestError(normalizedError.message, normalizedError, this));
+                        this._closePipedServerResponses();
+                        void this._error(toRequestError(error_, this));
                         return;
                     }
-                    // Publish retry event
-                    publishRetry({
-                        requestId: this._requestId,
-                        retryCount: this.retryCount + 1,
-                        error: typedError,
-                        delay: backoff,
-                    });
-                    this.emit('retry', this.retryCount + 1, error, (updatedOptions) => {
-                        const request = new Request(undefined, updatedOptions, options);
-                        request.retryCount = this.retryCount + 1;
-                        external_node_process_namespaceObject.nextTick(() => {
-                            void request.flush();
-                        });
-                        return request;
-                    });
                     return;
                 }
             }
@@ -53810,7 +54116,10 @@ class Request extends external_node_stream_.Duplex {
             }
             let data;
             while ((data = response.read()) !== null) {
-                this._downloadedSize += data.length; // eslint-disable-line @typescript-eslint/restrict-plus-operands
+                if (this._noPipe && typeof data === 'string') {
+                    data = external_node_buffer_.Buffer.from(data, response.readableEncoding ?? undefined);
+                }
+                this._downloadedSize += typeof data === 'string' ? external_node_buffer_.Buffer.byteLength(data, response.readableEncoding ?? undefined) : byteLength(data);
                 if (this._incrementalDecode) {
                     try {
                         const decodedChunk = typeof data === 'string' ? data : this._incrementalDecode.decoder.decode(data, { stream: true });
@@ -53826,17 +54135,34 @@ class Request extends external_node_stream_.Duplex {
                 if (progress.percent < 1) {
                     this.emit('downloadProgress', progress);
                 }
-                if (this._stopReading) {
-                    return;
-                }
-                this.push(data);
-                if (this._stopReading) {
+                if (this._stopReading || !this.push(data) || this._stopReading) {
                     return;
                 }
             }
         }
     }
+    // Fail at the call site: a write buffered by `cork()` would otherwise flush through `_write`
+    // after the body dispatch began and pass its guard.
+    write(chunk, encoding, callback) {
+        if (this.isReadonly && !this._dispatchingOwnBody) {
+            const error = new TypeError('The stream is read-only: the request body is provided by the `body`, `json` or `form` option.');
+            this.destroy(error);
+            // Like a write to a destroyed stream, the refused write still reports to its callback.
+            const writeCallback = typeof encoding === 'function' ? encoding : callback;
+            if (writeCallback) {
+                external_node_process_namespaceObject.nextTick(writeCallback, error);
+            }
+            return false;
+        }
+        return super.write(chunk, encoding, callback);
+    }
     _write(chunk, encoding, callback) {
+        // The `body`, `json` or `form` option owns the request body, so a user write would land
+        // past the framed `content-length` and corrupt the request.
+        if (this.isReadonly && !this._dispatchingOwnBody) {
+            callback(new TypeError('The stream is read-only: the request body is provided by the `body`, `json` or `form` option.'));
+            return;
+        }
         const write = () => {
             if (this._discardBodyWrites) {
                 callback();
@@ -53898,20 +54224,32 @@ class Request extends external_node_stream_.Duplex {
     _destroy(error, callback) {
         this._stopReading = true;
         this.flush = async () => { };
+        // Got owns a piped `ServerResponse`: it copied the status code and headers into it, so a
+        // request that fails would leave the client waiting forever. A retry only replaces the
+        // request, so the destination belongs to whichever attempt comes next. Node emits `close`
+        // after `error`, so an `error` listener can still answer the client itself, such as with a
+        // 502, and only a destination nobody ended is closed.
+        if (!this._retrying) {
+            this.once('close', () => {
+                this._closePipedServerResponses();
+            });
+        }
         // Prevent further retries
         this._stopRetry?.();
         this._cancelTimeouts?.();
+        clearTimeout(this._requestTimeout);
         this._abortListenerDisposer?.[Symbol.dispose]();
         this._destroyInFlightAlpnSocket();
         if (this.options) {
-            const { body } = this.options;
-            if (distribution.nodeStream(body)) {
-                body.destroy();
+            // Tear down the body this request dispatched. A hook can install the body for the next
+            // attempt before this request is destroyed, and that body must survive the retry.
+            this._destroyBody(this._dispatchedBody?.body);
+            if (this._dispatchedBody === undefined) {
+                // Nothing was ever dispatched, so whatever the options hold was never sent.
+                this._destroyBody(this.options.body);
             }
         }
-        if (this._request) {
-            this._request.destroy();
-        }
+        this._request?.destroy();
         // Workaround: http-timer only sets timings.end when the response emits 'end'.
         // When a stream is destroyed before completion, the 'end' event may not fire,
         // leaving timings.end undefined. This should ideally be fixed in http-timer
@@ -53938,20 +54276,44 @@ class Request extends external_node_stream_.Duplex {
         callback(error);
     }
     pipe(destination, options) {
-        if (destination instanceof external_node_http_.ServerResponse) {
+        if (isPipedServerResponse(destination)) {
             this._pipedServerResponses.add(destination);
         }
         return super.pipe(destination, options);
     }
     unpipe(destination) {
-        if (destination instanceof external_node_http_.ServerResponse) {
+        if (destination === undefined) {
+            this._pipedServerResponses.clear();
+        }
+        else if (isPipedServerResponse(destination)) {
             this._pipedServerResponses.delete(destination);
         }
         super.unpipe(destination);
         return this;
     }
+    // Got copied the status code and headers into every `ServerResponse` it is piped into, so it
+    // owns the response and has to end it. A request that ends without one leaves the client
+    // waiting forever.
+    _closePipedServerResponses() {
+        for (const destination of this._pipedServerResponses) {
+            if (destination.writableEnded) {
+                continue;
+            }
+            // An HTTP/2 stream destroyed without an error is reset with `NO_ERROR`, which the client
+            // reads as a complete response, so the failure has to be in the reset code.
+            if (destination instanceof external_node_http2_.Http2ServerResponse) {
+                destination.stream.close(external_node_http2_.constants.NGHTTP2_INTERNAL_ERROR);
+            }
+            else {
+                destination.destroy();
+            }
+        }
+        this._pipedServerResponses.clear();
+    }
     _attachAbortListener() {
-        if (this._abortListenerDisposer) {
+        this._abortListenerDisposer?.[Symbol.dispose]();
+        this._abortListenerDisposer = undefined;
+        if (this.destroyed) {
             return;
         }
         const { signal } = this.options;
@@ -53959,10 +54321,11 @@ class Request extends external_node_stream_.Duplex {
             return;
         }
         const abort = () => {
+            this._aborted = true;
             this._destroyInFlightAlpnSocket();
             // See https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static#return_value
             if (signal.reason?.name === 'TimeoutError') {
-                this.destroy(new TimeoutError(signal.reason, this.timings ?? createPreRequestErrorTimings(), this));
+                this.destroy(this._createTimeoutError(signal.reason));
             }
             else {
                 this.destroy(new AbortError(this));
@@ -53974,6 +54337,9 @@ class Request extends external_node_stream_.Duplex {
         else {
             this._abortListenerDisposer = (0,external_node_events_.addAbortListener)(signal, abort);
         }
+    }
+    _createTimeoutError(error) {
+        return new TimeoutError(error, this.timings ?? createPreRequestErrorTimings(), this);
     }
     _destroyInFlightAlpnSocket() {
         this._requestOptions?._alpnSocket?.destroy();
@@ -54000,6 +54366,27 @@ class Request extends external_node_stream_.Duplex {
         }
         return false;
     }
+    // A `beforeRequest` or `beforeRedirect` hook can assign a `FormData` body, and only this
+    // place turns one into a stream, so it runs again once the hooks have had their say.
+    _serializeFormDataBody(options, contentTypeChanged) {
+        if (!(options.body instanceof FormData)) {
+            return;
+        }
+        const headers = options.getInternalHeaders();
+        const { body, contentType } = serializeNativeFormDataBody(options.body);
+        // Every serialization picks a new boundary, so a header Got generated for an earlier one
+        // no longer names it. Only a header the caller set itself survives.
+        const contentTypeWasGenerated = !contentTypeChanged && (distribution.undefined(headers['content-type']) || this._nativeFormDataBody?.contentTypeWasGenerated === true);
+        this._nativeFormDataBody = {
+            form: options.body,
+            body,
+            contentTypeWasGenerated,
+        };
+        if (contentTypeWasGenerated) {
+            headers['content-type'] = contentType;
+        }
+        options.body = body;
+    }
     async _finalizeBody() {
         const { options } = this;
         const headers = options.getInternalHeaders();
@@ -54007,30 +54394,18 @@ class Request extends external_node_stream_.Duplex {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const isJSON = !distribution.undefined(options.json);
         const isBody = !distribution.undefined(options.body);
-        const cannotHaveBody = !this._methodCanHaveBody;
+        const cannotHaveBody = !methodCanHaveBody(options);
         if (isForm || isJSON || isBody) {
             if (cannotHaveBody) {
                 throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
             }
             // Serialize body
-            const noContentType = !distribution.string(headers['content-type']);
+            const noContentType = distribution.undefined(headers['content-type']);
             if (isBody) {
-                // Native FormData
-                if (options.body instanceof FormData) {
-                    const { body, contentType } = serializeNativeFormDataBody(options.body);
-                    this._nativeFormDataBody = {
-                        form: options.body,
-                        body,
-                        contentTypeWasGenerated: noContentType,
-                    };
-                    if (noContentType) {
-                        headers['content-type'] = contentType;
-                    }
-                    options.body = body;
-                }
-                else if (Object.prototype.toString.call(options.body) === '[object FormData]') {
+                if (Object.prototype.toString.call(options.body) === '[object FormData]' && !(options.body instanceof FormData)) {
                     throw new TypeError('Non-native FormData is not supported. Use globalThis.FormData instead.');
                 }
+                this._serializeFormDataBody(options, false);
             }
             else if (isForm) {
                 if (noContentType) {
@@ -54065,7 +54440,7 @@ class Request extends external_node_stream_.Duplex {
         if (options.responseType === 'json' && !('accept' in headers)) {
             headers.accept = 'application/json';
         }
-        this._bodySize = Number(headers['content-length']) || undefined;
+        this._bodySize = parseContentLength(headers['content-length']);
     }
     async _onResponseBase(response) {
         // This will be called e.g. when using cache so we need to check if this request has been aborted.
@@ -54114,9 +54489,11 @@ class Request extends external_node_stream_.Duplex {
         let typedResponse = prepareResponse(response);
         // Redirect responses that will be followed are drained raw. Decompressing them can
         // turn an irrelevant redirect body into a client-side failure or decompression DoS.
-        const shouldFollowRedirect = isRedirect && (typeof options.followRedirect === 'function' ? options.followRedirect(typedResponse) : options.followRedirect);
+        // prepareResponse already evaluated the redirect predicate.
+        const shouldFollowRedirect = isRedirect && !typedResponse.ok;
         if (options.decompress && !hasNoBody && !shouldFollowRedirect) {
-            response = decompressResponse(response);
+            response = decompressResponseBody(response);
+            copyRedirectDecision(typedResponse, response);
             typedResponse = prepareResponse(response);
             // When strictContentLength is enabled, track the compressed bytes emitted by the native response.
             if (options.strictContentLength && response !== nativeResponse) {
@@ -54129,16 +54506,15 @@ class Request extends external_node_stream_.Duplex {
         // `decompressResponse` wraps the response stream when it decompresses,
         // so `response !== nativeResponse` indicates decompression happened.
         const wasDecompressed = response !== nativeResponse;
-        this._responseSize = Number(response.headers['content-length']) || undefined;
+        this._responseSize = parseContentLength(response.headers['content-length']);
         this.response = typedResponse;
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        this._incrementalDecode = this._shouldIncrementallyDecodeBody() ? { decoder: new globalThis.TextDecoder('utf8', { ignoreBOM: true }), chunks: [] } : undefined;
-        // Publish response start event
+        this._incrementalDecode = this._shouldIncrementallyDecodeBody() ? { decoder: new TextDecoder(), chunks: [] } : undefined;
+        // Publish response start event. A subscriber gets a copy, so it cannot change the response.
         publishResponseStart({
             requestId: this._requestId,
             url: typedResponse.url,
             statusCode,
-            headers: response.headers,
+            headers: { ...response.headers },
             isFromCache: typedResponse.isFromCache,
         });
         response.once('error', (error) => {
@@ -54165,11 +54541,7 @@ class Request extends external_node_stream_.Duplex {
             this._aborted = true;
             // Check if there's a content-length mismatch to provide a more specific error
             if (!this._checkContentLengthMismatch()) {
-                this._beforeError(new ReadError({
-                    name: 'Error',
-                    message: 'The server aborted pending request',
-                    code: 'ECONNRESET',
-                }, this));
+                this._beforeError(createServerAbortedError(this));
             }
         });
         let canFinalizeResponse = false;
@@ -54185,6 +54557,8 @@ class Request extends external_node_stream_.Duplex {
             // Validate content-length if it was provided
             // Per RFC 9112: "If the sender closes the connection before the indicated number
             // of octets are received, the recipient MUST consider the message to be incomplete"
+            // The guards stay apart: merging them would skip this check whenever reading stopped.
+            // eslint-disable-next-line unicorn/prefer-combined-guards
             if (this._checkContentLengthMismatch()) {
                 return;
             }
@@ -54201,6 +54575,20 @@ class Request extends external_node_stream_.Duplex {
             this.push(null);
         };
         if (!shouldFollowRedirect) {
+            // The request budget ends with the final response body.
+            response.once('end', () => {
+                clearTimeout(this._requestTimeout);
+                /*
+                A stream request is never destroyed once it ends, so its abort listener would
+                outlive it and a shared signal firing later would destroy a finished request. The
+                promise API disposes it when the request itself is destroyed, which must not
+                happen before the `afterResponse` hooks have run.
+                */
+                if (!this._noPipe && this.writableFinished) {
+                    this._abortListenerDisposer?.[Symbol.dispose]();
+                    this._abortListenerDisposer = undefined;
+                }
+            });
             // `set-cookie` handling below awaits the cookie jar. A fast response can fully
             // end during that await, so we need to observe `end` early without completing
             // the outward stream until cookie handling has finished.
@@ -54214,23 +54602,25 @@ class Request extends external_node_stream_.Duplex {
             ? this._setRawBody(response)
             : undefined;
         if (distribution.object(options.cookieJar) && rawCookies) {
-            let promises = rawCookies.map(async (rawCookie) => options.cookieJar.setCookie(rawCookie, url.toString()));
-            if (options.ignoreInvalidCookies) {
-                promises = promises.map(async (promise) => {
-                    try {
-                        await promise;
-                    }
-                    catch { }
-                });
-            }
             try {
-                await Promise.all(promises);
+                // Apply fields in wire order so asynchronous stores cannot restore a replaced cookie.
+                for (const rawCookie of rawCookies) {
+                    try {
+                        // eslint-disable-next-line no-await-in-loop
+                        await options.cookieJar.setCookie(rawCookie, url.toString());
+                    }
+                    catch (error) {
+                        if (!options.ignoreInvalidCookies) {
+                            throw error;
+                        }
+                    }
+                }
             }
             catch (error) {
                 if (responseRawBodyPromise) {
                     await responseRawBodyPromise;
                 }
-                this._beforeError(normalizeError(error));
+                this._beforeError(error);
                 return;
             }
         }
@@ -54258,14 +54648,16 @@ class Request extends external_node_stream_.Duplex {
                 // We need this in order to support UTF-8
                 const redirectBuffer = external_node_buffer_.Buffer.from(redirectLocation, 'binary').toString();
                 const redirectUrl = new URL(redirectBuffer, url);
+                // A redirect without a fragment inherits the fragment of the original URL. See https://www.rfc-editor.org/rfc/rfc9110#section-10.2.2
+                if (!redirectBuffer.includes('#')) {
+                    const previousUrl = url;
+                    redirectUrl.hash = previousUrl.hash === '' && previousUrl.href.endsWith('#') ? '#' : previousUrl.hash;
+                }
                 const currentUnixSocketPath = getUnixSocketPath(url);
                 const redirectUnixSocketPath = getUnixSocketPath(redirectUrl);
-                if (redirectUrl.protocol === 'unix:' && redirectUnixSocketPath === undefined) {
-                    this._beforeError(new RequestError('Cannot redirect to UNIX socket', {}, this));
-                    return;
-                }
-                // Relative redirects on the same socket are fine, but a redirect must not switch to a different local socket.
-                if (redirectUnixSocketPath !== undefined && currentUnixSocketPath !== redirectUnixSocketPath) {
+                if ((redirectUrl.protocol === 'unix:' && redirectUnixSocketPath === undefined)
+                    // Relative redirects on the same socket are fine, but a redirect must not switch to a different local socket.
+                    || (redirectUnixSocketPath !== undefined && currentUnixSocketPath !== redirectUnixSocketPath)) {
                     this._beforeError(new RequestError('Cannot redirect to UNIX socket', {}, this));
                     return;
                 }
@@ -54279,7 +54671,7 @@ class Request extends external_node_stream_.Duplex {
                     && (statusCode === 301 || statusCode === 302)
                     && updatedOptions.method === 'POST';
                 const canRewrite = statusCode !== 307 && statusCode !== 308;
-                const userRequestedGet = updatedOptions.methodRewriting && canRewrite;
+                const userRequestedGet = updatedOptions.methodRewriting && canRewrite && updatedOptions.method !== 'HEAD';
                 const shouldDropBody = serverRequestedGet || crossOriginRequestedGet || userRequestedGet;
                 if (shouldDropBody) {
                     updatedOptions.method = 'GET';
@@ -54321,48 +54713,28 @@ class Request extends external_node_stream_.Duplex {
                         ...snapshotCrossOriginState(updatedOptions),
                         url: new URL(updatedOptions.url),
                     };
+                this._checkRequestTimeout();
+                if (this._stopReading) {
+                    return;
+                }
                 const changedState = await updatedOptions.trackStateMutations(async (changedState) => {
                     for (const hook of updatedOptions.hooks.beforeRedirect) {
                         // eslint-disable-next-line no-await-in-loop
                         await hook(updatedOptions, typedResponse);
+                        this._checkRequestTimeout(updatedOptions);
+                        if (this._stopReading) {
+                            break;
+                        }
                     }
                     return changedState;
                 });
+                if (this._stopReading) {
+                    return;
+                }
                 if (hasUrlOrPrefixUrlBoundaryChanged(updatedOptions, updatedOptions.url, boundaryBeforeRedirectHooks)) {
                     assertUrlHasSameOriginAsPrefixUrlIfNeeded(updatedOptions, updatedOptions.url);
                 }
                 updatedOptions.clearUnchangedCookieHeader(preHookState, changedState);
-                const nativeFormDataBody = this._nativeFormDataBody;
-                const mustReplayBodyOnRedirect = statusCode === 307 || statusCode === 308 || updatedOptions.method === 'QUERY';
-                if (mustReplayBodyOnRedirect) {
-                    const bodyUnchangedByHooks = updatedOptions.body === bodyBeforeRedirectHooks;
-                    const wasNonReplayable = isNonReplayableBody(bodyBeforeRedirectHooks);
-                    if (!bodyUnchangedByHooks && wasNonReplayable) {
-                        // A hook supplied a fresh body, so dispose of the original non-replayable one.
-                        this._destroyBody(bodyBeforeRedirectHooks);
-                    }
-                    else if (bodyUnchangedByHooks
-                        && nativeFormDataBody !== undefined
-                        && updatedOptions.body === nativeFormDataBody.body) {
-                        // Native FormData generates a fresh stream and boundary, so re-serialize it to replay the upload.
-                        const { body, contentType } = serializeNativeFormDataBody(nativeFormDataBody.form);
-                        nativeFormDataBody.body = body;
-                        updatedOptions.body = body;
-                        if (changedState.has('content-type')) {
-                            nativeFormDataBody.contentTypeWasGenerated = false;
-                        }
-                        else if (nativeFormDataBody.contentTypeWasGenerated) {
-                            updatedOptions.setInternalHeader('content-type', contentType);
-                        }
-                    }
-                    else if (bodyUnchangedByHooks
-                        && (wasNonReplayable || (distribution.undefined(updatedOptions.body) && (this._hasWrittenBody || this._hasWritableBody)))) {
-                        // Body-preserving redirects must replay the body, so follow the HTTP spec and other clients by failing for unchanged non-replayable bodies. Hooks may supply a fresh body.
-                        this._dropBody(updatedOptions);
-                        this._beforeError(new RequestError('Cannot follow redirect with a non-replayable body', {}, this));
-                        return;
-                    }
-                }
                 // If a beforeRedirect hook changed the URL to a different origin,
                 // strip sensitive headers that were preserved for the original origin.
                 // When isDifferentOrigin was already true, headers were already stripped above.
@@ -54395,6 +54767,43 @@ class Request extends external_node_stream_.Duplex {
                         });
                     }
                 }
+                const nativeFormDataBody = this._nativeFormDataBody;
+                const bodyUnchangedByHooks = updatedOptions.body === bodyBeforeRedirectHooks;
+                const wasNonReplayable = isNonReplayableBody(bodyBeforeRedirectHooks);
+                const bodyWasRemovedByHooks = changedState.has('body')
+                    && !hasBodyOption(updatedOptions)
+                    && this.options.body === bodyBeforeRedirectHooks
+                    && (!bodyUnchangedByHooks || this._hasWrittenBody || this._hasWritableBody);
+                if (bodyWasRemovedByHooks) {
+                    this._dropBody(updatedOptions);
+                }
+                else if (!bodyUnchangedByHooks
+                    && wasNonReplayable
+                    && this.options.body === bodyBeforeRedirectHooks) {
+                    // A hook replaced or removed the body, so dispose of the original non-replayable one.
+                    this._destroyBody(bodyBeforeRedirectHooks);
+                }
+                // Any redirect that keeps the body must replay it, including same-origin 301/302 redirects that keep the method.
+                if (this._hasBodyForRedirect(updatedOptions)) {
+                    if (bodyUnchangedByHooks
+                        && nativeFormDataBody !== undefined
+                        && updatedOptions.body === nativeFormDataBody.body) {
+                        this._reserializeFormDataBody(updatedOptions, changedState.has('content-type'));
+                    }
+                    else if (bodyUnchangedByHooks
+                        && (wasNonReplayable || (distribution.undefined(updatedOptions.body) && (this._hasWrittenBody || this._hasWritableBody)))) {
+                        // Body-preserving redirects must replay the body, so follow the HTTP spec and other clients by failing for unchanged non-replayable bodies. Hooks may supply a fresh body.
+                        this._dropBody(updatedOptions);
+                        this._beforeError(new RequestError('Cannot follow redirect with a non-replayable body', {}, this));
+                        return;
+                    }
+                }
+                // Hook-replaced bodies must update the inherited Content-Length unless the hook set one explicitly.
+                if (!bodyUnchangedByHooks && !changedState.has('content-length') && !distribution.undefined(updatedOptions.body)) {
+                    this._serializeFormDataBody(updatedOptions, changedState.has('content-type'));
+                    this._refreshBodySize(updatedOptions);
+                }
+                this._assertMethodCanHaveBody(updatedOptions, changedState);
                 // Publish redirect event
                 publishRedirect({
                     requestId: this._requestId,
@@ -54407,7 +54816,7 @@ class Request extends external_node_stream_.Duplex {
                 await this._makeRequest();
             }
             catch (error) {
-                this._beforeError(normalizeError(error));
+                this._beforeError(error);
                 return;
             }
             return;
@@ -54425,12 +54834,9 @@ class Request extends external_node_stream_.Duplex {
         // Skip storing for responses that shouldn't have bodies per RFC 9110.
         // When decompression occurs, only store if strictContentLength is enabled.
         if (!hasNoBody && (!wasDecompressed || options.strictContentLength)) {
-            const contentLengthHeader = nativeResponse.headers['content-length'];
-            if (contentLengthHeader !== undefined) {
-                const expectedLength = Number(contentLengthHeader);
-                if (!Number.isNaN(expectedLength) && expectedLength >= 0) {
-                    this._expectedContentLength = expectedLength;
-                }
+            const expectedLength = parseContentLength(nativeResponse.headers['content-length']);
+            if (expectedLength !== undefined && expectedLength >= 0) {
+                this._expectedContentLength = expectedLength;
             }
         }
         this.emit('downloadProgress', this.downloadProgress);
@@ -54464,22 +54870,29 @@ class Request extends external_node_stream_.Duplex {
             return;
         }
         this.emit('response', response);
+        const connectionListedHeaders = getConnectionListedHeaders(response.headers);
         for (const destination of this._pipedServerResponses) {
             if (destination.headersSent) {
                 continue;
             }
             for (const key in response.headers) {
-                if (Object.hasOwn(response.headers, key)) {
-                    const value = response.headers[key];
-                    // When decompression occurred, skip content-encoding and content-length
-                    // as they refer to the compressed data, not the decompressed stream.
-                    if (wasDecompressed && (key === 'content-encoding' || key === 'content-length')) {
-                        continue;
-                    }
-                    // Skip if value is undefined
-                    if (value !== undefined) {
-                        destination.setHeader(key, value);
-                    }
+                if (!Object.hasOwn(response.headers, key)) {
+                    continue;
+                }
+                // When decompression occurred, skip content-encoding and content-length
+                // as they refer to the compressed data, not the decompressed stream.
+                // Hop-by-hop headers apply to the upstream connection only, so an intermediary must
+                // not forward them either.
+                // The guards stay apart: the one above filters to own properties, this one decides
+                // which of them may be forwarded.
+                // eslint-disable-next-line unicorn/prefer-combined-guards
+                if ((wasDecompressed && (key === 'content-encoding' || key === 'content-length')) || hopByHopHeaders.has(key) || connectionListedHeaders.has(key)) {
+                    continue;
+                }
+                const value = response.headers[key];
+                // Skip if value is undefined
+                if (value !== undefined) {
+                    destination.setHeader(key, value);
                 }
             }
             destination.statusCode = statusCode;
@@ -54496,8 +54909,8 @@ class Request extends external_node_stream_.Duplex {
             const fromArray = await from.toArray();
             const hasNonStringChunk = fromArray.some(chunk => typeof chunk !== 'string');
             const rawBody = hasNonStringChunk
-                ? concatUint8Arrays(fromArray.map(chunk => typeof chunk === 'string' ? stringToUint8Array(chunk) : chunk))
-                : stringToUint8Array(fromArray.join(''));
+                ? concatUint8Arrays(fromArray.map(chunk => typeof chunk === 'string' ? external_node_buffer_.Buffer.from(chunk, from.readableEncoding ?? undefined) : chunk))
+                : new Uint8Array(external_node_buffer_.Buffer.from(fromArray.join(''), from.readableEncoding ?? undefined));
             const shouldUseIncrementalDecodedBody = from === this && this._incrementalDecode !== undefined;
             // On retry Request is destroyed with no error, therefore the above will successfully resolve.
             // So in order to check if this was really successful, we need to check if it has been properly ended.
@@ -54532,29 +54945,25 @@ class Request extends external_node_stream_.Duplex {
         }
         catch (error) {
             /* istanbul ignore next: better safe than sorry */
-            this._beforeError(normalizeError(error));
+            this._beforeError(error);
         }
     }
-    _onRequest(request) {
+    _onRequest(request, useCache) {
         const { options } = this;
         const { timeout, url } = options;
-        // Publish request start event
+        // Publish request start event. A subscriber gets a copy, so it cannot change the request.
         publishRequestStart({
             requestId: this._requestId,
             url: getSanitizedUrl(this.options),
             method: options.method,
-            headers: options.headers,
+            headers: { ...options.headers },
         });
         utils_timer(request);
-        const { isGotHttp2Request } = request;
-        let timeoutDelays = timeout;
-        if (isGotHttp2Request) {
-            const { socket: _socket, ...http2TimeoutDelays } = timeout;
-            timeoutDelays = http2TimeoutDelays;
-        }
-        this._cancelTimeouts = timedOut(request, timeoutDelays, url);
+        // `timeout.socket` is the inactivity timeout. The HTTP/2 request maps it onto the
+        // stream, so a stalled response body still times out.
+        this._cancelTimeouts = timedOut(request, timeout, url);
         let lastRequestError;
-        const responseEventName = options.cache ? 'cacheableResponse' : 'response';
+        const responseEventName = useCache ? 'cacheableResponse' : 'response';
         request.once(responseEventName, (response) => {
             void this._onResponse(response);
         });
@@ -54562,7 +54971,7 @@ class Request extends external_node_stream_.Duplex {
             this._aborted = true;
             // Force clean-up, because some packages (e.g. nock) don't do this.
             request.destroy();
-            const wrappedError = error instanceof timed_out_TimeoutError ? new TimeoutError(error, this.timings ?? createPreRequestErrorTimings(), this) : new RequestError(error.message, error, this);
+            const wrappedError = error instanceof timed_out_TimeoutError ? this._createTimeoutError(error) : new RequestError(error.message, error, this);
             this._beforeError(wrappedError);
         };
         request.once('error', (error) => {
@@ -54578,7 +54987,13 @@ class Request extends external_node_stream_.Duplex {
             */
             if (isTransientWriteError(error)) {
                 queueMicrotask(() => {
-                    if (this._isRequestStale(request)) {
+                    /*
+                    `request.writableEnded` and `request.destroyed` are not checked here: a
+                    request whose body finished writing still fails when the connection resets
+                    before the response, so a response-less reset is the real failure and not a
+                    superseded request. A response that already arrived makes it stale.
+                    */
+                    if (this._request !== request || hasResponse(request)) {
                         return;
                     }
                     emitRequestError(error);
@@ -54587,26 +55002,64 @@ class Request extends external_node_stream_.Duplex {
             }
             emitRequestError(error);
         });
-        if (!options.cache) {
+        if (!useCache) {
             request.once('close', () => {
-                if (this._request !== request || Boolean(request.res) || this._stopReading) {
+                if (this._request !== request || hasResponse(request) || this._stopReading) {
                     return;
                 }
-                this._beforeError(lastRequestError ?? new ReadError({
-                    name: 'Error',
-                    message: 'The server aborted pending request',
-                    code: 'ECONNRESET',
-                }, this));
+                this._beforeError(lastRequestError ?? createServerAbortedError(this));
             });
         }
         this._unproxyEvents = proxyEvents(request, this, proxiedRequestEvents);
         this._request = request;
+        this._bodySize = parseContentLength(options.headers['content-length']);
         this.emit('uploadProgress', this.uploadProgress);
         this._sendBody();
         this.emit('request', request);
     }
     _isRequestStale(request) {
-        return this._request !== request || Boolean(request.res) || request.destroyed || request.writableEnded;
+        return this._request !== request || hasResponse(request) || request.destroyed || request.writableEnded;
+    }
+    _cancelActiveWebBodyReader(body) {
+        const activeReader = this._activeWebBodyReader;
+        if (activeReader?.body !== body) {
+            return false;
+        }
+        this._activeWebBodyReader = undefined;
+        try {
+            void activeReader.reader.cancel().catch(core_noop);
+        }
+        catch { }
+        finally {
+            activeReader.reader.releaseLock();
+        }
+        return true;
+    }
+    async *_iterateWebBody(body) {
+        const reader = body.getReader();
+        this._activeWebBodyReader = { body, reader };
+        try {
+            while (true) {
+                // eslint-disable-next-line no-await-in-loop
+                const { done, value } = await reader.read();
+                if (done) {
+                    return;
+                }
+                yield value;
+            }
+        }
+        finally {
+            this._cancelActiveWebBodyReader(body);
+        }
+    }
+    async *_iterateBody(body) {
+        // Keep source errors separate from socket write failures, which may be retried.
+        try {
+            yield* body instanceof ReadableStream ? this._iterateWebBody(body) : body;
+        }
+        catch (error) {
+            throw new UploadError(normalizeError(error), this);
+        }
     }
     async _asyncWrite(chunk, request = this) {
         return new Promise((resolve, reject) => {
@@ -54632,36 +55085,42 @@ class Request extends external_node_stream_.Duplex {
     _sendBody() {
         // Send body
         const { body } = this.options;
+        this._dispatchedBody = { body };
+        // From here on, every write routed through `_write` is Got's own body dispatch, so a
+        // read-only stream no longer needs to refuse it.
+        this._dispatchingOwnBody = true;
         const currentRequest = this.redirectUrls.length === 0 && !this._discardBodyWrites ? this : this._request ?? this;
-        if (distribution.nodeStream(body)) {
+        if (distribution.nodeStream(body) && currentRequest === this) {
+            // Hooks and handlers can replace the body after the constructor registered its listener.
+            body.off('error', this._onBodyError).once('error', this._onBodyError);
             body.pipe(currentRequest);
         }
         else if (distribution.buffer(body)) {
             // Buffer should be sent directly without conversion
             this._writeBodyInChunks(body, currentRequest);
         }
-        else if (distribution.typedArray(body)) {
-            // Typed arrays should be treated like buffers, not iterated over
+        else if (ArrayBuffer.isView(body)) {
+            // ArrayBuffer views should be treated like buffers, not iterated over
             // Create a Uint8Array view over the data (Node.js streams accept Uint8Array)
-            const typedArray = body;
-            const uint8View = new Uint8Array(typedArray.buffer, typedArray.byteOffset, typedArray.byteLength);
+            const uint8View = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
             this._writeBodyInChunks(uint8View, currentRequest);
         }
-        else if (distribution.asyncIterable(body) || (distribution.iterable(body) && !distribution.string(body) && !isBuffer(body))) {
+        else if (isIterableBody(body)) {
             (async () => {
                 const isInitialRequest = currentRequest === this;
                 const bodyOptions = this.options;
+                const isBodySuperseded = () => this.options !== bodyOptions || this.options.body !== body;
                 try {
-                    for await (const chunk of body) {
-                        if (this.options !== bodyOptions || this.options.body !== body) {
+                    for await (const chunk of this._iterateBody(body)) {
+                        if (isBodySuperseded()) {
                             return;
                         }
                         await this._asyncWrite(chunk, currentRequest);
-                        if (this.options !== bodyOptions || this.options.body !== body) {
+                        if (isBodySuperseded()) {
                             return;
                         }
                     }
-                    if (this.options === bodyOptions && this.options.body === body) {
+                    if (!isBodySuperseded()) {
                         if (isInitialRequest) {
                             super.end();
                             return;
@@ -54670,16 +55129,26 @@ class Request extends external_node_stream_.Duplex {
                     }
                 }
                 catch (error) {
-                    if (this.options !== bodyOptions || this.options.body !== body) {
+                    if (isBodySuperseded()) {
                         return;
                     }
-                    this._beforeError(normalizeError(error));
+                    this._beforeError(error);
                 }
             })();
         }
         else if (distribution.undefined(body)) {
             // No body to send, end the request
-            if ((this._noPipe ?? false) || !this._methodCanHaveBody || currentRequest !== this) {
+            if (currentRequest !== this) {
+                void (async () => {
+                    try {
+                        await this._endWritableRequest(currentRequest);
+                    }
+                    catch (error) {
+                        this._beforeError(error);
+                    }
+                })();
+            }
+            else if ((this._noPipe ?? false) || !this._methodCanHaveBody) {
                 currentRequest.end();
             }
         }
@@ -54808,26 +55277,45 @@ class Request extends external_node_stream_.Duplex {
         }
     }
     get _methodCanHaveBody() {
-        return !methodsWithoutBody.has(this.options.method) || (this.options.method === 'GET' && this.options.allowGetBody);
+        return methodCanHaveBody(this.options);
     }
     _canWriteBody() {
         return !this._noPipe && !this.isReadonly && this._methodCanHaveBody;
     }
     _hasBodyForRedirect(options) {
-        return !distribution.undefined(options.body) || !distribution.undefined(options.json) || !distribution.undefined(options.form) || this._hasWrittenBody || this._hasWritableBody;
+        return hasBodyOption(options) || this._hasWrittenBody || this._hasWritableBody;
     }
     _hasUnchangedBodyForRedirect(options, state, changedState) {
-        return !changedState.has('body')
-            && !changedState.has('json')
-            && !changedState.has('form')
+        return !hasBodyOptionChanged(changedState)
             && this._hasBodyForRedirect(options)
             && isBodyUnchanged(options, state);
     }
+    // A hook that switched to a method that cannot carry a body must drop or replace the body,
+    // the same way the initial request preparation requires.
+    _assertMethodCanHaveBody(options, changedState) {
+        if (changedState.has('method') && !distribution.undefined(options.body) && !methodCanHaveBody(options)) {
+            throw new TypeError(`The \`${options.method}\` method cannot be used with a body`);
+        }
+    }
+    _refreshBodySize(options) {
+        const bodySize = distribution.undefined(options.body) || !distribution.undefined(options.getInternalHeaders()['transfer-encoding']) ? undefined : getBodySize(options.body, undefined);
+        if (bodySize === undefined) {
+            options.deleteInternalHeader('content-length');
+        }
+        else {
+            options.setInternalHeader('content-length', String(bodySize));
+        }
+        this._bodySize = bodySize;
+    }
     _dropBody(updatedOptions) {
         const { body } = this.options;
-        const hadOptionBody = !distribution.undefined(body) || !distribution.undefined(this.options.json) || !distribution.undefined(this.options.form);
+        const updatedBody = updatedOptions.body;
+        const hadOptionBody = hasBodyOption(this.options);
         this.options.clearBody();
         this._destroyBody(body);
+        if (updatedBody !== body) {
+            this._destroyBody(updatedBody);
+        }
         if (!hadOptionBody && !this.writableEnded) {
             this._skipRequestEndInFinal = true;
             super.end();
@@ -54837,6 +55325,20 @@ class Request extends external_node_stream_.Duplex {
         this._hasWrittenBody = false;
         this._hasWritableBody = false;
     }
+    _reserializeFormDataBody(options, contentTypeChanged) {
+        const nativeFormDataBody = this._nativeFormDataBody;
+        // Native FormData generates a fresh stream and boundary, so re-serialize it to replay the upload.
+        this._destroyBody(options.body);
+        const { body, contentType } = serializeNativeFormDataBody(nativeFormDataBody.form);
+        nativeFormDataBody.body = body;
+        options.body = body;
+        if (contentTypeChanged) {
+            nativeFormDataBody.contentTypeWasGenerated = false;
+        }
+        else if (nativeFormDataBody.contentTypeWasGenerated) {
+            options.setInternalHeader('content-type', contentType);
+        }
+    }
     _destroyBody(body) {
         if (distribution.nodeStream(body)) {
             const bodyStream = body;
@@ -54845,7 +55347,12 @@ class Request extends external_node_stream_.Duplex {
             bodyStream.on('error', core_noop);
             bodyStream.destroy();
         }
-        else if (distribution.asyncIterable(body) || (distribution.iterable(body) && !distribution.string(body) && !isBuffer(body))) {
+        else if (body instanceof ReadableStream) {
+            if (!this._cancelActiveWebBodyReader(body) && !body.locked) {
+                void body.cancel().catch(core_noop);
+            }
+        }
+        else if (isIterableBody(body)) {
             const iterableBody = body;
             // Signal the iterator to clean up, but don't await it:
             // the for-await loop in _sendBody exits via the options.body sentinel,
@@ -54854,7 +55361,6 @@ class Request extends external_node_stream_.Duplex {
                 try {
                     const result = iterableBody.return();
                     if (result instanceof Promise) {
-                        // eslint-disable-next-line promise/prefer-await-to-then
                         result.catch(core_noop);
                     }
                 }
@@ -54902,6 +55408,10 @@ class Request extends external_node_stream_.Duplex {
             return;
         }
         const cacheableRequest = new dist(((requestOptions, handler) => {
+            const gotRequest = requestOptions.gotRequest;
+            if (gotRequest?._stopReading) {
+                throw new AbortError(gotRequest);
+            }
             /**
             Wraps the cacheable-request handler to run beforeCache hooks.
             These hooks control caching behavior by:
@@ -54920,52 +55430,66 @@ class Request extends external_node_stream_.Duplex {
                         handler(response);
                         return;
                     }
+                    // The hooks change the caching layer's view of the headers, not the response the
+                    // caller receives. The cache policy keeps a reference to whatever `headers` holds
+                    // when it is built, so a copy is swapped in and swapped back afterwards. The copy
+                    // must own the array values too, or a hook pushing to `set-cookie` would edit the
+                    // caller's list. Unlike headers, a status mutation is shared with the caller on
+                    // purpose: the live response streams carry it.
+                    const callerHeaders = response.headers;
+                    response.headers = Object.fromEntries(Object.entries(callerHeaders).map(([name, value]) => [name, Array.isArray(value) ? [...value] : value]));
                     try {
-                        // Call each beforeCache hook with the response
-                        // Hooks can directly mutate the response - mutations take effect immediately
-                        for (const hook of beforeCacheHooks) {
-                            const result = hook(response);
-                            if (result === false) {
-                                // Prevent caching by adding no-cache headers
-                                // Mutate the response directly to add headers
-                                response.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
-                                response.headers.pragma = 'no-cache';
-                                response.headers.expires = '0';
-                                handler(response);
-                                // Don't call remaining hooks - we've decided not to cache
+                        try {
+                            // Call each beforeCache hook with the response
+                            // Hooks can directly mutate the response - mutations take effect immediately
+                            for (const hook of beforeCacheHooks) {
+                                const result = hook(response);
+                                if (result === false) {
+                                    // Prevent caching by adding no-cache headers
+                                    // Mutate the response directly to add headers
+                                    response.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
+                                    response.headers.pragma = 'no-cache';
+                                    response.headers.expires = '0';
+                                    handler(response);
+                                    // Don't call remaining hooks - we've decided not to cache
+                                    return;
+                                }
+                                if (distribution.promise(result)) {
+                                    // BeforeCache hooks must be synchronous because cacheable-request's handler is synchronous
+                                    throw new TypeError('beforeCache hooks must be synchronous. The hook returned a Promise, but this hook must return synchronously. If you need async logic, use beforeRequest hook instead.');
+                                }
+                                if (result !== undefined) {
+                                    // Hooks should return false or undefined only
+                                    // Mutations work directly - no need to return the response
+                                    throw new TypeError('beforeCache hook must return false or undefined. To modify the response, mutate it directly.');
+                                }
+                                // Else: void/undefined = continue
+                            }
+                        }
+                        catch (error) {
+                            // Convert hook errors to RequestError and propagate
+                            // This is consistent with how other hooks handle errors
+                            if (gotRequest) {
+                                gotRequest._beforeError(error);
+                                // Don't call handler when error was propagated successfully
                                 return;
                             }
-                            if (distribution.promise(result)) {
-                                // BeforeCache hooks must be synchronous because cacheable-request's handler is synchronous
-                                throw new TypeError('beforeCache hooks must be synchronous. The hook returned a Promise, but this hook must return synchronously. If you need async logic, use beforeRequest hook instead.');
-                            }
-                            if (result !== undefined) {
-                                // Hooks should return false or undefined only
-                                // Mutations work directly - no need to return the response
-                                throw new TypeError('beforeCache hook must return false or undefined. To modify the response, mutate it directly.');
-                            }
-                            // Else: void/undefined = continue
-                        }
-                    }
-                    catch (error) {
-                        const normalizedError = normalizeError(error);
-                        // Convert hook errors to RequestError and propagate
-                        // This is consistent with how other hooks handle errors
-                        if (gotRequest) {
-                            gotRequest._beforeError(normalizedError instanceof RequestError ? normalizedError : new RequestError(normalizedError.message, normalizedError, gotRequest));
-                            // Don't call handler when error was propagated successfully
+                            // If gotRequest is missing, log the error to aid debugging
+                            // We still call the handler to prevent the request from hanging
+                            console.error('Got: beforeCache hook error (request context unavailable):', error);
+                            // Call handler with response (potentially partially modified)
+                            handler(response);
                             return;
                         }
-                        // If gotRequest is missing, log the error to aid debugging
-                        // We still call the handler to prevent the request from hanging
-                        console.error('Got: beforeCache hook error (request context unavailable):', normalizedError);
-                        // Call handler with response (potentially partially modified)
+                        // All hooks ran successfully
+                        // Cache the response with any mutations applied
                         handler(response);
-                        return;
                     }
-                    // All hooks ran successfully
-                    // Cache the response with any mutations applied
-                    handler(response);
+                    finally {
+                        // The caller's response keeps the server's headers, whatever the hooks or
+                        // the cache layer did with the copy.
+                        response.headers = callerHeaders;
+                    }
                 }
                 : handler;
             const result = requestOptions._request(requestOptions, wrappedHandler);
@@ -55009,16 +55533,20 @@ class Request extends external_node_stream_.Duplex {
     }
     async _createCacheableRequest(url, options) {
         return new Promise((resolve, reject) => {
+            const hostname = distribution.string(url.hostname) && url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname;
             Object.assign(options, {
                 protocol: url.protocol,
-                hostname: distribution.string(url.hostname) && url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname,
-                host: distribution.string(url.hostname) && url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname,
+                hostname,
+                host: hostname,
                 hash: url.hash === '' ? '' : (url.hash ?? null),
                 search: url.search === '' ? '' : (url.search ?? null),
                 pathname: url.pathname,
                 href: url.href,
                 path: `${url.pathname || ''}${url.search || ''}`,
-                ...(distribution.string(url.port) && url.port.length > 0 ? { port: Number(url.port) } : {}),
+                ...(distribution.string(url.port) && url.port.length > 0 && { port: Number(url.port) }),
+                // The `&&` form spreads an empty credential as `{0: ''}`, so the absent case stays
+                // explicit. A URL such as `http://@example.com` has both parts set to `''`.
+                // eslint-disable-next-line unicorn/consistent-conditional-object-spread
                 ...(url.username || url.password ? { auth: `${url.username || ''}:${url.password || ''}` } : {}),
             });
             let request;
@@ -55052,8 +55580,54 @@ class Request extends external_node_stream_.Duplex {
             });
         });
     }
+    // `timeout.request` is a global budget: one timer covers the whole request, including redirects and the hooks between them.
+    // Redirect and hook boundaries call this again so time spent in hooks counts and changes hooks make to `timeout.request` take effect.
+    // The budget is read from the options the hook mutated, which is not `this.options` until the hooks are done.
+    _checkRequestTimeout(options = this.options) {
+        clearTimeout(this._requestTimeout);
+        const budget = options.timeout.request;
+        if (budget === undefined || this._startedAt === undefined || this._stopReading) {
+            return;
+        }
+        const remaining = budget - (Date.now() - this._startedAt);
+        if (remaining <= 0) {
+            this._expireRequestTimeout(budget);
+            return;
+        }
+        // Node turns overflowing timer delays into 1 ms, so an unarmable budget means no timeout.
+        if (!isArmableTimerDelay(remaining)) {
+            return;
+        }
+        this._requestTimeout = setTimeout(() => {
+            // A hook may have changed the budget while the timer was pending, so only an unchanged budget expires here.
+            if (this.options.timeout.request === budget) {
+                this._expireRequestTimeout(budget);
+            }
+            else {
+                this._checkRequestTimeout();
+            }
+        }, remaining);
+        this._requestTimeout.unref();
+    }
+    _expireRequestTimeout(budget) {
+        const error = new timed_out_TimeoutError(budget, 'request');
+        // An in-flight native request reports the error through its own error handler, which tears down the socket and records the timings.
+        if (this._request && !this._request.destroyed) {
+            this._request.destroy(error);
+        }
+        else {
+            this._beforeError(error);
+        }
+    }
     async _makeRequest() {
         const { options } = this;
+        this._attachAbortListener();
+        if (this.redirectUrls.length > 0) {
+            this._checkRequestTimeout();
+        }
+        if (this.destroyed || this._stopReading) {
+            return;
+        }
         const shouldDeleteGeneratedHeader = (currentHeader, generatedHeader) => currentHeader === generatedHeader || distribution.undefined(currentHeader);
         const syncGeneratedHeader = (name, { currentHeader, explicitHeader, nextHeader, staleGeneratedHeader, }) => {
             if (!distribution.undefined(nextHeader)) {
@@ -55078,17 +55652,10 @@ class Request extends external_node_stream_.Duplex {
                 else if (distribution.null(currentHeaders[key])) {
                     throw new TypeError(`Use \`undefined\` instead of \`null\` to delete the \`${key}\` header`);
                 }
-                else if (Array.isArray(currentHeaders[key]) && key === 'transfer-encoding') {
-                    // Node serializes request header arrays as repeated field lines. Keep framing
-                    // unambiguous by allowing only one transfer-encoding value here.
-                    if (currentHeaders[key].length !== 1) {
-                        throw new TypeError(`The \`${key}\` header must be a single value`);
-                    }
-                    options.setInternalHeader(key, currentHeaders[key][0]);
-                }
-                else if (Array.isArray(currentHeaders[key]) && singleValueRequestHeaders.has(key)) {
-                    // Duplicate credential and content-length lines are not allowed on requests.
-                    // Normalize a single-element array to match the long-supported string path.
+                else if (Array.isArray(currentHeaders[key]) && (key === 'transfer-encoding' || singleValueRequestHeaders.has(key))) {
+                    // Node serializes request header arrays as repeated field lines, so keep framing
+                    // unambiguous, and duplicate credential and content-length lines are not allowed on
+                    // requests. Normalize a single-element array to match the long-supported string path.
                     if (currentHeaders[key].length !== 1) {
                         throw new TypeError(`The \`${key}\` header must be a single value`);
                     }
@@ -55104,18 +55671,18 @@ class Request extends external_node_stream_.Duplex {
             const cookieString = await cookieJar.getCookieString(options.url.toString());
             return distribution.nonEmptyString(cookieString) ? cookieString : undefined;
         };
+        if (options.cookieJar && !options.isHeaderExplicitlySet('cookie')) {
+            options.deleteInternalHeader('cookie');
+        }
         const headers = sanitizeHeaders();
         const initialHeaders = options.getInternalHeaders();
         const authorizationWasInitiallyExplicit = options.isHeaderExplicitlySet('authorization');
         const explicitAuthorizationHeader = authorizationWasInitiallyExplicit ? initialHeaders.authorization : undefined;
         const explicitCookieHeader = options.isHeaderExplicitlySet('cookie') ? initialHeaders.cookie : undefined;
-        const authorizationWasInitiallyOmitted = options.isHeaderExplicitlySet('authorization') && distribution.undefined(initialHeaders.authorization);
+        const authorizationWasInitiallyOmitted = authorizationWasInitiallyExplicit && distribution.undefined(initialHeaders.authorization);
         const cookieWasInitiallyOmitted = options.isHeaderExplicitlySet('cookie') && distribution.undefined(initialHeaders.cookie);
-        if (options.decompress && distribution.undefined(headers['accept-encoding'])) {
-            const encodings = ['gzip', 'deflate'];
-            if (supportsBrotli) {
-                encodings.push('br');
-            }
+        if (options.decompress && distribution.undefined(headers['accept-encoding']) && !options.isHeaderExplicitlySet('accept-encoding')) {
+            const encodings = supportsBrotli ? ['gzip', 'deflate', 'br'] : ['gzip', 'deflate'];
             if (core_supportsZstd) {
                 encodings.push('zstd');
             }
@@ -55134,12 +55701,15 @@ class Request extends external_node_stream_.Duplex {
         }
         if (!cookieWasInitiallyOmitted) {
             generatedCookieHeader = await getCookieHeader(cookieJar);
+            this._checkRequestTimeout();
+            if (this._stopReading) {
+                return;
+            }
             if (!distribution.undefined(generatedCookieHeader)) {
                 options.setInternalHeader('cookie', generatedCookieHeader);
             }
         }
         let request;
-        let shouldOmitRequestUrlCredentials = false;
         const urlBeforeRequestHooks = options.url instanceof URL ? new URL(options.url) : undefined;
         const boundaryBeforeRequestHooks = getUrlPrefixBoundary(options);
         const stateBeforeRequestHooks = urlBeforeRequestHooks ? snapshotCrossOriginState(options) : undefined;
@@ -55148,6 +55718,12 @@ class Request extends external_node_stream_.Duplex {
             for (const hook of options.hooks.beforeRequest) {
                 // eslint-disable-next-line no-await-in-loop
                 const result = await hook(options, { retryCount: this.retryCount });
+                this._checkRequestTimeout();
+                if (this._stopReading) {
+                    // The request timed out or was aborted while the hook was pending.
+                    destroyRequestResult(result);
+                    break;
+                }
                 if (!distribution.undefined(result)) {
                     // @ts-expect-error Skip the type mismatch to support abstract responses
                     request = () => result;
@@ -55156,6 +55732,21 @@ class Request extends external_node_stream_.Duplex {
             }
             return changedState;
         });
+        this._attachAbortListener();
+        if (this.destroyed) {
+            return;
+        }
+        let shouldOmitRequestUrlCredentials = false;
+        // A hook that replaced the body must refresh the inherited `content-length`, or the
+        // declared length belongs to the previous body and the extra bytes stay on the
+        // connection. The sibling retry and redirect hooks do the same, and additionally tear
+        // down the body they replaced, which this path has no use for: the hook is done with
+        // it and the caller still owns it.
+        if (changedState.has('body') && !changedState.has('content-length')) {
+            this._serializeFormDataBody(options, changedState.has('content-type'));
+            this._refreshBodySize(options);
+        }
+        this._assertMethodCanHaveBody(options, changedState);
         if (urlBeforeRequestHooks
             && options.url instanceof URL
             && hasUrlOrPrefixUrlBoundaryChanged(options, options.url, boundaryBeforeRequestHooks)) {
@@ -55176,26 +55767,18 @@ class Request extends external_node_stream_.Duplex {
                     crossOriginHookStrippedHeaders.add(header);
                 }
             }
-            const changedOptions = { headers: changedHeaders };
-            if (hookChangedState.has('url')) {
-                changedOptions.url = options.url;
-            }
-            if (hookChangedState.has('prefixUrl')) {
-                changedOptions.prefixUrl = options.prefixUrl;
-            }
-            if (hookChangedState.has('username')) {
-                changedOptions.username = options.username;
-            }
-            if (hookChangedState.has('password')) {
-                changedOptions.password = options.password;
-            }
+            const changedOptions = {
+                headers: changedHeaders,
+                ...(hookChangedState.has('url') && { url: options.url }),
+                ...(hookChangedState.has('prefixUrl') && { prefixUrl: options.prefixUrl }),
+                ...(hookChangedState.has('username') && { username: options.username }),
+                ...(hookChangedState.has('password') && { password: options.password }),
+            };
             options.stripSensitiveHeaders(urlBeforeRequestHooks, options.url, changedOptions);
             this._discardBodyWrites = true;
             this._hasWrittenBody = false;
             this._hasWritableBody = false;
-            if (!hookChangedState.has('body')
-                && !hookChangedState.has('json')
-                && !hookChangedState.has('form')
+            if (!hasBodyOptionChanged(hookChangedState)
                 && isBodyUnchanged(options, stateBeforeRequestHooks)) {
                 options.clearBody();
                 this._bodySize = undefined;
@@ -55286,12 +55869,16 @@ class Request extends external_node_stream_.Duplex {
         if (shouldOmitRequestUrlCredentials) {
             this._requestOptions.auth = undefined;
         }
-        if (options.cache) {
-            this._requestOptions._request = request;
-            this._requestOptions.cache = options.cache;
-            this._requestOptions.body = options.body;
-            this._requestOptions.beforeCacheHooks = options.hooks.beforeCache;
-            this._requestOptions.gotRequest = this;
+        // Streaming uploads cannot provide a cache key without consuming the body.
+        const useCache = Boolean(options.cache) && (options.body === undefined || typeof options.body === 'string' || ArrayBuffer.isView(options.body));
+        if (useCache) {
+            Object.assign(this._requestOptions, {
+                _request: request,
+                cache: options.cache,
+                body: options.body,
+                beforeCacheHooks: options.hooks.beforeCache,
+                gotRequest: this,
+            });
             try {
                 this._prepareCache(options.cache);
             }
@@ -55300,40 +55887,36 @@ class Request extends external_node_stream_.Duplex {
             }
         }
         // Cache support
-        const function_ = options.cache ? this._createCacheableRequest : request;
+        const function_ = useCache ? this._createCacheableRequest : request;
         try {
             // We can't do `await fn(...)`,
             // because stream `error` event can be emitted before `Promise.resolve()`.
-            const requestFunctionStartedAt = Date.now();
-            const originalRequestTimeout = options.timeout.request;
-            let shouldRestoreRequestTimeout = false;
+            // The request budget starts once the initial setup is done and is shared by every redirect.
+            this._startedAt ??= Date.now();
+            this._checkRequestTimeout();
+            if (this._stopReading) {
+                return;
+            }
             let requestOrResponse = function_(url, this._requestOptions);
             if (distribution.promise(requestOrResponse)) {
                 requestOrResponse = await requestOrResponse;
-                if (options.timeout.request !== undefined) {
-                    const remainingRequestTimeout = options.timeout.request - (Date.now() - requestFunctionStartedAt);
-                    options.timeout.request = Math.max(0, remainingRequestTimeout);
-                    shouldRestoreRequestTimeout = true;
-                }
             }
-            try {
-                if (is_client_request(requestOrResponse)) {
-                    this._onRequest(requestOrResponse);
-                }
-                else if (this.writableEnded) {
+            if (this._stopReading) {
+                // The request timed out or was aborted while the request function was pending.
+                destroyRequestResult(requestOrResponse);
+                throw new AbortError(this);
+            }
+            if (is_client_request(requestOrResponse)) {
+                this._onRequest(requestOrResponse, useCache);
+            }
+            else if (this.writableEnded) {
+                void this._onResponse(requestOrResponse);
+            }
+            else {
+                this.once('finish', () => {
                     void this._onResponse(requestOrResponse);
-                }
-                else {
-                    this.once('finish', () => {
-                        void this._onResponse(requestOrResponse);
-                    });
-                    this._sendBody();
-                }
-            }
-            finally {
-                if (shouldRestoreRequestTimeout) {
-                    options.timeout.request = originalRequestTimeout;
-                }
+                });
+                this._sendBody();
             }
         }
         catch (error) {
@@ -55355,7 +55938,8 @@ class Request extends external_node_stream_.Duplex {
                         error = await hook(error);
                         // Validate hook return value
                         if (!(error instanceof Error)) {
-                            throw new TypeError(`The \`beforeError\` hook must return an Error instance. Received ${distribution.string(error) ? 'string' : String(typeof error)}.`);
+                            const received = error === null ? 'null' : (distribution.string(error) ? 'string' : (typeof error));
+                            throw new TypeError(`The \`beforeError\` hook must return an Error instance. Received ${received}.`);
                         }
                     }
                     // Mark this error as processed by hooks so _destroy preserves custom error types.
@@ -55368,16 +55952,14 @@ class Request extends external_node_stream_.Duplex {
             }
         }
         catch (error_) {
-            const normalizedError = normalizeError(error_);
-            error = new RequestError(normalizedError.message, normalizedError, this);
+            error = toRequestError(error_, this);
         }
-        // Publish error event
-        publishError({
-            requestId: this._requestId,
-            url: getSanitizedUrl(this.options),
-            error,
-            timings: this.timings,
-        });
+        // A hook can install a body for a retry that will not happen. Nothing dispatched it, and
+        // `_destroy` only tears down what was dispatched, so this request still owns it. The
+        // undispatched case is `_destroy`'s own, which runs below.
+        if (this._dispatchedBody !== undefined && this.options && this.options.body !== this._dispatchedBody.body) {
+            this._destroyBody(this.options.body);
+        }
         this.destroy(error);
         // Manually emit error for Promise API to ensure it receives it.
         // Node.js streams may not re-emit if an error was already emitted during retry attempts.
@@ -55482,7 +56064,7 @@ class Request extends external_node_stream_.Duplex {
     Whether the stream is read-only. Returns `true` when `body`, `json`, or `form` options are provided.
     */
     get isReadonly() {
-        return !distribution.undefined(this.options?.body) || !distribution.undefined(this.options?.json) || !distribution.undefined(this.options?.form);
+        return hasBodyOption(this.options);
     }
 }
 
@@ -55494,10 +56076,10 @@ class Request extends external_node_stream_.Duplex {
 
 
 
-const compressedEncodings = new Set(['gzip', 'deflate', 'br', 'zstd']);
+
+const compressedEncodings = new Set(['gzip', 'x-gzip', 'deflate', 'br', 'zstd']);
 const as_promise_proxiedRequestEvents = [
     'request',
-    'response',
     'redirect',
     'uploadProgress',
     'downloadProgress',
@@ -55508,18 +56090,42 @@ function asPromise(firstRequest) {
     const emitter = new external_node_events_.EventEmitter();
     let promiseSettled = false;
     const promise = new Promise((resolve, reject) => {
-        const makeRequest = (retryCount, defaultOptions) => {
-            const request = firstRequest ?? new Request(undefined, undefined, defaultOptions);
+        const makeRequest = (retryCount, defaultOptions, retrySource) => {
+            const request = firstRequest ?? new Request(undefined, undefined, defaultOptions, retrySource);
             request.retryCount = retryCount;
             request._noPipe = true;
             globalRequest = request;
+            const setResponse = (response) => {
+                globalResponse = response;
+                request.response = response;
+                response.ok = isResponseOk(response);
+            };
+            // Settles the promise and emits `response`. The event carries the response the promise settles
+            // with, not the response of an attempt that is about to be retried or thrown.
+            const resolveWithResponse = (response) => {
+                request.destroy();
+                promiseSettled = true;
+                // The listener runs outside any request error handling, so a throw would otherwise
+                // escape as an unhandled error and leave the promise pending. The later `resolve()` is
+                // then a no-op.
+                try {
+                    emitter.emit('response', response);
+                }
+                catch (error) {
+                    reject(normalizeError(error));
+                }
+                // eslint-disable-next-line unicorn/no-multiple-promise-resolver-calls
+                resolve(request.options.resolveBodyOnly ? response.body : response);
+            };
             request.once('response', (response) => {
                 void (async () => {
                     // Parse body
                     const contentEncoding = (response.headers['content-encoding'] ?? '').toLowerCase();
-                    const isCompressed = compressedEncodings.has(contentEncoding);
+                    const isCompressed = contentEncoding.split(',').some(encoding => compressedEncodings.has(encoding.trim()));
                     const { options } = request;
-                    if (isCompressed && !options.decompress) {
+                    // Content-Encoding on a bodyless response describes the representation, not transferred bytes.
+                    const hasNoBody = options.method === 'HEAD' || response.statusCode === 204 || response.statusCode === 205 || response.statusCode === 304;
+                    if (isCompressed && !options.decompress && !hasNoBody) {
                         response.body = response.rawBody;
                     }
                     else {
@@ -55527,23 +56133,23 @@ function asPromise(firstRequest) {
                             response.body = parseBody(response, options.responseType, options.parseJson, options.encoding);
                         }
                         catch (error) {
-                            // Fall back to `utf8`
+                            // Preserve the response text when parsing fails.
                             try {
-                                response.body = decodeUint8Array(response.rawBody);
+                                response.body = decodeUint8Array(response.rawBody, options.encoding);
                             }
                             catch (error) {
                                 request._beforeError(new ParseError(normalizeError(error), response));
                                 return;
                             }
                             if (isResponseOk(response)) {
-                                request._beforeError(normalizeError(error));
+                                request._beforeError(error);
                                 return;
                             }
                         }
                     }
                     try {
                         const hooks = options.hooks.afterResponse;
-                        for (const [index, hook] of hooks.entries()) {
+                        for (const hook of hooks) {
                             const previousUrl = options.url ? new URL(options.url) : undefined;
                             const previousBoundary = getUrlPrefixBoundary(options);
                             const previousState = previousUrl ? snapshotCrossOriginState(options) : undefined;
@@ -55553,62 +56159,32 @@ function asPromise(firstRequest) {
                             // eslint-disable-next-line no-await-in-loop
                             response = await requestOptions.trackStateMutations(async (changedState) => hook(responseSnapshot, async (updatedOptions) => {
                                 const preserveHooks = updatedOptions.preserveHooks ?? false;
-                                const reusesRequestOptions = updatedOptions === requestOptions;
-                                const hasExplicitBody = reusesRequestOptions
-                                    ? changedState.has('body') || changedState.has('json') || changedState.has('form')
-                                    : (Object.hasOwn(updatedOptions, 'body') && updatedOptions.body !== undefined)
-                                        || (Object.hasOwn(updatedOptions, 'json') && updatedOptions.json !== undefined)
-                                        || (Object.hasOwn(updatedOptions, 'form') && updatedOptions.form !== undefined);
-                                const clearsCookieJar = Object.hasOwn(updatedOptions, 'cookieJar') && updatedOptions.cookieJar === undefined;
-                                if (hasExplicitBody && !reusesRequestOptions) {
-                                    options.clearBody();
-                                }
-                                if (!reusesRequestOptions && clearsCookieJar) {
-                                    options.cookieJar = undefined;
-                                }
-                                if (!reusesRequestOptions) {
-                                    const { url, ...updatedOptionsWithoutUrl } = updatedOptions;
-                                    options.merge(updatedOptionsWithoutUrl);
-                                    options.syncCookieHeaderAfterMerge(previousState, updatedOptionsWithoutUrl.headers);
-                                }
-                                options.clearUnchangedCookieHeader(previousState, reusesRequestOptions ? changedState : undefined);
-                                const currentUrl = options.url;
-                                if (previousUrl
-                                    && currentUrl instanceof URL
-                                    && hasUrlOrPrefixUrlBoundaryChanged(options, currentUrl, previousBoundary)) {
-                                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(options, currentUrl);
-                                }
-                                if (!reusesRequestOptions
-                                    && updatedOptions.url === undefined
-                                    && previousUrl
-                                    && currentUrl instanceof URL
-                                    && !isSameOrigin(previousUrl, currentUrl)) {
-                                    options.stripSensitiveHeaders(previousUrl, currentUrl, updatedOptions);
-                                    if (!hasExplicitBody) {
-                                        options.clearBody();
+                                if (updatedOptions === requestOptions) {
+                                    const hasExplicitBody = hasBodyOptionChanged(changedState);
+                                    options.clearUnchangedCookieHeader(previousState, changedState);
+                                    const currentUrl = options.url;
+                                    if (previousUrl
+                                        && currentUrl instanceof URL
+                                        && hasUrlOrPrefixUrlBoundaryChanged(options, currentUrl, previousBoundary)) {
+                                        assertUrlHasSameOriginAsPrefixUrlIfNeeded(options, currentUrl);
+                                    }
+                                    if (updatedOptions.url !== undefined
+                                        && previousUrl
+                                        && !isSameOrigin(previousUrl, currentUrl)) {
+                                        options.stripUnchangedCrossOriginState(previousState, changedState, { clearBody: !hasExplicitBody });
                                     }
                                 }
-                                if (updatedOptions.url !== undefined) {
-                                    const nextUrl = reusesRequestOptions
-                                        ? options.url
-                                        : applyUrlOverride(options, updatedOptions.url, updatedOptions);
-                                    if (previousUrl) {
-                                        if (reusesRequestOptions && !isSameOrigin(previousUrl, nextUrl)) {
-                                            options.stripUnchangedCrossOriginState(previousState, changedState, { clearBody: !hasExplicitBody });
-                                        }
-                                        else {
-                                            options.stripSensitiveHeaders(previousUrl, nextUrl, updatedOptions);
-                                            if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
-                                                options.clearBody();
-                                            }
-                                        }
-                                    }
+                                else {
+                                    options.mergeNextRequestOptions(updatedOptions, {
+                                        previousUrl,
+                                        previousState,
+                                        previousBoundary,
+                                    });
                                 }
-                                // Remove any further hooks for that request, because we'll call them anyway.
-                                // The loop continues. We don't want duplicates (asPromise recursion).
-                                // Unless preserveHooks is true, in which case we keep the remaining hooks.
+                                // RetryError interrupts this loop, so skip all response hooks on the retry by default.
+                                // preserveHooks explicitly opts into running the complete hook list again.
                                 if (!preserveHooks) {
-                                    options.hooks.afterResponse = options.hooks.afterResponse.slice(0, index);
+                                    options.hooks.afterResponse = [];
                                 }
                                 throw new RetryError(request);
                             }));
@@ -55618,17 +56194,15 @@ function asPromise(firstRequest) {
                         }
                     }
                     catch (error) {
-                        request._beforeError(normalizeError(error));
+                        request._beforeError(error);
                         return;
                     }
-                    globalResponse = response;
-                    if (!isResponseOk(response)) {
+                    setResponse(response);
+                    if (!response.ok) {
                         request._beforeError(new HTTPError(response));
                         return;
                     }
-                    request.destroy();
-                    promiseSettled = true;
-                    resolve(request.options.resolveBodyOnly ? response.body : response);
+                    resolveWithResponse(response);
                 })();
             });
             let handledFinalError = false;
@@ -55646,11 +56220,9 @@ function asPromise(firstRequest) {
                 }
                 handledFinalError = true;
                 promiseSettled = true;
-                const { options } = request;
-                if (error instanceof HTTPError && !options.throwHttpErrors) {
-                    const { response } = error;
-                    request.destroy();
-                    resolve(options.resolveBodyOnly ? response.body : response);
+                if (error instanceof HTTPError && !request.options.throwHttpErrors) {
+                    setResponse(error.response);
+                    resolveWithResponse(error.response);
                     return;
                 }
                 reject(error);
@@ -55660,7 +56232,11 @@ function asPromise(firstRequest) {
             // after retry logic completes, so we need this listener to remain active.
             // See https://github.com/sindresorhus/got/issues/1995
             request.on('error', onError);
-            const previousBody = request.options?.body;
+            let previousBody = request.options?.body;
+            request.on('request', () => {
+                // Async handlers and beforeRequest hooks can supply the body after this Promise was created.
+                previousBody = request.options.body;
+            });
             request.once('retry', (newRetryCount, error) => {
                 firstRequest = undefined;
                 // If promise already settled, don't retry
@@ -55671,14 +56247,14 @@ function asPromise(firstRequest) {
                     return;
                 }
                 const newBody = request.options.body;
-                if (previousBody === newBody && (distribution.nodeStream(newBody) || newBody instanceof ReadableStream)) {
+                if (previousBody === newBody && isNonReplayableBody(newBody)) {
                     error.message = 'Cannot retry with consumed body stream';
                     onError(error);
                     return;
                 }
                 // This is needed! We need to reuse `request.options` because they can get modified!
                 // For example, by calling `promise.json()`.
-                makeRequest(newRetryCount, request.options);
+                makeRequest(newRetryCount, request.options, request);
             });
             proxyEvents(request, emitter, as_promise_proxiedRequestEvents);
             if (distribution.undefined(firstRequest)) {
@@ -55687,27 +56263,23 @@ function asPromise(firstRequest) {
         };
         makeRequest(0);
     });
-    promise.on = function (event, function_) {
-        emitter.on(event, function_);
-        return this;
-    };
-    promise.once = function (event, function_) {
-        emitter.once(event, function_);
-        return this;
-    };
-    promise.off = function (event, function_) {
-        emitter.off(event, function_);
-        return this;
-    };
+    for (const method of ['on', 'once', 'off']) {
+        promise[method] = function (event, function_) {
+            emitter[method](event, function_);
+            return this;
+        };
+    }
     const shortcut = (promiseToAwait, responseType) => {
         const newPromise = (async () => {
             // Wait until downloading has ended
-            await promiseToAwait;
-            const { options } = globalResponse.request;
-            if (responseType === 'text') {
-                const text = decodeUint8Array(globalResponse.rawBody, options.encoding);
-                return (isUtf8Encoding(options.encoding) ? text.replace(/^\u{FEFF}/v, '') : text);
+            const response = await promiseToAwait;
+            // Handlers may replace the response or recover one from a request error.
+            if (!globalRequest.options.resolveBodyOnly && response?.request instanceof Request && response.rawBody instanceof Uint8Array) {
+                globalResponse = response;
             }
+            const { options } = globalResponse.request;
+            // `parseBody` wraps a decode failure in a `ParseError`, so an unusable encoding is
+            // reported with the response attached instead of as a bare `TypeError`.
             return parseBody(globalResponse, responseType, options.parseJson, options.encoding);
         })();
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -55752,10 +56324,9 @@ const aliases = [
     'delete',
     'query',
 ];
-const optionsObjectUrlErrorMessage = 'The `url` option is not supported in options objects. Pass it as the first argument instead.';
 const assertNoUrlInOptionsObject = (options) => {
     if (Object.hasOwn(options, 'url')) {
-        throw new TypeError(optionsObjectUrlErrorMessage);
+        throw new TypeError('The `url` option is not supported in options objects. Pass it as the first argument instead.');
     }
 };
 const create_create = (defaults) => {
@@ -55764,6 +56335,12 @@ const create_create = (defaults) => {
         handlers: [...defaults.handlers],
         mutableDefaults: defaults.mutableDefaults,
     };
+    // `body`, `json` and `form` are documented as never being merged with the instance
+    // defaults, so a payload given to `got.extend()` must not reach the instance's requests.
+    // Only the payload is dropped: an instance may still set the body headers it wants.
+    defaults.options.body = undefined;
+    defaults.options.json = undefined;
+    defaults.options.form = undefined;
     Object.defineProperty(defaults, 'mutableDefaults', {
         enumerable: true,
         configurable: false,
@@ -55794,12 +56371,18 @@ const create_create = (defaults) => {
         if (isStream && request.options) {
             request.options.isStream = true;
         }
+        // `request.options` stays unset when the input was rejected before the options were built,
+        // and the request reports that itself. Otherwise the handler must pass the instance on.
+        const optionsBuilt = request.options instanceof Options;
         let promise;
-        const urlBeforeHandlers = request.options?.url instanceof URL ? new URL(request.options.url) : undefined;
         const boundaryBeforeHandlers = request.options ? getUrlPrefixBoundary(request.options) : undefined;
         const lastHandler = (normalized) => {
-            if (urlBeforeHandlers
-                && boundaryBeforeHandlers
+            // `Options` keeps its state private, so a spread copy or a plain object would lose
+            // everything and then fail later with an unrelated internal error.
+            if (optionsBuilt && !(normalized instanceof Options)) {
+                throw new TypeError('The `next()` function of a handler must be called with the `options` object it received');
+            }
+            if (boundaryBeforeHandlers?.url
                 && normalized?.url instanceof URL
                 && hasUrlOrPrefixUrlBoundaryChanged(normalized, normalized.url, boundaryBeforeHandlers)) {
                 assertUrlHasSameOriginAsPrefixUrlIfNeeded(normalized, normalized.url);
@@ -55824,6 +56407,9 @@ const create_create = (defaults) => {
                 if (result !== promise) {
                     const descriptors = Object.getOwnPropertyDescriptors(promise);
                     for (const key in descriptors) {
+                        // `in` is deliberate: it also matches inherited names, and a promise carries `then`
+                        // on its prototype, which must not be copied onto the result.
+                        // eslint-disable-next-line unicorn/no-computed-property-existence-check
                         if (key in result) {
                             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                             delete descriptors[key];
@@ -55842,7 +56428,8 @@ const create_create = (defaults) => {
     got.extend = (...instancesOrOptions) => {
         const options = new Options(undefined, undefined, defaults.options);
         const handlers = [...defaults.handlers];
-        let mutableDefaults;
+        // `instance.extend(…)` must behave like `got.extend(instance, …)`, so the parent's mutability is inherited unless an argument overrides it.
+        let { mutableDefaults } = defaults;
         for (const value of instancesOrOptions) {
             if (isGotInstance(value)) {
                 options.merge(value.defaults.options);
@@ -55853,15 +56440,22 @@ const create_create = (defaults) => {
                 assertNoUrlInOptionsObject(value);
                 options.merge(value);
                 if (value.handlers) {
+                    // A non-function entry would otherwise be skipped or crash inside the request
+                    // without naming the option that caused it.
+                    for (const [index, handler] of value.handlers.entries()) {
+                        if (!distribution.function(handler)) {
+                            throw new TypeError(`Expected \`handlers[${index}]\` to be a function, got \`${typeof handler}\``);
+                        }
+                    }
                     handlers.push(...value.handlers);
                 }
-                mutableDefaults = value.mutableDefaults;
+                mutableDefaults = value.mutableDefaults ?? mutableDefaults;
             }
         }
         return create_create({
             options,
             handlers,
-            mutableDefaults: Boolean(mutableDefaults),
+            mutableDefaults,
         });
     };
     // Pagination
@@ -55873,8 +56467,7 @@ const create_create = (defaults) => {
             assertNoUrlInOptionsObject(options);
         }
         let normalizedOptions = new Options(url, options, defaults.options);
-        normalizedOptions.resolveBodyOnly = false;
-        const { pagination } = normalizedOptions;
+        let { pagination } = normalizedOptions;
         assert.function(pagination.transform);
         assert.function(pagination.shouldContinue);
         assert.function(pagination.filter);
@@ -55883,41 +56476,59 @@ const create_create = (defaults) => {
         assert.number(pagination.requestLimit);
         assert.number(pagination.backoff);
         const allItems = [];
-        let { countLimit } = pagination;
+        let numberOfItems = 0;
         let numberOfRequests = 0;
-        while (numberOfRequests < pagination.requestLimit) {
+        while (numberOfRequests < pagination.requestLimit && numberOfItems < pagination.countLimit) {
             if (numberOfRequests !== 0) {
-                // eslint-disable-next-line no-await-in-loop
-                await (0,promises_namespaceObject.setTimeout)(pagination.backoff);
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await (0,promises_namespaceObject.setTimeout)(pagination.backoff, undefined, { signal: normalizedOptions.signal });
+                }
+                catch (error) {
+                    if (!normalizedOptions.signal?.aborted) {
+                        throw error;
+                    }
+                    // Let the next request report cancellation through Got's normal error handling.
+                }
             }
+            // Pagination callbacks always receive the complete response.
+            normalizedOptions.resolveBodyOnly = false;
             // eslint-disable-next-line no-await-in-loop
             const response = (await got(undefined, undefined, normalizedOptions));
             // eslint-disable-next-line no-await-in-loop
             const parsed = await pagination.transform(response);
+            if (!distribution.array(parsed)) {
+                // The same context the paginate override gets, so the failing page is not anonymous.
+                throw new TypeError(`Option 'pagination.transform': Expected values which are \`Array\`. Received values of type \`${typeof parsed}\`.`);
+            }
             const currentItems = [];
-            assert.array(parsed);
             for (const item of parsed) {
-                if (pagination.filter({ item, currentItems, allItems })) {
-                    if (!pagination.shouldContinue({ item, currentItems, allItems })) {
-                        return;
-                    }
-                    yield item;
-                    if (pagination.stackAllItems) {
-                        allItems.push(item);
-                    }
-                    currentItems.push(item);
-                    if (--countLimit <= 0) {
-                        return;
-                    }
+                if (!pagination.filter({ item, currentItems, allItems })) {
+                    continue;
                 }
+                if (!pagination.shouldContinue({ item, currentItems, allItems })) {
+                    return;
+                }
+                yield item;
+                if (pagination.stackAllItems) {
+                    allItems.push(item);
+                }
+                currentItems.push(item);
+                if (++numberOfItems >= pagination.countLimit) {
+                    return;
+                }
+            }
+            if (++numberOfRequests >= pagination.requestLimit) {
+                return;
             }
             const requestOptions = response.request.options;
             const previousUrl = requestOptions.url ? new URL(requestOptions.url) : undefined;
             const previousBoundary = getUrlPrefixBoundary(requestOptions);
             const previousState = previousUrl ? snapshotCrossOriginState(requestOptions) : undefined;
-            // eslint-disable-next-line no-await-in-loop
+            // The inner `await` applies an async `paginate`, the same way `transform` is handled.
+            // eslint-disable-next-line no-await-in-loop, @typescript-eslint/no-loop-func -- Pagination is updated only after this callback finishes.
             const [optionsToMerge, changedState] = await requestOptions.trackStateMutations(async (changedState) => [
-                pagination.paginate({
+                await pagination.paginate({
                     response,
                     currentItems,
                     allItems,
@@ -55927,59 +56538,28 @@ const create_create = (defaults) => {
             if (optionsToMerge === false) {
                 return;
             }
-            if (optionsToMerge === response.request.options) {
-                normalizedOptions = response.request.options;
+            // A `paginate` that forgot its return value must be reported at the option, the same
+            // way `transform` is, instead of crashing later while reading `url` off it.
+            if (!(optionsToMerge instanceof Options) && !distribution.plainObject(optionsToMerge)) {
+                throw new TypeError(`Option 'pagination.paginate': Expected \`false\` or a plain options object, got \`${typeof optionsToMerge}\``);
+            }
+            if (optionsToMerge === requestOptions) {
+                normalizedOptions = requestOptions;
                 normalizedOptions.clearUnchangedCookieHeader(previousState, changedState);
-                if (previousUrl) {
-                    const nextUrl = normalizedOptions.url;
-                    if (nextUrl
-                        && hasUrlOrPrefixUrlBoundaryChanged(normalizedOptions, nextUrl, previousBoundary)) {
+                const nextUrl = normalizedOptions.url;
+                if (previousUrl && nextUrl) {
+                    if (hasUrlOrPrefixUrlBoundaryChanged(normalizedOptions, nextUrl, previousBoundary)) {
                         assertUrlHasSameOriginAsPrefixUrlIfNeeded(normalizedOptions, nextUrl);
                     }
-                    if (nextUrl && !isSameOrigin(previousUrl, nextUrl)) {
+                    if (!isSameOrigin(previousUrl, nextUrl)) {
                         normalizedOptions.prefixUrl = '';
                         normalizedOptions.stripUnchangedCrossOriginState(previousState, changedState);
                     }
                 }
             }
             else {
-                const paginationOptions = normalizedOptions;
-                const paginationUrl = paginationOptions.url instanceof URL ? new URL(paginationOptions.url) : undefined;
-                const paginationBoundary = getUrlPrefixBoundary(paginationOptions);
-                const hasExplicitBody = (Object.hasOwn(optionsToMerge, 'body') && optionsToMerge.body !== undefined)
-                    || (Object.hasOwn(optionsToMerge, 'json') && optionsToMerge.json !== undefined)
-                    || (Object.hasOwn(optionsToMerge, 'form') && optionsToMerge.form !== undefined);
-                const clearsCookieJar = Object.hasOwn(optionsToMerge, 'cookieJar') && optionsToMerge.cookieJar === undefined;
-                if (hasExplicitBody) {
-                    paginationOptions.clearBody();
-                }
-                if (clearsCookieJar) {
-                    paginationOptions.cookieJar = undefined;
-                }
-                const { url, ...optionsToMergeWithoutUrl } = optionsToMerge;
-                paginationOptions.merge(optionsToMergeWithoutUrl);
-                paginationOptions.syncCookieHeaderAfterMerge(previousState, optionsToMergeWithoutUrl.headers);
-                if (paginationOptions.url instanceof URL
-                    && hasUrlOrPrefixUrlBoundaryChanged(paginationOptions, paginationOptions.url, paginationBoundary)) {
-                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(paginationOptions, paginationOptions.url);
-                }
-                if (url === undefined
-                    && previousUrl
-                    && paginationOptions.url instanceof URL
-                    && !isSameOrigin(previousUrl, paginationOptions.url)) {
-                    paginationOptions.stripSensitiveHeaders(previousUrl, paginationOptions.url, optionsToMerge);
-                    if (!hasExplicitBody) {
-                        paginationOptions.clearBody();
-                    }
-                }
-                if (previousUrl
-                    && paginationUrl
-                    && !isSameOrigin(paginationUrl, previousUrl)) {
-                    paginationOptions.stripSensitiveHeaders(paginationUrl, previousUrl, optionsToMerge);
-                    if (!hasExplicitBody) {
-                        paginationOptions.clearBody();
-                    }
-                }
+                const paginationBoundary = getUrlPrefixBoundary(normalizedOptions);
+                const paginationUrl = paginationBoundary.url;
                 try {
                     assert.any([distribution.string, distribution.urlInstance, distribution.undefined], optionsToMerge.url);
                 }
@@ -55989,25 +56569,27 @@ const create_create = (defaults) => {
                     }
                     throw error;
                 }
-                if (url !== undefined) {
-                    const nextUrl = applyUrlOverride(paginationOptions, url, {
-                        ...optionsToMerge,
-                        baseUrl: previousUrl,
-                    });
-                    if (paginationOptions.prefixUrl.toString() !== paginationBoundary.prefixUrl
-                        || paginationOptions.allowAbsoluteUrls !== paginationBoundary.allowAbsoluteUrls) {
-                        assertUrlHasSameOriginAsPrefixUrlIfNeeded(paginationOptions, nextUrl);
-                    }
-                    if (previousUrl) {
-                        paginationOptions.stripSensitiveHeaders(previousUrl, nextUrl, optionsToMerge);
-                        if (!isSameOrigin(previousUrl, nextUrl) && !hasExplicitBody) {
-                            paginationOptions.clearBody();
-                        }
+                const { nextUrl, hasExplicitBody } = normalizedOptions.mergeNextRequestOptions(optionsToMerge, {
+                    previousUrl,
+                    previousState,
+                    previousBoundary: paginationBoundary,
+                    baseUrl: previousUrl,
+                });
+                if (previousUrl
+                    && paginationUrl
+                    && !isSameOrigin(paginationUrl, previousUrl)) {
+                    normalizedOptions.stripSensitiveHeaders(paginationUrl, previousUrl, optionsToMerge);
+                    if (!hasExplicitBody) {
+                        normalizedOptions.clearBody();
                     }
                 }
-                normalizedOptions = paginationOptions;
+                if (nextUrl
+                    && (normalizedOptions.prefixUrl.toString() !== paginationBoundary.prefixUrl
+                        || normalizedOptions.allowAbsoluteUrls !== paginationBoundary.allowAbsoluteUrls)) {
+                    assertUrlHasSameOriginAsPrefixUrlIfNeeded(normalizedOptions, nextUrl);
+                }
             }
-            numberOfRequests++;
+            pagination = normalizedOptions.pagination;
         }
     });
     got.paginate = paginateEach;
@@ -56022,6 +56604,7 @@ const create_create = (defaults) => {
         got.stream[method] = ((url, options) => makeRequest(url, { ...options, method }, defaults.options, true));
     }
     if (!defaults.mutableDefaults) {
+        Object.freeze(defaults);
         Object.freeze(defaults.handlers);
         defaults.options.freeze();
     }
