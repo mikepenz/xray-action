@@ -184,7 +184,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.characterData_replaceData = characterData_replaceData;
 exports.characterData_substringData = characterData_substringData;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const DOMException_1 = __webpack_require__(7175);
 const TreeAlgorithm_1 = __webpack_require__(3532);
 const MutationObserverAlgorithm_1 = __webpack_require__(3243);
@@ -355,7 +355,7 @@ const RangeImpl_1 = __webpack_require__(3691);
 const NodeIteratorImpl_1 = __webpack_require__(4142);
 const TreeWalkerImpl_1 = __webpack_require__(6254);
 const NodeFilterImpl_1 = __webpack_require__(4649);
-const MutationRecordImpl_1 = __webpack_require__(2414);
+const MutationRecordImpl_1 = __webpack_require__(33);
 const DOMTokenListImpl_1 = __webpack_require__(6629);
 /**
  * Creates a `DOMImplementation`.
@@ -739,7 +739,7 @@ exports.dom_runEventConstructingSteps = dom_runEventConstructingSteps;
 exports.dom_runChildTextContentChangeSteps = dom_runChildTextContentChangeSteps;
 const DOMImpl_1 = __webpack_require__(698);
 const TreeAlgorithm_1 = __webpack_require__(3532);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const ShadowTreeAlgorithm_1 = __webpack_require__(708);
 const supportedTokens = new Map();
 /**
@@ -1070,7 +1070,7 @@ exports.document_elementInterface = document_elementInterface;
 exports.document_internalCreateElementNS = document_internalCreateElementNS;
 exports.document_adopt = document_adopt;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const util_2 = __webpack_require__(7061);
 const ElementImpl_1 = __webpack_require__(1342);
 const CustomElementAlgorithm_1 = __webpack_require__(5075);
@@ -1211,7 +1211,7 @@ exports.element_createAnElement = element_createAnElement;
 exports.element_insertAdjacent = element_insertAdjacent;
 const DOMImpl_1 = __webpack_require__(698);
 const infra_1 = __webpack_require__(4737);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const DOMException_1 = __webpack_require__(7175);
 const CreateAlgorithm_1 = __webpack_require__(8308);
 const CustomElementAlgorithm_1 = __webpack_require__(5075);
@@ -1821,7 +1821,7 @@ exports.event_activateAnEventHandler = event_activateAnEventHandler;
 exports.event_deactivateAnEventHandler = event_deactivateAnEventHandler;
 const DOMImpl_1 = __webpack_require__(698);
 const interfaces_1 = __webpack_require__(9454);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const CustomEventImpl_1 = __webpack_require__(3171);
 const EventImpl_1 = __webpack_require__(2390);
 const DOMException_1 = __webpack_require__(7175);
@@ -2884,7 +2884,7 @@ exports.mutation_remove = mutation_remove;
 const DOMImpl_1 = __webpack_require__(698);
 const DOMException_1 = __webpack_require__(7175);
 const interfaces_1 = __webpack_require__(9454);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const util_2 = __webpack_require__(7061);
 const infra_1 = __webpack_require__(4737);
 const CustomElementAlgorithm_1 = __webpack_require__(5075);
@@ -3883,7 +3883,7 @@ exports.observer_queueMutationRecord = observer_queueMutationRecord;
 exports.observer_queueTreeMutationRecord = observer_queueTreeMutationRecord;
 exports.observer_queueAttributeMutationRecord = observer_queueAttributeMutationRecord;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const infra_1 = __webpack_require__(4737);
 const CreateAlgorithm_1 = __webpack_require__(8308);
 const TreeAlgorithm_1 = __webpack_require__(3532);
@@ -4197,7 +4197,7 @@ exports.node_listOfElementsWithClassNames = node_listOfElementsWithClassNames;
 exports.node_locateANamespacePrefix = node_locateANamespacePrefix;
 exports.node_locateANamespace = node_locateANamespace;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const infra_1 = __webpack_require__(4737);
 const CreateAlgorithm_1 = __webpack_require__(8308);
 const OrderedSetAlgorithm_1 = __webpack_require__(8421);
@@ -4939,7 +4939,7 @@ exports.range_getContainedNodes = range_getContainedNodes;
 exports.range_getPartiallyContainedNodes = range_getPartiallyContainedNodes;
 const interfaces_1 = __webpack_require__(9454);
 const DOMException_1 = __webpack_require__(7175);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const CreateAlgorithm_1 = __webpack_require__(8308);
 const TreeAlgorithm_1 = __webpack_require__(3532);
 const BoundaryPointAlgorithm_1 = __webpack_require__(8652);
@@ -5691,7 +5691,7 @@ exports.shadowTree_assignSlotables = shadowTree_assignSlotables;
 exports.shadowTree_assignSlotablesForATree = shadowTree_assignSlotablesForATree;
 exports.shadowTree_assignASlot = shadowTree_assignASlot;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const util_2 = __webpack_require__(7061);
 const TreeAlgorithm_1 = __webpack_require__(3532);
 const MutationObserverAlgorithm_1 = __webpack_require__(3243);
@@ -5933,7 +5933,7 @@ exports.text_contiguousExclusiveTextNodes = text_contiguousExclusiveTextNodes;
 exports.text_descendantTextContent = text_descendantTextContent;
 exports.text_split = text_split;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const DOMException_1 = __webpack_require__(7175);
 const CreateAlgorithm_1 = __webpack_require__(8308);
 const TreeAlgorithm_1 = __webpack_require__(3532);
@@ -6232,7 +6232,7 @@ exports.tree_lastChild = tree_lastChild;
 exports.tree_treePosition = tree_treePosition;
 exports.tree_index = tree_index;
 exports.tree_retarget = tree_retarget;
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const interfaces_1 = __webpack_require__(9454);
 /**
  * Gets the next descendant of the given node of the tree rooted at `root`
@@ -7718,7 +7718,7 @@ exports.CharacterDataImpl = CharacterDataImpl;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChildNodeImpl = void 0;
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const algorithm_1 = __webpack_require__(6573);
 /**
  * Represents a mixin that extends child nodes that can have siblings
@@ -8800,10 +8800,10 @@ const DOMImpl_1 = __webpack_require__(698);
 const interfaces_1 = __webpack_require__(9454);
 const DOMException_1 = __webpack_require__(7175);
 const NodeImpl_1 = __webpack_require__(2280);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const util_2 = __webpack_require__(7061);
 const infra_1 = __webpack_require__(4737);
-const URLAlgorithm_1 = __webpack_require__(1269);
+const URLAlgorithm_1 = __webpack_require__(3650);
 const algorithm_1 = __webpack_require__(6573);
 const WebIDLAlgorithm_1 = __webpack_require__(4239);
 /**
@@ -10138,7 +10138,7 @@ exports.EventImpl = EventImpl;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EventTargetImpl = void 0;
 const DOMException_1 = __webpack_require__(7175);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const algorithm_1 = __webpack_require__(6573);
 /**
  * Represents a target to which an event can be dispatched.
@@ -10253,7 +10253,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.HTMLCollectionImpl = void 0;
 const infra_1 = __webpack_require__(4737);
 const algorithm_1 = __webpack_require__(6573);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const util_2 = __webpack_require__(7061);
 /**
  * Represents a collection of elements.
@@ -10409,7 +10409,7 @@ exports.HTMLCollectionImpl = HTMLCollectionImpl;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.MutationObserverImpl = void 0;
 const DOMImpl_1 = __webpack_require__(698);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const infra_1 = __webpack_require__(4737);
 /**
  * Represents an object that can be used to observe mutations to the tree of
@@ -10540,7 +10540,7 @@ exports.MutationObserverImpl = MutationObserverImpl;
 
 /***/ }),
 
-/***/ 2414:
+/***/ 33:
 /***/ ((__unused_webpack_module, exports) => {
 
 
@@ -10834,10 +10834,10 @@ exports.NodeImpl = void 0;
 const DOMImpl_1 = __webpack_require__(698);
 const interfaces_1 = __webpack_require__(9454);
 const EventTargetImpl_1 = __webpack_require__(3611);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const DOMException_1 = __webpack_require__(7175);
 const algorithm_1 = __webpack_require__(6573);
-const URLAlgorithm_1 = __webpack_require__(1269);
+const URLAlgorithm_1 = __webpack_require__(3650);
 const WebIDLAlgorithm_1 = __webpack_require__(4239);
 /**
  * Represents a generic XML node.
@@ -12047,7 +12047,7 @@ exports.NodeListStaticImpl = NodeListStaticImpl;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.NonDocumentTypeChildNodeImpl = void 0;
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 /**
  * Represents a mixin that extends child nodes that can have siblings
  * other than doctypes. This mixin is implemented by {@link Element} and
@@ -12096,7 +12096,7 @@ exports.NonDocumentTypeChildNodeImpl = NonDocumentTypeChildNodeImpl;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.NonElementParentNodeImpl = void 0;
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const algorithm_1 = __webpack_require__(6573);
 /**
  * Represents a mixin that extends non-element parent nodes. This mixin
@@ -12131,7 +12131,7 @@ exports.NonElementParentNodeImpl = NonElementParentNodeImpl;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ParentNodeImpl = void 0;
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 const algorithm_1 = __webpack_require__(6573);
 /**
  * Represents a mixin that extends parent nodes that can have children.
@@ -12301,7 +12301,7 @@ const AbstractRangeImpl_1 = __webpack_require__(3773);
 const DOMException_1 = __webpack_require__(7175);
 const algorithm_1 = __webpack_require__(6573);
 const WebIDLAlgorithm_1 = __webpack_require__(4239);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 /**
  * Represents a live range.
  */
@@ -12981,7 +12981,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.StaticRangeImpl = void 0;
 const AbstractRangeImpl_1 = __webpack_require__(3773);
 const DOMException_1 = __webpack_require__(7175);
-const util_1 = __webpack_require__(628);
+const util_1 = __webpack_require__(8247);
 /**
  * Represents a static range.
  */
@@ -13472,7 +13472,7 @@ const HTMLCollectionImpl_1 = __webpack_require__(9065);
 Object.defineProperty(exports, "HTMLCollection", ({ enumerable: true, get: function () { return HTMLCollectionImpl_1.HTMLCollectionImpl; } }));
 const MutationObserverImpl_1 = __webpack_require__(9137);
 Object.defineProperty(exports, "MutationObserver", ({ enumerable: true, get: function () { return MutationObserverImpl_1.MutationObserverImpl; } }));
-const MutationRecordImpl_1 = __webpack_require__(2414);
+const MutationRecordImpl_1 = __webpack_require__(33);
 Object.defineProperty(exports, "MutationRecord", ({ enumerable: true, get: function () { return MutationRecordImpl_1.MutationRecordImpl; } }));
 const NamedNodeMapImpl_1 = __webpack_require__(3145);
 Object.defineProperty(exports, "NamedNodeMap", ({ enumerable: true, get: function () { return NamedNodeMapImpl_1.NamedNodeMapImpl; } }));
@@ -16028,7 +16028,7 @@ Object.defineProperty(exports, "XMLSerializer", ({ enumerable: true, get: functi
 
 /***/ }),
 
-/***/ 7405:
+/***/ 9786:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
@@ -16308,13 +16308,13 @@ exports.Guard = Guard;
 
 /***/ }),
 
-/***/ 628:
+/***/ 8247:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EmptySet = exports.Guard = exports.Cast = void 0;
-var Cast_1 = __webpack_require__(7405);
+var Cast_1 = __webpack_require__(9786);
 Object.defineProperty(exports, "Cast", ({ enumerable: true, get: function () { return Cast_1.Cast; } }));
 var Guard_1 = __webpack_require__(7773);
 Object.defineProperty(exports, "Guard", ({ enumerable: true, get: function () { return Guard_1.Guard; } }));
@@ -16433,7 +16433,7 @@ function isASCIIByte(byte) {
 
 /***/ }),
 
-/***/ 4398:
+/***/ 2017:
 /***/ ((__unused_webpack_module, exports) => {
 
 
@@ -17568,7 +17568,7 @@ exports.splitAStringOnASCIIWhitespace = splitAStringOnASCIIWhitespace;
 exports.splitAStringOnCommas = splitAStringOnCommas;
 exports.concatenate = concatenate;
 const CodePoints_1 = __webpack_require__(4467);
-const ByteSequence_1 = __webpack_require__(4398);
+const ByteSequence_1 = __webpack_require__(2017);
 const Byte_1 = __webpack_require__(8311);
 const util_1 = __webpack_require__(7061);
 /**
@@ -18008,7 +18008,7 @@ const base64 = __importStar(__webpack_require__(9558));
 exports.base64 = base64;
 const byte = __importStar(__webpack_require__(8311));
 exports.byte = byte;
-const byteSequence = __importStar(__webpack_require__(4398));
+const byteSequence = __importStar(__webpack_require__(2017));
 exports.byteSequence = byteSequence;
 const codePoint = __importStar(__webpack_require__(4467));
 exports.codePoint = codePoint;
@@ -18032,7 +18032,7 @@ exports.string = string;
 
 /***/ }),
 
-/***/ 1269:
+/***/ 3650:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
@@ -25589,9 +25589,9 @@ exports.fragment = fragment;
 exports.convert = convert;
 const interfaces_1 = __webpack_require__(5385);
 const util_1 = __webpack_require__(7061);
-const util_2 = __webpack_require__(628);
+const util_2 = __webpack_require__(8247);
 const _1 = __webpack_require__(957);
-const dom_1 = __webpack_require__(5250);
+const dom_1 = __webpack_require__(2869);
 /** @inheritdoc */
 function builder(p1, p2) {
     const options = formatBuilderOptions(isXMLBuilderCreateOptions(p1) ? p1 : interfaces_1.DefaultBuilderOptions);
@@ -25736,7 +25736,7 @@ const algorithm_1 = __webpack_require__(6573);
 const infra_1 = __webpack_require__(4737);
 const NamespacePrefixMap_1 = __webpack_require__(8377);
 const LocalNameSet_1 = __webpack_require__(7830);
-const util_2 = __webpack_require__(628);
+const util_2 = __webpack_require__(8247);
 const XMLCBWriter_1 = __webpack_require__(9341);
 const JSONCBWriter_1 = __webpack_require__(6108);
 const YAMLCBWriter_1 = __webpack_require__(2233);
@@ -26423,9 +26423,9 @@ const interfaces_1 = __webpack_require__(5385);
 const util_1 = __webpack_require__(7061);
 const writers_1 = __webpack_require__(2062);
 const interfaces_2 = __webpack_require__(9454);
-const util_2 = __webpack_require__(628);
+const util_2 = __webpack_require__(8247);
 const algorithm_1 = __webpack_require__(6573);
-const dom_1 = __webpack_require__(5250);
+const dom_1 = __webpack_require__(2869);
 const infra_1 = __webpack_require__(4737);
 const readers_1 = __webpack_require__(8526);
 /**
@@ -27160,7 +27160,7 @@ exports.XMLBuilderImpl = XMLBuilderImpl;
 
 /***/ }),
 
-/***/ 5250:
+/***/ 2869:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
@@ -27373,7 +27373,7 @@ exports.DefaultXMLBuilderCBOptions = {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BaseReader = void 0;
-const dom_1 = __webpack_require__(5250);
+const dom_1 = __webpack_require__(2869);
 /**
  * Parses XML nodes.
  */
@@ -30471,7 +30471,7 @@ exports.XMLWriter = void 0;
 const util_1 = __webpack_require__(7061);
 const interfaces_1 = __webpack_require__(9454);
 const BaseWriter_1 = __webpack_require__(4726);
-const util_2 = __webpack_require__(628);
+const util_2 = __webpack_require__(8247);
 /**
  * Serializes XML nodes into strings.
  */
