@@ -45779,6 +45779,38 @@ class AbortError extends RequestError {
         }
     }
 }
+/**
+An error to be thrown when the response body does not match the [Standard Schema](https://standardschema.dev) validator passed to `.json(schema)`. Includes an `issues` property with the issues from the schema. Each issue has a `message` and an optional `path`.
+
+It intentionally does not extend `RequestError`, because the request succeeded. The user-provided schema did not accept the data, so it has no `code`, `options`, `request`, `response` or `timings` property, and it is not passed to `beforeError` hooks.
+
+@example
+```
+import got, {SchemaValidationError} from 'got';
+import {z} from 'zod';
+
+const userSchema = z.object({name: z.string()});
+
+try {
+    const user = await got('https://example.com/user').json(userSchema);
+    console.log(user.name);
+} catch (error) {
+    if (error instanceof SchemaValidationError) {
+        console.error(error.issues);
+    } else {
+        throw error;
+    }
+}
+```
+*/
+class SchemaValidationError extends Error {
+    name = 'SchemaValidationError';
+    issues;
+    constructor(issues) {
+        super('Response schema validation failed');
+        this.issues = issues;
+    }
+}
 
 ;// CONCATENATED MODULE: external "node:process"
 const external_node_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:process");
@@ -49344,6 +49376,7 @@ const parseBody = (response, responseType, parseJson, encoding) => {
             return cachedDecodedBody ?? decodeUint8Array(rawBody, encoding);
         }
         if (responseType === 'json') {
+            // TODO: In the next major version, return `undefined` instead of `''` for an empty body, to match Ky. This affects `.json()`, `.json(schema)`, and `responseType: 'json'`. Also decide whether a custom `parseJson` should be called with `''` (Ky calls it).
             if (rawBody.length === 0) {
                 return '';
             }
@@ -53271,6 +53304,8 @@ class Options {
 
     It's like setting the options to `{responseType: 'json', resolveBodyOnly: true}` but without affecting the main Got promise.
 
+    `.json()` also accepts a [Standard Schema](https://standardschema.dev) validator, in which case the promise resolves with the output of the schema.
+
     __Note__: When using streams, this option is ignored.
 
     @example
@@ -56209,6 +56244,18 @@ const as_promise_proxiedRequestEvents = [
     'uploadProgress',
     'downloadProgress',
 ];
+const validateWithSchema = async (value, schema) => {
+    // JavaScript users can pass anything, so check the shape before calling into the schema.
+    const standardSchema = distribution.object(schema) ? schema['~standard'] : undefined;
+    if (!distribution.object(standardSchema) || typeof standardSchema.validate !== 'function') {
+        throw new TypeError('The `schema` argument must follow the Standard Schema specification');
+    }
+    const validationResult = await standardSchema.validate(value);
+    if (validationResult.issues) {
+        throw new SchemaValidationError(validationResult.issues);
+    }
+    return validationResult.value;
+};
 function asPromise(firstRequest) {
     let globalRequest;
     let globalResponse;
@@ -56394,7 +56441,7 @@ function asPromise(firstRequest) {
             return this;
         };
     }
-    const shortcut = (promiseToAwait, responseType) => {
+    const shortcut = (promiseToAwait, responseType, schema) => {
         const newPromise = (async () => {
             // Wait until downloading has ended
             const response = await promiseToAwait;
@@ -56405,7 +56452,14 @@ function asPromise(firstRequest) {
             const { options } = globalResponse.request;
             // `parseBody` wraps a decode failure in a `ParseError`, so an unusable encoding is
             // reported with the response attached instead of as a bare `TypeError`.
-            return parseBody(globalResponse, responseType, options.parseJson, options.encoding);
+            const body = parseBody(globalResponse, responseType, options.parseJson, options.encoding);
+            if (schema === undefined) {
+                return body;
+            }
+            // Awaiting instead of returning the validation promise keeps the caller's frame in the
+            // async stack trace of a `SchemaValidationError`.
+            const validatedBody = await validateWithSchema(body, schema);
+            return validatedBody;
         })();
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         Object.defineProperties(newPromise, Object.getOwnPropertyDescriptors(promiseToAwait));
@@ -56415,14 +56469,14 @@ function asPromise(firstRequest) {
     // When custom handlers wrap the promise to transform errors, these methods
     // are copied to the handler's promise. Using `this` ensures we await the
     // handler's wrapped promise, not the original, so errors propagate correctly.
-    promise.json = function () {
+    promise.json = function (schema) {
         if (globalRequest.options) {
             const { headers } = globalRequest.options;
             if (!globalRequest.writableFinished && !('accept' in headers)) {
                 headers.accept = 'application/json';
             }
         }
-        return shortcut(this, 'json');
+        return shortcut(this, 'json', schema);
     };
     promise.buffer = function () {
         return shortcut(this, 'buffer');
